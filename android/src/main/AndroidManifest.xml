@@ -1,0 +1,27 @@
+
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="ie.gov.tracing">
+
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+    <uses-feature android:name="android.hardware.bluetooth" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+
+    <application
+        android:allowBackup="false"
+        android:supportsRtl="true">
+
+        <!-- Receivers -->
+        <receiver
+            android:name=".nearby.ExposureNotificationBroadcastReceiver"
+            android:permission="com.google.android.gms.nearby.exposurenotification.EXPOSURE_CALLBACK"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.exposurenotification.ACTION_EXPOSURE_STATE_UPDATED" />
+                <action android:name="com.google.android.gms.exposurenotification.ACTION_REQUEST_DIAGNOSIS_KEYS" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

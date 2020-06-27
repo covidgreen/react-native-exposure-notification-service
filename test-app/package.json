@@ -1,0 +1,37 @@
+{
+  "main": "index.js",
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "web": "expo start --web",
+    "start": "react-native start",
+    "reinstall": "yarn remove react-native-exposure-notification-service && yarn add file:../ && yarn pod",
+    "pod": "cd ios && rm -rf Pods && pod install && cd ..",
+    "test": "jest"
+  },
+  "dependencies": {
+    "expo": "~37.0.3",
+    "expo-updates": "~0.2.0",
+    "react-dom": "~16.9.0",
+    "react": "16.11.0",
+    "react-native": "0.62.2",
+    "react-native-exposure-notification-service": "file:../",
+    "react-native-gesture-handler": "~1.6.0",
+    "react-native-reanimated": "~1.7.0",
+    "react-native-screens": "~2.2.0",
+    "react-native-unimodules": "~0.9.0",
+    "react-native-web": "~0.11.7"
+  },
+  "devDependencies": {
+    "@babel/core": "~7.9.0",
+    "@types/react": "~16.9.23",
+    "@types/react-native": "^0.62.0",
+    "babel-preset-expo": "~8.1.0",
+    "jest-expo": "~37.0.0",
+    "typescript": "~3.8.3"
+  },
+  "jest": {
+    "preset": "react-native"
+  },
+  "private": true
+}
