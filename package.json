@@ -19,10 +19,19 @@
     "native-module"
   ],
   "author": {
-    "name": "Health Service Executive (HSE)",
-    "email": "yourname@email.com"
+    "name": "Health Service Executive (HSE)"
   },
-  "license": "MIT",
+  "contributors": [
+    "Colm Harte <colm.harte@nearform.com>",
+    "James M Snell <jasnell@gmail.com>",
+    "Gar Mac Críosta <gar.maccriosta@hse.ie>",
+    "Shaun Baker <shaun.baker@nearform.com>",
+    "Paul Negrutiu <paul.negrutiu@nearform.com>",
+    "Jack Clark <jack.clark@nearform.com>",
+    "Andrea Forni <andrea.forni@nearform.com>",
+    "Jack Murdoch <jack.murdoch@nearform.com>"
+  ],
+  "license": "Apache-2.0",
   "readmeFilename": "README.md",
   "peerDependencies": {
     "react": "16.11.0",

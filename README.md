@@ -1,7 +1,7 @@
 # React Native Exposure Notification Service
 
-React Native Exposure Notification Service is a react native module, which provides a common interface to 
-Apple/Google's Exposure Notification APIs
+React Native Exposure Notification Service is a react native module, which provides a common interface to
+Apple/Google's Exposure Notification APIs.
 
 For more on contact tracing see:
 - https://www.google.com/covid19/exposurenotifications/
@@ -20,7 +20,7 @@ For more on contact tracing see:
 
 To integrate with your react-native app, edit your apps package.json and add the following dependency:
 
-```json 
+```json
 {
     "dependencies": {
         "react-native-exposure-notification-service": "git+https://github.com/nearform/react-native-exposure-notification.git"
@@ -45,7 +45,7 @@ On Android there are no further steps.
 CocoaPods on iOS needs this extra step:
 
 ```
-cd ios && pod install && cd .. 
+cd ios && pod install && cd ..
 ````
 
 
@@ -89,7 +89,7 @@ Used to check if the device has the contact tracing APIs installed. This returns
 const enabled = await ExposureNotificationModule.exposureEnabled()
 ```
 
-Use to check if the contact tracing is enabled. This returns a promise that resolves with true if contact tracing is enabled. 
+Use to check if the contact tracing is enabled. This returns a promise that resolves with true if contact tracing is enabled.
 
 **Note:** On android, if enabled is true, tracing has started.
 
@@ -123,13 +123,13 @@ ExposureNotificationModule.configure(options)
 
 Use to configure the module. This method is synchronous, and should be called before start etc. It takes an options object as a parameter with the following properties:
 
-- `exposureCheckFrequency`: a number representing the period between exposure downloads in minutes 
+- `exposureCheckFrequency`: a number representing the period between exposure downloads in minutes
 - `serverURL`: a string representing the the server api url (should not have trailing /)
 - `authToken`: a string representing the current authorization token
 - `refreshToken`: a string representing a token used to refresh the authorization token
 - `storeExposuresFor`: a number representing the number of days to store data for
 - `fileLimit`: a number representing the file limit
-- `version`: a string representing the app version number 
+- `version`: a string representing the app version number
 - `notificationTitle`: a string representing the title for positive exposure notifications popup,
 - `notificationDesc`: a string representing the description for positive exposure notifications popup,
 - `callbackNumber`: a string representing the phone number of a user if opted into automatic callback on positive exposure notification,
@@ -159,7 +159,7 @@ Used to get the current start status.  This method returns a promise that resolv
 
 The state can return as `active`, `disabled`, `unavailable` or `unknown`, and if set to `disabled` will contain the type presenting the reason why.
 
-State changes also trigger the event `onStatusChanged`. 
+State changes also trigger the event `onStatusChanged`.
 
 ---
 
@@ -211,7 +211,7 @@ Used to retrieve a devices own diagnosis keys (typically all keys before today w
 ExposureNotificationModule.checkExposure()
 ```
 
-Used to manually check exposure during testing.  Typically checkExposure is performed in background on schedule specified in configure. 
+Used to manually check exposure during testing.  Typically checkExposure is performed in background on schedule specified in configure.
 This facilitates an immediate check.
 
 On successful matches, this will raise a notification to the user, and also raise an `exposure` event to the app
@@ -265,7 +265,7 @@ useEffect(() => {
         }
 
         // handle other events...
-    }        
+    }
 
     const subscription = emitter.addListener('exposureEvent', handleEvent)
 
@@ -326,9 +326,9 @@ When building/running an app using the native module, several issues can arise.
 
 #### Google Play Services (Exposure Notifications)
 
-The Exposure Notification API provided by Google uses the Nearby API installed with Google Play Services. 
+The Exposure Notification API provided by Google uses the Nearby API installed with Google Play Services.
 
-This API is being rolled out by Google so that as many devices as possible support the API. 
+This API is being rolled out by Google so that as many devices as possible support the API.
 
 The minimum android version required is 23 (marshmallow).
 
@@ -347,7 +347,7 @@ To keep required classes from being obfuscated, edit you `proguard-rules.pro` an
 ```
 -keep public class com.horcrux.svg.** {*;}
 -keep class com.google.crypto.tink.** { *; }
--keep class net.sqlcipher.** { *; } 
+-keep class net.sqlcipher.** { *; }
 -keep class net.sqlcipher.database.* { *; }
 -keep class * extends androidx.room.RoomDatabase
 -keep class * extends com.google.auto
@@ -366,7 +366,7 @@ You can link to commit using `#<commit>` at the end of the git reference, or add
 
 eg.
 
-```json 
+```json
 {
     "dependencies": {
         "react-native-exposure-notification": "git+https://github.com/nearform/react-native-exposure-notification.git#semver:^1.0"
@@ -390,8 +390,42 @@ yarn add file:<path-to-module>`
 
 In order to upload/download diagnosis keys for exposure notifications, an applications using this module needs to connect to a server that accepts upload of tokens, and packages them into valid export zip files.
 
+## Team
+
+### Lead Maintainers
+
+* @colmharte - Colm Harte <colm.harte@nearform.com>
+* @jasnell - James M Snell <jasnell@gmail.com>
+* @aspiringarc - Gar Mac Críosta <gar.maccriosta@hse.ie>
+
+### Core Team
+
+* @ShaunBaker - Shaun Baker <shaun.baker@nearform.com>
+* @floridemai - Paul Negrutiu <paul.negrutiu@nearform.com>
+* @jackdclark - Jack Clark <jack.clark@nearform.com>
+* @andreaforni - Andrea Forni <andrea.forni@nearform.com>
+* @jackmurdoch - Jack Murdoch <jack.murdoch@nearform.com>
+
+### Contributors
+
+* TBD
+* TBD
+
+### Past Contributors
+
+* TBD
+* TBD
+
+## Hosted By
+
+<img alttext="Linux Foundation Public Health Logo" src="https://www.lfph.io/wp-content/themes/cncf-theme/images/lfph/faces-w_2000.png" width="100">
+
+[Linux Foundation Public Health](https://lfph.io)
+
+## Acknowledgements
+
+<a href="https://www.hse.ie"><img alttext="HSE Ireland Logo" src="https://www.hse.ie/images/hse.jpg" width="200" /></a><a href="https://nearform.com"><img alttext="NearForm Logo" src="https://openjsf.org/wp-content/uploads/sites/84/2019/04/nearform.png" width="400" /></a>
+
 ## License
 
-React Native Exposure Notification is MIT licensed, as found in the [LICENSE][l] file.
-
-[l]: https://github.com/nearform/react-native-exposure-notification/blob/add-mit-license/LICENSE
+Licensed under [Apache v2.0](LICENSE)
