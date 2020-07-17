@@ -1,3 +1,5 @@
+<img alttext="COVID Green Logo" src="https://github.com/covidgreen/covid-green-assets/raw/current/covidgreen-stacked-color.svg" width="400" />
+
 # React Native Exposure Notification Service
 
 React Native Exposure Notification Service is a react native module, which provides a common interface to
