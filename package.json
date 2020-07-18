@@ -1,17 +1,17 @@
 {
   "name": "react-native-exposure-notification-service",
   "title": "React Native Exposure Notification Service",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "React native module providing a common interface to Apple/Google's Exposure Notification APIs",
   "main": "index.js",
   "repository": {
     "repository": {
       "type": "git",
-      "url": "git+https://github.com/HSEIreland/react-native-exposure-notification-service.git",
-      "baseUrl": "https://github.com/HSEIreland/react-native-exposure-notification-service"
+      "url": "git+https://github.com/covidgreen/react-native-exposure-notification-service.git",
+      "baseUrl": "https://github.com/covidgreen/react-native-exposure-notification-service"
     }
   },
-  "homepage": "https://github.com/HSEIreland/react-native-exposure-notification-service",
+  "homepage": "https://github.com/covidgreen/react-native-exposure-notification-service",
   "keywords": [
     "react-native",
     "exposure-notification",
