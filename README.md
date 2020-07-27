@@ -410,7 +410,7 @@ In order to upload/download diagnosis keys for exposure notifications, an applic
 
 ### Contributors
 
-* @moogster31 - Katie Roberts <katie.roberts@geekworld.co>
+* @moogster31 - Katie Roberts <katie@geekworld.co>
 * TBD
 
 ### Past Contributors
