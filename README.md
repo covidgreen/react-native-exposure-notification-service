@@ -11,11 +11,11 @@ For more on contact tracing see:
 
 ## Contents
 
-- [Getting Started](#getting-started)
-- [Usage](#usage)
-- [Test Application](#test-application)
-- [Caveats](#caveats)
-- [License](#license)
+- [Getting Started](#-getting-started)
+- [Usage](#-usage)
+- [Test Application](#-test-application)
+- [Caveats](#-caveats)
+- [License](#-license)
 
 
 ## Getting started
