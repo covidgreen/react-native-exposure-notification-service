@@ -11,11 +11,11 @@ For more on contact tracing see:
 
 ## Contents
 
-- [Getting Started](#-getting-started)
-- [Usage](#-usage)
-- [Test Application](#-test-application)
-- [Caveats](#-caveats)
-- [License](#-license)
+- [Getting Started](#getting-started)
+- [Usage](#usage)
+- [Test Application](#test-application)
+- [Caveats](#caveats)
+- [License](#license)
 
 
 ## Getting started
@@ -410,7 +410,7 @@ In order to upload/download diagnosis keys for exposure notifications, an applic
 
 ### Contributors
 
-* TBD
+* @moogster31 - Katie Roberts <katie@geekworld.co>
 * TBD
 
 ### Past Contributors
