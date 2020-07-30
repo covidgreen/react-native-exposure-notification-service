@@ -1,7 +1,7 @@
 {
   "name": "react-native-exposure-notification-service",
   "title": "React Native Exposure Notification Service",
-  "version": "1.0.5",
+  "version": "1.1.15",
   "description": "React native module providing a common interface to Apple/Google's Exposure Notification APIs",
   "main": "index.js",
   "repository": {
@@ -19,7 +19,7 @@
     "native-module"
   ],
   "author": {
-    "name": "Health Service Executive (HSE)"
+    "HSE Ireland": "Health Service Executive (HSE)"
   },
   "contributors": [
     "Colm Harte <colm.harte@nearform.com>",
