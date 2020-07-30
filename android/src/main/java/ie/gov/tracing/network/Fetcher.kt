@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.annotation.Keep
 import com.google.common.io.BaseEncoding
 import com.google.gson.Gson
+import ie.gov.tracing.Tracing
 import ie.gov.tracing.common.Events
+import ie.gov.tracing.storage.ExpoSecureStoreInterop
 import ie.gov.tracing.storage.ExposureEntity
 import ie.gov.tracing.storage.SharedPrefs
 import org.apache.commons.io.FileUtils
@@ -22,6 +24,10 @@ data class Callback(val mobile: String, val closeContactDate: Long, val payload:
 
 @Keep
 data class Metric(val os: String, val event: String, val version: String, val payload: Map<String, Any>?)
+
+@Keep
+data class CallbackRecovery(val mobile:String, val code: String, val iso: String,val number: String)
+
 
 class Fetcher {
 
@@ -186,7 +192,8 @@ class Fetcher {
         fun triggerCallback(exposureEntity: ExposureEntity, context: Context, payload: Map<String, Any>) {
             try {
                 val notificationSent = SharedPrefs.getLong("notificationSent", context)
-                val callbackNum = SharedPrefs.getString("callbackNumber", context)
+                var callbackNum = SharedPrefs.getString("callbackNumber", context)
+
 
                 if (notificationSent > 0) {
                     Events.raiseEvent(Events.INFO, "triggerCallback - notification " +
@@ -195,9 +202,29 @@ class Fetcher {
                 }
 
                 if (callbackNum.isEmpty()) {
-                    Events.raiseEvent(Events.INFO, "triggerCallback - no callback number " +
-                            "set, not sending callback")
-                    return
+
+                    try {
+                        val store = ExpoSecureStoreInterop(context)
+                        val jsonStr = store.getItemImpl("cti.callBack")
+                        val callBackData = Gson().fromJson(jsonStr, CallbackRecovery::class.java)
+
+                        if(callBackData.code == null || callBackData.number == null){
+                            Events.raiseEvent(Events.INFO, "triggerCallback - no callback recovery")
+                            return;
+                        }
+                        callbackNum = callBackData.code +  callBackData.number
+
+
+                    } catch (exExpo: Exception) {
+                        Events.raiseError("ExpoSecureStoreInterop", exExpo)
+                    }
+
+                    if (callbackNum.isEmpty()) {
+
+                        Events.raiseEvent(Events.INFO, "triggerCallback - no callback number " +
+                                "set, not sending callback")
+                        return
+                    }
                 }
 
                 val dayInMs = 1000 * 60 * 60 * 24

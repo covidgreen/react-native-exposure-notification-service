@@ -59,7 +59,7 @@ public class ExposureNotificationClientWrapper {
   }
 
   Task<Void> provideDiagnosisKeys(List<File> files, String token) {
-    String settings = Fetcher.fetch("/settings", false, appContext);
+    String settings = Fetcher.fetch("/settings/exposures", false, appContext);
     Gson gson = new Gson();
     Map map = gson.fromJson(settings, Map.class);
 
