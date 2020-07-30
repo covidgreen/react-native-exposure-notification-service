@@ -53,7 +53,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
         notificationDesc: configDict["notificationDesc"] as? String ?? "The COVID Tracker App has detected that you may have been exposed to someone who has tested positive for COVID-19.",
         authToken: token,
         version: (configDict["version"] as? String ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)!,
-        fileLimit: configDict["fileLimit"] as? Int ?? 10,
+        fileLimit: configDict["fileLimit"] as? Int ?? 3,
         callbackNumber: configDict["callbackNumber"] as? String ?? "",
         analyticsOptin: configDict["analyticsOptin"] as? Bool ?? false
       )
@@ -174,9 +174,9 @@ public class ExposureNotificationModule: RCTEventEmitter {
         }
     }
      
-    @objc public func checkExposure(_ readExposureDetails: Bool) {
+    @objc public func checkExposure(_ readExposureDetails: Bool, _ skipTimeCheck: Bool) {
         if #available(iOS 13.5, *) {
-            ExposureProcessor.shared.checkExposureForeground(readExposureDetails)
+            ExposureProcessor.shared.checkExposureForeground(readExposureDetails, skipTimeCheck)
         }
     }
      

@@ -245,7 +245,7 @@ public class ExposureProcessor {
         os_log("Registering background task", log: OSLog.exposure, type: .debug)
     }
     
-    public func checkExposureBackground(_ task: BGTask) {
+    private func checkExposureBackground(_ task: BGTask) {
        os_log("Running exposure check in background", log: OSLog.exposure, type: .debug)
        let queue = OperationQueue()
        queue.maxConcurrentOperationCount = 1
@@ -265,11 +265,11 @@ public class ExposureProcessor {
        }
     }
     
-    public func checkExposureForeground(_ exposureDetails: Bool) {
+    public func checkExposureForeground(_ exposureDetails: Bool, _ skipTimeCheck: Bool) {
        os_log("Running exposure check in foreground", log: OSLog.exposure, type: .debug)
        let queue = OperationQueue()
        queue.maxConcurrentOperationCount = 1
-       queue.addOperation(ExposureCheck(true, exposureDetails))
+       queue.addOperation(ExposureCheck(skipTimeCheck, exposureDetails))
 
        let lastOperation = queue.operations.last
        lastOperation?.completionBlock = {
@@ -277,7 +277,7 @@ public class ExposureProcessor {
        }
     }
     
-    public func scheduleCheckExposure() {
+    private func scheduleCheckExposure() {
       let context = Storage.PersistentContainer.shared.newBackgroundContext()
       guard ENManager.authorizationStatus == .authorized else {
            os_log("Not authorised so can't schedule exposure checks", log: OSLog.exposure, type: .info)

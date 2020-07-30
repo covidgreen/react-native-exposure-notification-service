@@ -61,7 +61,7 @@ class ExposureCheck: AsyncOperation {
         case .callback:
           return self.configData.serverURL + "/callback"
         case .settings:
-          return self.configData.serverURL + "/settings"
+          return self.configData.serverURL + "/settings/exposures"
         case .refresh:
           return self.configData.serverURL + "/refresh"
       }
@@ -98,7 +98,11 @@ class ExposureCheck: AsyncOperation {
           self.finishNoProcessing("No config set so can't proceeed with checking exposures")
           return
        }
-       self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)))
+    
+       let serverDomain: String = getDomain(self.configData.serverURL)
+       let manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
+       self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)), serverTrustManager: manager)
+        
        os_log("Running with params %@, %@, %@", log: OSLog.checkExposure, type: .debug, self.configData.serverURL, self.configData.authToken, self.configData.refreshToken)
        
        guard (self.configData.lastRunDate!.addingTimeInterval(TimeInterval(self.configData.checkExposureInterval * 60)) < Date() || self.skipTimeCheck) else {
@@ -125,11 +129,17 @@ class ExposureCheck: AsyncOperation {
        }
     }
     
+    private func getDomain(_ url: String) -> String {
+        let url = URL(string: url)
+        return url!.host!
+    }
+    
     private func finishNoProcessing(_ message: String) {
       os_log("%@", log: OSLog.checkExposure, type: .info, message)
 
       Storage.shared.updateRunData(self.storageContext, message)
-      self.finish()
+        
+      self.trackDailyMetrics()
     }
   
     private func processExposures(_ files: [URL], _ lastIndex: Int) {
@@ -224,8 +234,8 @@ class ExposureCheck: AsyncOperation {
           
           let durations:[Int] = exposures.customAttenuationDurations ?? exposures.attenuationDurations
           
-          guard durations.count == 3, thresholds.thresholdWeightings.count == 3 else {
-            Storage.shared.updateRunData(self.storageContext, "Failure processing exposure keys, Durations or threshold not an array of 3 elements")
+          guard thresholds.thresholdWeightings.count >= durations.count else {
+            Storage.shared.updateRunData(self.storageContext, "Failure processing exposure keys, thresholds not correctly defined")
             return self.trackDailyMetrics()
           }
           
@@ -234,7 +244,7 @@ class ExposureCheck: AsyncOperation {
             contactTime += Int(Double(element) * thresholds.thresholdWeightings[index])
           }
           
-          os_log("Calculated contact time, %d, %d, %d, %d, %d", log: OSLog.checkExposure, type: .debug, durations[0], durations[1], durations[2], contactTime, thresholds.timeThreshold)
+          os_log("Calculated contact time, %@, %d, %d", log: OSLog.checkExposure, type: .debug, durations.map { String($0) }, contactTime, thresholds.timeThreshold)
           
           if contactTime >= thresholds.timeThreshold && exposures.maximumRiskScoreFullRange > 0 {
              os_log("Detected exposure event", log: OSLog.checkExposure, type: .info)
@@ -256,13 +266,15 @@ class ExposureCheck: AsyncOperation {
     }
   
     private func trackDailyMetrics() {
-      let calendar = Calendar.current
-      
-      guard let dailyTrace = self.configData.dailyTrace else {
+      guard self.configData != nil else {
+        // don't track daily trace if config not setup
         return self.finish()
       }
-             
-      if (!self.isCancelled && !calendar.isDate(Date(), inSameDayAs: dailyTrace)) {
+        
+      let calendar = Calendar.current
+      let checkDate: Date = self.configData.dailyTrace ?? calendar.date(byAdding: .day, value: -2, to: Date())!
+        
+      if (!self.isCancelled && !calendar.isDate(Date(), inSameDayAs: checkDate)) {
          Storage.shared.updateDailyTrace(self.storageContext, date: Date())
          self.saveMetric(event: "DAILY_ACTIVE_TRACE") { _ in
            self.finish()

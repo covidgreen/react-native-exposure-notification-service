@@ -108,7 +108,7 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void checkExposure(Boolean readExposureDetails) {
+    public void checkExposure(Boolean readExposureDetails, Boolean skipTimeCheck) {
         if(nearbyNotSupported()) return;
         Tracing.checkExposure(readExposureDetails);
     }

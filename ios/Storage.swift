@@ -26,6 +26,11 @@ public class Storage {
         var lastRunDate: Date?
     }
     
+    private struct CodableCallback: Decodable {
+        let code: String
+        let number: String
+    }
+    
     public static let shared = Storage()
     
     public func readSettings(_ context: NSManagedObjectContext) -> Config! {
@@ -38,10 +43,18 @@ public class Storage {
          if data.count > 0 {
             let keychain = KeychainSwift()
           
-            let callbackNum = keychain.get("nm:callbackNumber") ?? ""
+            let callbackData = keychain.get("cti.callBack") ?? "{\"code\":\"\",\"number\":\"\"}"
+            let callBack = try JSONDecoder().decode(CodableCallback.self, from: callbackData.data(using: .utf8)!)
+            
+            var callbackNum = keychain.get("nm:callbackNumber") ?? ""
+            if callbackNum.isEmpty {
+                callbackNum = "\(callBack.code)\(callBack.number)"
+            }
             let authToken = keychain.get("nm:authToken") ?? ""
             let refreshToken = keychain.get("nm:refreshToken") ?? ""
             let defaultDate = Date().addingTimeInterval(-1*24*60*60)
+            
+            
             settings = Config(
               refreshToken:refreshToken,
               serverURL: data[0].value(forKey: "serverURL") as! String,
