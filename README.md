@@ -665,8 +665,9 @@ In order to upload/download diagnosis keys for exposure notifications, an applic
 
 ### Contributors
 
-* @moogster31 - Katie Roberts <katie@geekworld.co>
-* TBD
+* @dennisgove - Dennis Gove <dgove1@bloomberg.net>
+* @dharding - David J Harding <davidjasonharding@gmail.com>
+* @fiacc - Fiac O'Brien Moran <fiacc.obrienmoran@nearform.com>
 
 ### Past Contributors
 
