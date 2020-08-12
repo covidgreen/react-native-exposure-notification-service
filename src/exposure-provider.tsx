@@ -19,7 +19,8 @@ import ExposureNotification, {
   AuthorisedStatus,
   StatusState,
   Status,
-  CloseContact
+  CloseContact,
+  StatusType
 } from './exposure-notification-module';
 
 import {getPermissions, requestPermissions} from './utils/permissions';
@@ -63,7 +64,8 @@ export interface ExposureContextValue extends State {
 
 const initialState = {
   status: {
-    state: StatusState.unknown
+    state: StatusState.unavailable,
+    type: StatusType.initialising
   },
   supported: false,
   canSupport: false,
@@ -128,6 +130,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   const [state, setState] = useState<State>(initialState);
   const unknownStatusTimer = useRef<any>(null);
 
+  let subscription = emitter.addListener('exposureEvent', handleEvent);
+
   useEffect(() => {
     function handleEvent(
       ev: {onStatusChanged?: Status; status?: any; scheduledTask?: any} = {}
@@ -138,7 +142,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       }
     }
 
-    let subscription = emitter.addListener('exposureEvent', handleEvent);
 
     const listener = (type: AppStateStatus) => {
       if (type === 'active') {
