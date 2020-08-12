@@ -130,8 +130,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   const [state, setState] = useState<State>(initialState);
   const unknownStatusTimer = useRef<any>(null);
 
-  let subscription = emitter.addListener('exposureEvent', handleEvent);
-
   useEffect(() => {
     function handleEvent(
       ev: {onStatusChanged?: Status; status?: any; scheduledTask?: any} = {}
@@ -142,6 +140,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       }
     }
 
+    let subscription = emitter.addListener('exposureEvent', handleEvent);
 
     const listener = (type: AppStateStatus) => {
       if (type === 'active') {
