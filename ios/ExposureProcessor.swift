@@ -90,8 +90,12 @@ public class ExposureProcessor {
             result["type"] = ["bluetooth"]
         case .restricted:
             result["state"] = "restricted"
+        case .paused:
+            result["state"] = "disabled"
+            result["type"] = "paused"
         default:
             result["state"] = "unavailable"
+            result["type"] = "initialising"
       }
       os_log("Status is %d", log: OSLog.checkExposure, type: .debug, ExposureManager.shared.manager.exposureNotificationStatus.rawValue)
       

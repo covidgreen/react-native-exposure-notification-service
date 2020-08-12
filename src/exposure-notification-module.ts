@@ -36,6 +36,7 @@ export interface CloseContact {
 }
 
 export enum StatusState {
+  unavailable = 'unavailable',
   unknown = 'unknown',
   restricted = 'restricted',
   disabled = 'disabled',
@@ -45,7 +46,9 @@ export enum StatusState {
 export enum StatusType {
   bluetooth = 'bluetooth',
   exposure = 'exposure',
-  resolution = 'resolution'
+  resolution = 'resolution',
+  paused = 'paused',
+  initialising = 'initialising'
 }
 
 export interface Status {

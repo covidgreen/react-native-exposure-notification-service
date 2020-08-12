@@ -156,13 +156,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     };
   }, []);
 
-  const clearAndResetTimer = (timerRef: any) => {
-    if (timerRef && timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-
   useEffect(() => {
     async function checkSupportAndStart() {
       await supportsExposureApi();
@@ -175,21 +168,10 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         await configure();
         start();
       }
-
-      if (state.status.state === StatusState.unknown) {
-        clearAndResetTimer(unknownStatusTimer);
-        unknownStatusTimer.current = setTimeout(() => {
-          setState((s) => ({...s, initialised: true}));
-        }, 5000);
-      } else {
-        clearAndResetTimer(unknownStatusTimer);
-        setState((s) => ({...s, initialised: true}));
-      }
     }
 
     checkSupportAndStart();
 
-    return () => clearAndResetTimer(unknownStatusTimer);
   }, [state.permissions, isReady]);
 
   const supportsExposureApi = async function () {
