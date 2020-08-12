@@ -65,7 +65,7 @@ export interface ExposureContextValue extends State {
 const initialState = {
   status: {
     state: StatusState.unavailable,
-    type: StatusType.initialising
+    type: [StatusType.initialising]
   },
   supported: false,
   canSupport: false,
