@@ -201,7 +201,9 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   const validateStatus = async (status?: Status) => {
     let newStatus = status || ((await ExposureNotification.status()) as Status);
     const enabled = await ExposureNotification.exposureEnabled();
-    const initialised = !(newStatus.state === StatusState.unavailable && newStatus.type?.includes(StatusType.starting))
+
+    const isStarting = state.isAuthorised === AuthorisedStatus.unknown && newStatus.state === StatusState.unavailable && newStatus.type?.includes(StatusType.starting)
+    const initialised = !isStarting || !state.canSupport
     setState((s) => ({...s, status: newStatus, enabled, initialised}));
   };
 

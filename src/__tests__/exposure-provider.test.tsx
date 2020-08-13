@@ -56,6 +56,9 @@ jest.mock('../exposure-notification-module', () => ({
   StatusType: {
     starting: 'starting'
   },
+  AuthorisedStatus: {
+    unknown: 'unknown'
+  },
   authoriseExposure: jest.fn().mockResolvedValue(true),
   configure: jest.fn().mockResolvedValue(true),
   start: jest.fn().mockResolvedValue(true),

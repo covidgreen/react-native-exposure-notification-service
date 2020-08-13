@@ -406,17 +406,17 @@ class Tracing {
                                 promise.resolve("granted")
                             } else {
                                 Events.raiseEvent(Events.INFO,"isAuthorised: denied")
-                                promise.resolve("denied")
+                                promise.resolve("blocked")
                             }
                         }
                         .addOnFailureListener { ex ->
                             Events.raiseError("isAuthorised - onFailure", ex)
                             handleApiException(ex)
-                            promise.resolve("denied")
+                            promise.resolve("blocked")
                         }
             } catch (ex: Exception) {
                 Events.raiseError("isAuthorised - exception", ex)
-                promise.resolve("denied")
+                promise.resolve("blocked")
             }
         }
 
