@@ -65,7 +65,7 @@ export interface ExposureContextValue extends State {
 const initialState = {
   status: {
     state: StatusState.unavailable,
-    type: [StatusType.initialising]
+    type: [StatusType.starting]
   },
   supported: false,
   canSupport: false,
@@ -201,7 +201,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   const validateStatus = async (status?: Status) => {
     let newStatus = status || ((await ExposureNotification.status()) as Status);
     const enabled = await ExposureNotification.exposureEnabled();
-    setState((s) => ({...s, status: newStatus, enabled}));
+    const initialised = !(newStatus.state === StatusState.unavailable && newStatus.type?.includes(StatusType.starting))
+    setState((s) => ({...s, status: newStatus, enabled, initialised}));
   };
 
   const start = async () => {

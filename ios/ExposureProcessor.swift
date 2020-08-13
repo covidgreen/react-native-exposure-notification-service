@@ -95,7 +95,7 @@ public class ExposureProcessor {
             result["type"] = "paused"
         default:
             result["state"] = "unavailable"
-            result["type"] = "initialising"
+            result["type"] = "starting"
       }
       os_log("Status is %d", log: OSLog.checkExposure, type: .debug, ExposureManager.shared.manager.exposureNotificationStatus.rawValue)
       

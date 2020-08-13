@@ -116,7 +116,7 @@ class Tracing {
 
         var status = STATUS_STOPPED
         private var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
-        private var exposureDisabledReason = "initialising"
+        private var exposureDisabledReason = "starting"
 
         private lateinit var exposureWrapper: ExposureNotificationClientWrapper
 

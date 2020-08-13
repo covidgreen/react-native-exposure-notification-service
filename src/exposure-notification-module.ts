@@ -48,7 +48,7 @@ export enum StatusType {
   exposure = 'exposure',
   resolution = 'resolution',
   paused = 'paused',
-  initialising = 'initialising'
+  starting = 'starting'
 }
 
 export interface Status {
