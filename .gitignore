@@ -65,3 +65,6 @@ buck-out/
 
 # TypeScript
 dist/
+
+# Jest
+.jest/

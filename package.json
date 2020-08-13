@@ -44,7 +44,8 @@
     "lint:fix": "npm run lint -- --fix",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "jest"
   },
   "peerDependencies": {
     "react": "16.11.0",
@@ -54,19 +55,27 @@
   },
   "devDependencies": {
     "@react-native-community/eslint-config": "^2.0.0",
+    "@testing-library/react-hooks": "^3.3.0",
+    "@testing-library/react-native": "^5.0.3",
+    "@types/jest": "^26.0.4",
     "@types/react-native": "^0.62.0",
+    "babel-jest": "^26.1.0",
     "eslint": "^7.4.0",
     "husky": "^4.2.5",
+    "jest": "^26.1.0",
     "lint-staged": "^10.2.11",
     "prettier": "^2.0.5",
     "react": "16.11.0",
     "react-native": "0.62.2",
     "react-native-permissions": "^2.1.5",
+    "react-test-renderer": "^16.13.1",
+    "ts-jest": "^26.1.2",
     "typescript": "^3.9.6"
   },
   "husky": {
     "hooks": {
-      "pre-commit": "lint-staged"
+      "pre-commit": "lint-staged",
+      "pre-push": "npm test"
     }
   }
 }
