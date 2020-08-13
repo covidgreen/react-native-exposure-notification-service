@@ -51,7 +51,10 @@ jest.mock('../utils/permissions', () => ({
 
 jest.mock('../exposure-notification-module', () => ({
   StatusState: {
-    unknown: 'unknown'
+    unavailable: 'unavailable'
+  },
+  StatusType: {
+    starting: 'starting'
   },
   authoriseExposure: jest.fn().mockResolvedValue(true),
   configure: jest.fn().mockResolvedValue(true),
@@ -242,7 +245,7 @@ describe('useExposure', () => {
       getCloseContacts: expect.any(Function),
       getDiagnosisKeys: expect.any(Function),
       getLogData: expect.any(Function),
-      initialised: false,
+      initialised: true,
       isAuthorised: true,
       permissions: {
         exposure: {
