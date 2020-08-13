@@ -191,7 +191,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       supported: is,
       isAuthorised
     }));
-
+    await validateStatus(status)
     if (enabled) {
       await configure();
       getCloseContacts();
@@ -201,10 +201,12 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   const validateStatus = async (status?: Status) => {
     let newStatus = status || ((await ExposureNotification.status()) as Status);
     const enabled = await ExposureNotification.exposureEnabled();
+    const isAuthorised = await ExposureNotification.isAuthorised();
+    const canSupport = await ExposureNotification.canSupport();
 
-    const isStarting = state.isAuthorised === AuthorisedStatus.unknown && newStatus.state === StatusState.unavailable && newStatus.type?.includes(StatusType.starting)
-    const initialised = !isStarting || !state.canSupport
-    setState((s) => ({...s, status: newStatus, enabled, initialised}));
+    const isStarting = (isAuthorised === AuthorisedStatus.unknown || isAuthorised === AuthorisedStatus.granted) && newStatus.state === StatusState.unavailable && newStatus.type?.includes(StatusType.starting)
+    const initialised = !isStarting || !canSupport
+    setState((s) => ({...s, status: newStatus, enabled, isAuthorised, canSupport, initialised}));
   };
 
   const start = async () => {
