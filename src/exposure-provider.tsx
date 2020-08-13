@@ -19,7 +19,8 @@ import ExposureNotification, {
   AuthorisedStatus,
   StatusState,
   Status,
-  CloseContact
+  CloseContact,
+  StatusType
 } from './exposure-notification-module';
 
 import {getPermissions, requestPermissions} from './utils/permissions';
@@ -63,7 +64,8 @@ export interface ExposureContextValue extends State {
 
 const initialState = {
   status: {
-    state: StatusState.unknown
+    state: StatusState.unavailable,
+    type: [StatusType.starting]
   },
   supported: false,
   canSupport: false,
@@ -156,13 +158,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     };
   }, []);
 
-  const clearAndResetTimer = (timerRef: any) => {
-    if (timerRef && timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-
   useEffect(() => {
     async function checkSupportAndStart() {
       await supportsExposureApi();
@@ -175,21 +170,10 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         await configure();
         start();
       }
-
-      if (state.status.state === StatusState.unknown) {
-        clearAndResetTimer(unknownStatusTimer);
-        unknownStatusTimer.current = setTimeout(() => {
-          setState((s) => ({...s, initialised: true}));
-        }, 5000);
-      } else {
-        clearAndResetTimer(unknownStatusTimer);
-        setState((s) => ({...s, initialised: true}));
-      }
     }
 
     checkSupportAndStart();
 
-    return () => clearAndResetTimer(unknownStatusTimer);
   }, [state.permissions, isReady]);
 
   const supportsExposureApi = async function () {
@@ -207,7 +191,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       supported: is,
       isAuthorised
     }));
-
+    await validateStatus(status)
     if (enabled) {
       await configure();
       getCloseContacts();
@@ -217,7 +201,12 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   const validateStatus = async (status?: Status) => {
     let newStatus = status || ((await ExposureNotification.status()) as Status);
     const enabled = await ExposureNotification.exposureEnabled();
-    setState((s) => ({...s, status: newStatus, enabled}));
+    const isAuthorised = await ExposureNotification.isAuthorised();
+    const canSupport = await ExposureNotification.canSupport();
+
+    const isStarting = (isAuthorised === AuthorisedStatus.unknown || isAuthorised === AuthorisedStatus.granted) && newStatus.state === StatusState.unavailable && newStatus.type?.includes(StatusType.starting)
+    const initialised = !isStarting || !canSupport
+    setState((s) => ({...s, status: newStatus, enabled, isAuthorised, canSupport, initialised}));
   };
 
   const start = async () => {

@@ -115,8 +115,8 @@ class Tracing {
         private const val STATUS_STOPPING = "STOPPING"
 
         var status = STATUS_STOPPED
-        private var exposureStatus = EXPOSURE_STATUS_UNKNOWN
-        private var exposureDisabledReason = ""
+        private var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
+        private var exposureDisabledReason = "starting"
 
         private lateinit var exposureWrapper: ExposureNotificationClientWrapper
 
@@ -406,17 +406,17 @@ class Tracing {
                                 promise.resolve("granted")
                             } else {
                                 Events.raiseEvent(Events.INFO,"isAuthorised: denied")
-                                promise.resolve("denied")
+                                promise.resolve("blocked")
                             }
                         }
                         .addOnFailureListener { ex ->
                             Events.raiseError("isAuthorised - onFailure", ex)
                             handleApiException(ex)
-                            promise.resolve("denied")
+                            promise.resolve("blocked")
                         }
             } catch (ex: Exception) {
                 Events.raiseError("isAuthorised - exception", ex)
-                promise.resolve("denied")
+                promise.resolve("blocked")
             }
         }
 

@@ -158,6 +158,8 @@ Used to get the current start status. This method returns a promise that resolve
 
 The state can return as `active`, `disabled`, `unavailable` or `unknown`, and if set to `disabled` will contain the type presenting the reason why.
 
+The type can return as `bluetooth`, `exposure`, `resolution`, `paused`, `starting` and its meaning should be read in combination with `state`, i.e. a state of `disabled` and a type of `bluetooth` indicates that ENS is disabled because bluetooth is off.
+
 State changes also trigger the event `onStatusChanged`.
 
 ---
