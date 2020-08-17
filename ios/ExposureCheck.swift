@@ -93,6 +93,11 @@ class ExposureCheck: AsyncOperation {
             return
        }
         
+       guard ExposureManager.shared.manager.exposureNotificationEnabled else {
+            self.finishNoProcessing("Exposure notifications not enabled")
+            return
+       }
+
        self.configData = Storage.shared.readSettings(self.storageContext)
        guard self.configData != nil else {
           self.finishNoProcessing("No config set so can't proceeed with checking exposures")

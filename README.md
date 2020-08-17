@@ -374,10 +374,6 @@ function Root() {
 
 `boolean` (default `false`) Consent to send analytics to your exposure API's `/metrics` endpoint
 
-##### `debug` (optional)
-
-`boolean` use the `ExposureNotificationModule` in debug mode
-
 ### `useExposure`
 
 Use the `useExposure` hook in any component to consume the `ExposureProvider` context & methods

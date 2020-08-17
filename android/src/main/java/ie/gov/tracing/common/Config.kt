@@ -6,7 +6,6 @@ import ie.gov.tracing.storage.SharedPrefs
 
 class Config {
     companion object {
-        var debug = false
         fun configure(params: ReadableMap) {
             try {
                 Events.raiseEvent(Events.INFO, "Saving configuration...")
@@ -22,8 +21,6 @@ class Config {
                 SharedPrefs.setString("refreshToken", params.getString("refreshToken")!!, Tracing.context)
                 SharedPrefs.setString("authToken", params.getString("authToken")!!, Tracing.context)
                 SharedPrefs.setString("callbackNumber", params.getString("callbackNumber")!!, Tracing.context)
-                
-                debug = params.getBoolean("debug")
             } catch(ex: Exception) {
                 Events.raiseError("Error setting configuration: ", ex)
             }

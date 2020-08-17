@@ -194,7 +194,6 @@ class Fetcher {
                 val notificationSent = SharedPrefs.getLong("notificationSent", context)
                 var callbackNum = SharedPrefs.getString("callbackNumber", context)
 
-
                 if (notificationSent > 0) {
                     Events.raiseEvent(Events.INFO, "triggerCallback - notification " +
                             "already sent: " + notificationSent)
@@ -206,6 +205,10 @@ class Fetcher {
                     try {
                         val store = ExpoSecureStoreInterop(context)
                         val jsonStr = store.getItemImpl("cti.callBack")
+                        if (jsonStr.isEmpty()) {
+                            Events.raiseEvent(Events.INFO, "triggerCallback - no callback recovery")
+                            return;
+                        }
                         val callBackData = Gson().fromJson(jsonStr, CallbackRecovery::class.java)
 
                         if(callBackData.code == null || callBackData.number == null){
@@ -213,8 +216,6 @@ class Fetcher {
                             return;
                         }
                         callbackNum = callBackData.code +  callBackData.number
-
-
                     } catch (exExpo: Exception) {
                         Events.raiseError("ExpoSecureStoreInterop", exExpo)
                     }

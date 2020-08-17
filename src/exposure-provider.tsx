@@ -248,9 +248,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         notificationDesc: notificationDescription,
         callbackNumber,
         analyticsOptin,
-        // this is an undocumented param
-        // @ts-ignore
-        debug
       };
 
       await ExposureNotification.configure(config);

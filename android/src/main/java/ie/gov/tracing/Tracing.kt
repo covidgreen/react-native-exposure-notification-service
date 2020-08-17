@@ -203,10 +203,7 @@ class Tracing {
             override fun onSuccess(message: String) {
                 try {
                     Events.raiseEvent(Events.INFO, "authorisationCallback - success")
-                    // only start scheduler if starting, this path occurs during authorisation too
-                    // so we dont start sceduler when just authorising
                     if (status == STATUS_STARTING) {
-                        ProvideDiagnosisKeysWorker.startScheduler()
                         setNewStatus(STATUS_STARTED)
                         startPromise?.resolve(true)
                     } else {
@@ -317,7 +314,7 @@ class Tracing {
                 Config.configure(params)
                 val newCheckFrequency = getLong("exposureCheckFrequency", context)
 
-                if(newCheckFrequency != oldCheckFrequency && status == STATUS_STARTED) {
+                if(newCheckFrequency != oldCheckFrequency) {
                     scheduleCheckExposure()
                 }
             } catch (ex: Exception) {
@@ -525,7 +522,8 @@ class Tracing {
             }
         }
 
-        private fun scheduleCheckExposure() {
+        @JvmStatic
+        fun scheduleCheckExposure() {
             try {
                 // stop and re-start with config value
                 ProvideDiagnosisKeysWorker.stopScheduler()
