@@ -81,8 +81,6 @@ public class MainApplication extends Application implements ReactApplication {
     SoLoader.init(this, /* native exopackage */ false);
     initializeFlipper(this); // Remove this line if you don't want Flipper enabled
 
-    Tracing.scheduleCheckExposure();
-
     if (!BuildConfig.DEBUG) {
       UpdatesController.initialize(this);
     }

@@ -231,6 +231,8 @@ class Tracing {
                 exposureWrapper = ExposureNotificationClientWrapper.get(context)
                 reactContext.addActivityEventListener(Listener())
                 currentContext = context // this is overridden depending on path into codebase
+
+                scheduleCheckExposure()
             } catch (ex: Exception) {
                 Events.raiseError("init", ex)
             }
