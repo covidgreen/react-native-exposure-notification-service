@@ -524,8 +524,7 @@ class Tracing {
             }
         }
 
-        @JvmStatic
-        fun scheduleCheckExposure() {
+        private fun scheduleCheckExposure() {
             try {
                 // stop and re-start with config value
                 ProvideDiagnosisKeysWorker.stopScheduler()
