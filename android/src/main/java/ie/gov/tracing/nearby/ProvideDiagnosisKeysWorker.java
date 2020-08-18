@@ -113,7 +113,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
       // validate config set before running
       final String auth = SharedPrefs.getString("authToken", this.getApplicationContext());
-      if (authToken.isEmpty()) {
+      if (auth.isEmpty()) {
         // config not yet populated so don't run
         return Futures.immediateFailedFuture(new NotEnabledException());
       }
