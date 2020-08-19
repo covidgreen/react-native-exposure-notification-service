@@ -203,10 +203,7 @@ class Tracing {
             override fun onSuccess(message: String) {
                 try {
                     Events.raiseEvent(Events.INFO, "authorisationCallback - success")
-                    // only start scheduler if starting, this path occurs during authorisation too
-                    // so we dont start sceduler when just authorising
                     if (status == STATUS_STARTING) {
-                        ProvideDiagnosisKeysWorker.startScheduler()
                         setNewStatus(STATUS_STARTED)
                         startPromise?.resolve(true)
                     } else {
@@ -234,6 +231,8 @@ class Tracing {
                 exposureWrapper = ExposureNotificationClientWrapper.get(context)
                 reactContext.addActivityEventListener(Listener())
                 currentContext = context // this is overridden depending on path into codebase
+
+                scheduleCheckExposure()
             } catch (ex: Exception) {
                 Events.raiseError("init", ex)
             }
@@ -246,7 +245,7 @@ class Tracing {
             } else if (status === STATUS_STOPPED) {
                 setExposureStatus(EXPOSURE_STATUS_DISABLED, "exposure")
             }
-            Events.raiseEvent(Events.STATUS, status)
+            Events.raiseEvent(Events.ON_STATUS_CHANGED, status)
         }
 
         @JvmStatic
@@ -317,7 +316,7 @@ class Tracing {
                 Config.configure(params)
                 val newCheckFrequency = getLong("exposureCheckFrequency", context)
 
-                if(newCheckFrequency != oldCheckFrequency && status == STATUS_STARTED) {
+                if(newCheckFrequency != oldCheckFrequency) {
                     scheduleCheckExposure()
                 }
             } catch (ex: Exception) {

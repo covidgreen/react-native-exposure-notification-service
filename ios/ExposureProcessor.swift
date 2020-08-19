@@ -121,8 +121,6 @@ public class ExposureProcessor {
                 resolve(true)
             }
         }
-        
-        scheduleCheckExposure()
     }
     
     public func stop(_ resolve: @escaping RCTPromiseResolveBlock,
@@ -247,6 +245,8 @@ public class ExposureProcessor {
                 ExposureProcessor.shared.checkExposureBackground(task as! BGProcessingTask)
         }
         os_log("Registering background task", log: OSLog.exposure, type: .debug)
+        
+        self.scheduleCheckExposure()
     }
     
     private func checkExposureBackground(_ task: BGTask) {
@@ -283,11 +283,6 @@ public class ExposureProcessor {
     
     private func scheduleCheckExposure() {
       let context = Storage.PersistentContainer.shared.newBackgroundContext()
-      guard ENManager.authorizationStatus == .authorized else {
-           os_log("Not authorised so can't schedule exposure checks", log: OSLog.exposure, type: .info)
-           Storage.shared.updateRunData(context, "Not authorised so can't schedule exposure checks")
-           return
-      }
       
       do {
           let request = BGProcessingTaskRequest(identifier: self.backgroundName)

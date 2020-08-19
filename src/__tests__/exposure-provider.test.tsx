@@ -94,8 +94,7 @@ const mockConfig = {
   notificationTitle: 'testNotificationTitle',
   notificationDescription: 'testNotificationDescription',
   analyticsOptin: true,
-  callbackNumber: '0123456789',
-  debug: false
+  callbackNumber: '0123456789'
 };
 
 const ExposureProviderWithMockConfig: React.FC<Partial<
@@ -197,7 +196,6 @@ describe('<ExposureProvider />', () => {
       analyticsOptin: mockConfig.analyticsOptin,
       authToken: mockConfig.authToken,
       callbackNumber: mockConfig.callbackNumber,
-      debug: mockConfig.debug,
       exposureCheckFrequency:
         mockConfig.traceConfiguration.exposureCheckInterval,
       fileLimit: mockConfig.traceConfiguration.fileLimitiOS,
@@ -353,7 +351,6 @@ describe('useExposure', () => {
         analyticsOptin: mockConfig.analyticsOptin,
         authToken: mockConfig.authToken,
         callbackNumber: mockConfig.callbackNumber,
-        debug: mockConfig.debug,
         exposureCheckFrequency:
           mockConfig.traceConfiguration.exposureCheckInterval,
         fileLimit: mockConfig.traceConfiguration.fileLimitiOS,

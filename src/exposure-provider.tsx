@@ -110,7 +110,6 @@ export interface ExposureProviderProps {
   notificationDescription: string;
   callbackNumber?: string;
   analyticsOptin?: boolean;
-  debug?: boolean;
 }
 
 export const ExposureProvider: React.FC<ExposureProviderProps> = ({
@@ -125,7 +124,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   notificationDescription,
   callbackNumber = '',
   analyticsOptin = false,
-  debug = false
 }) => {
   const [state, setState] = useState<State>(initialState);
   const unknownStatusTimer = useRef<any>(null);
@@ -248,9 +246,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         notificationDesc: notificationDescription,
         callbackNumber,
         analyticsOptin,
-        // this is an undocumented param
-        // @ts-ignore
-        debug
       };
 
       await ExposureNotification.configure(config);

@@ -21,7 +21,7 @@ class Events {
         const val ON_STATUS_CHANGED = "onStatusChanged" // tracing api status
         const val ON_EXPOSURE = "exposure"
 
-        private const val TAG = "RNExposureNotification"
+        private const val TAG = "RNExposureNotificationService"
 
         private fun raiseEvent(map: ReadableMap) {
             Tracing.reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)?.emit("exposureEvent", map)
@@ -33,7 +33,7 @@ class Events {
                 isDebuggable = 0 != Tracing.currentContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
             } catch (ex: Exception) {}
 
-            if (isDebuggable || Config.debug) return true // allow all events in debug
+            if (isDebuggable) return true // allow all events in debug
             if(eventName == ON_STATUS_CHANGED || eventName == ON_EXPOSURE) return true // allow these debug or release
 
             return false
@@ -41,6 +41,7 @@ class Events {
 
         @JvmStatic
         fun raiseEvent(eventName: String, eventValue: String?): Boolean {
+            Log.d(TAG, eventValue)
             if(!allowed(eventName)) return false
             val map = Arguments.createMap()
             try {

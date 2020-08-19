@@ -111,6 +111,13 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       SharedPrefs.remove("lastApiError", Tracing.currentContext);
       SharedPrefs.remove("lastError", Tracing.currentContext);
 
+      // validate config set before running
+      final String auth = SharedPrefs.getString("authToken", this.getApplicationContext());
+      if (auth.isEmpty()) {
+        // config not yet populated so don't run
+        return Futures.immediateFailedFuture(new NotEnabledException());
+      }
+
       deleteOldData();
 
       final String token = generateRandomToken();
@@ -228,12 +235,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   }
 
   public static void startScheduler() {
-    /*if(isWorkScheduled()) {
-      Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startScheduler: already scheduled");
-      return;
-    }*/
-
     long checkFrequency = SharedPrefs.getLong("exposureCheckFrequency", Tracing.context);
+    if (checkFrequency <= 0) {
+      checkFrequency = 120;
+    }
     Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startScheduler: run every " +
             checkFrequency + " minutes");
     WorkManager workManager = WorkManager.getInstance(Tracing.context);
