@@ -119,11 +119,6 @@ dependencies {
 
     implementation 'androidx.concurrent:concurrent-futures:1.0.0'
 
-    // play services included in aar
-    // .m2/repository early-access-programme
-    //implementation 'com.google.android.gms:play-services-nearby:18.0.2-eap'
-    //real when available
-    //implementation 'com.google.android.gms:play-services-nearby:18.0.2'
     implementation 'com.google.android.gms:play-services-base:17.2.1'
     implementation 'com.google.android.gms:play-services-basement:17.2.1'
     implementation 'com.google.android.gms:play-services-safetynet:17.0.0'

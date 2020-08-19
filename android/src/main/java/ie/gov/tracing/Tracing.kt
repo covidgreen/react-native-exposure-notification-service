@@ -245,7 +245,7 @@ class Tracing {
             } else if (status === STATUS_STOPPED) {
                 setExposureStatus(EXPOSURE_STATUS_DISABLED, "exposure")
             }
-            Events.raiseEvent(Events.STATUS, status)
+            Events.raiseEvent(Events.ON_STATUS_CHANGED, status)
         }
 
         @JvmStatic
