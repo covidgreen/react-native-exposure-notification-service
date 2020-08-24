@@ -72,14 +72,16 @@ class ExposureCheck: AsyncOperation {
     private var configData: Storage.Config!
     private var readExposureDetails: Bool = false
     private var skipTimeCheck: Bool = false
+    private var simulateExposureOnly: Bool = false
     private let storageContext = Storage.PersistentContainer.shared.newBackgroundContext()
     private var sessionManager: Session!
     
-    init(_ skipTimeCheck: Bool, _ accessDetails: Bool) {
+    init(_ skipTimeCheck: Bool, _ accessDetails: Bool, _ simulateExposureOnly: Bool) {
         super.init()
     
         self.skipTimeCheck = skipTimeCheck
         self.readExposureDetails = accessDetails
+        self.simulateExposureOnly = simulateExposureOnly
     }
     
     override func cancel() {
@@ -116,9 +118,15 @@ class ExposureCheck: AsyncOperation {
             self.finishNoProcessing("Check was run at \(formatter.string(from: self.configData.lastRunDate!)), interval is \(self.configData.checkExposureInterval), its too soon to check again")
             return
        }
+      
+       if (self.simulateExposureOnly) {
+           os_log("Simulating exposure alert", log: OSLog.exposure, type: .debug)
+           simulateExposureEvent()
+           return
+       }
         
        os_log("Starting exposure checking", log: OSLog.exposure, type: .debug)
-      
+
        getExposureFiles { result in
             switch result {
               case let .failure(error):
@@ -134,6 +142,19 @@ class ExposureCheck: AsyncOperation {
        }
     }
     
+    private func simulateExposureEvent() {
+        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: 2, attenuationDurations: [30, 30, 30], matchedKeyCount: 1,  maxRiskScore: 10, exposureDate: Date())
+      
+        info.maximumRiskScoreFullRange = 10
+        info.riskScoreSumFullRange = 10
+        info.customAttenuationDurations = [30, 30, 30]
+                
+        let thresholds = Thresholds(thresholdWeightings: [1,1,0], timeThreshold: 15)
+
+        let lastId = self.configData.lastExposureIndex!
+        return self.finishProcessing(.success((info, lastId, thresholds)))
+    }
+
     private func getDomain(_ url: String) -> String {
         let url = URL(string: url)
         return url!.host!
@@ -480,7 +501,7 @@ class ExposureCheck: AsyncOperation {
        }
     }
     
-  private func triggerUserNotification(_ exposures: ExposureProcessor.ExposureInfo, _ completion: @escaping  (Result<Bool, Error>) -> Void) {
+    private func triggerUserNotification(_ exposures: ExposureProcessor.ExposureInfo, _ completion: @escaping  (Result<Bool, Error>) -> Void) {
       let content = UNMutableNotificationContent()
       let calendar = Calendar.current
       let dateToday = calendar.startOfDay(for: Date())
@@ -508,7 +529,7 @@ class ExposureCheck: AsyncOperation {
         self.triggerCallBack(lastExposure!, payload, completion)
       }
       
-  }
+    }
   
     private func triggerCallBack(_ lastExposure: Date, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
     guard !self.isCancelled else {

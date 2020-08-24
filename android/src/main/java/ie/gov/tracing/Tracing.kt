@@ -330,6 +330,19 @@ class Tracing {
             ProvideDiagnosisKeysWorker.startOneTimeWorkRequest()
         }
 
+        @JvmStatic
+        fun simulateExposure(timeDelay: Long = 0) {
+            extraDetails = false
+            WorkManager workManager = WorkManager.getInstance(context);
+            workManager.enqueue(
+                new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
+                .setInitialDelay(timeDelay)
+                .setInputData(
+                  new Data.Builder().putBoolean("simulate", true).putString(ExposureNotificationClient.EXTRA_TOKEN, "dummy")
+                      .build())
+            .build());            
+        }
+
         private fun getExposureKeyAsMap(tek: TemporaryExposureKey): WritableMap {
             val result: WritableMap = Arguments.createMap()
             result.putString("keyData", BaseEncoding.base64().encode(tek.keyData))

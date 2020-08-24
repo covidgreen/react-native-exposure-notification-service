@@ -72,11 +72,12 @@ public class StateUpdatedWorker extends ListenableWorker {
     Tracing.currentContext = getApplicationContext();
 
     final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
+    final Boolean simulate = getInputData().getBoolean("simulate");
     if (token == null) {
       return Futures.immediateFuture(Result.failure());
     } else {
       return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-          ExposureNotificationClientWrapper.get(context).getExposureSummary(token),
+          ExposureNotificationClientWrapper.get(context).getExposureSummary(token, simulate),
           DEFAULT_API_TIMEOUT.toMillis(),
           TimeUnit.MILLISECONDS,
           AppExecutors.getScheduledExecutor()))

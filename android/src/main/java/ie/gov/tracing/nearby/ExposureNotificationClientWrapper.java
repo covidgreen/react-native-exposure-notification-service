@@ -91,7 +91,16 @@ public class ExposureNotificationClientWrapper {
               .provideDiagnosisKeys(files, exposureConfiguration, token);
   }
 
-  Task<ExposureSummary> getExposureSummary(String token) {
+  Task<ExposureSummary> getExposureSummary(String token, Boolean simulate) {
+    if (simulate) {
+      ExposureSummaryBuilder builder = ExposureSummary.ExposureSummaryBuilder()
+      builder.setAttenuationDurations([30, 30, 30])
+      builder.setDaysSinceLastExposure(1)
+      builder.setMatchedKeyCount(1)
+      builder.setMaximumRiskScore(10)
+      builder.setSummationRiskScore(10)
+      return builder.build
+    }
     return exposureNotificationClient.getExposureSummary(token);
   }
 

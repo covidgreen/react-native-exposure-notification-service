@@ -113,6 +113,11 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
         Tracing.checkExposure(readExposureDetails);
     }
 
+    public void simulateExposure(Long timeDelay) {
+        if(nearbyNotSupported()) return;
+        Tracing.simulateExposure(timeDelay);
+    }
+
     @ReactMethod
     public void authoriseExposure(Promise promise) {
         if(nearbyNotSupported()){
