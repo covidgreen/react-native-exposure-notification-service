@@ -128,7 +128,7 @@ class ExposureCheck: AsyncOperation {
                   self.processExposures(urls, lastIndex)
                 }
                 else {
-                  self.finishNoProcessing("No files available to process")
+                  self.finishNoProcessing("No files available to process", false)
                 }
             }
        }
@@ -139,12 +139,21 @@ class ExposureCheck: AsyncOperation {
         return url!.host!
     }
     
-    private func finishNoProcessing(_ message: String) {
+    private func finishNoProcessing(_ message: String, _ log: Bool = true) {
       os_log("%@", log: OSLog.checkExposure, type: .info, message)
 
       Storage.shared.updateRunData(self.storageContext, message)
-        
-      self.trackDailyMetrics()
+
+      if (log) {
+        let payload:[String: Any] = [
+          "description": message
+        ]
+        self.saveMetric(event: "LOG_ERROR", payload: payload) { _ in
+          self.trackDailyMetrics()
+        }
+      } else {
+        self.trackDailyMetrics()
+      }
     }
   
     private func processExposures(_ files: [URL], _ lastIndex: Int) {
@@ -240,8 +249,7 @@ class ExposureCheck: AsyncOperation {
           let durations:[Int] = exposures.customAttenuationDurations ?? exposures.attenuationDurations
           
           guard thresholds.thresholdWeightings.count >= durations.count else {
-            Storage.shared.updateRunData(self.storageContext, "Failure processing exposure keys, thresholds not correctly defined")
-            return self.trackDailyMetrics()
+            return self.finishNoProcessing("Failure processing exposure keys, thresholds not correctly defined");
           }
           
           var contactTime = 0
@@ -263,9 +271,7 @@ class ExposureCheck: AsyncOperation {
             self.trackDailyMetrics()
           }
       case let .failure(error):
-          os_log("Failure processing exposure keys, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
-          Storage.shared.updateRunData(self.storageContext, "Failure processing exposure keys, \(error.localizedDescription)")
-          self.trackDailyMetrics()
+          return self.finishNoProcessing("Failure processing exposure keys, \(error.localizedDescription)");
       }
         
     }
@@ -277,7 +283,7 @@ class ExposureCheck: AsyncOperation {
       }
         
       let calendar = Calendar.current
-      let checkDate: Date = self.configData.dailyTrace ?? calendar.date(byAdding: .day, value: -2, to: Date())!
+      let checkDate: Date = self.configData.dailyTrace ?? calendar.date(byAdding: .day, value: -1, to: Date())!
         
       if (!self.isCancelled && !calendar.isDate(Date(), inSameDayAs: checkDate)) {
          Storage.shared.updateDailyTrace(self.storageContext, date: Date())
@@ -289,7 +295,7 @@ class ExposureCheck: AsyncOperation {
       }
       
     }
-  
+
     private func getExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
@@ -510,7 +516,7 @@ class ExposureCheck: AsyncOperation {
       
   }
   
-    private func triggerCallBack(_ lastExposure: Date, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
+  private func triggerCallBack(_ lastExposure: Date, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
     guard !self.isCancelled else {
       return self.cancelProcessing()
     }
@@ -542,7 +548,7 @@ class ExposureCheck: AsyncOperation {
     }
     
   }
-  
+
   private func saveMetric(event: String, completion: @escaping  (Result<Bool, Error>) -> Void) {
     self.saveMetric(event: event, payload: nil, completion: completion)
   }
