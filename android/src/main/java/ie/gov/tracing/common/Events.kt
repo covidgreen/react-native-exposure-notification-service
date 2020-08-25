@@ -12,6 +12,7 @@ import ie.gov.tracing.storage.SharedPrefs
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.HashMap;
+import ie.gov.tracing.network.Fetcher;
 
 // central logging and events
 class Events {
@@ -72,7 +73,7 @@ class Events {
         @JvmStatic
         fun raiseError(message: String, ex: Exception) {
             try {
-                var payload: HashMap<String, Object> = HashMap<String, Object>();
+                var payload: HashMap<String, Any> = HashMap<String, Any>();
                 payload.put("description", "$message: $ex");
                 Fetcher.saveMetric("LOG_ERROR", Tracing.currentContext, payload);
 
