@@ -71,6 +71,10 @@ class Events {
         @JvmStatic
         fun raiseError(message: String, ex: Exception) {
             try {
+                HashMap<String, Object> payload = new HashMap<>();
+                payload.put("description", "$message: $ex");
+                Fetcher.saveMetric("LOG_ERROR", Tracing.currentContext, payload);
+
                 if(allowed(ERROR)) { // if debugging allow stacktrace
                     var sw = StringWriter()
                     val pw = PrintWriter(sw)
@@ -83,6 +87,7 @@ class Events {
                     SharedPrefs.setString("lastError", "$ex - $sw", Tracing.currentContext)
                     raiseEvent(ERROR, "$message: $ex - $sw")
                 } else { // otherwise just log generic message
+
                     Log.e(TAG, "error: $ex")
                 }
             } catch (ex: Exception) {
