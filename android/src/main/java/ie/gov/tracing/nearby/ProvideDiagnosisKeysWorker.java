@@ -232,7 +232,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
           return true;
       }
     } catch (Exception ex) {
-      Events.raiseError("isWorkScheduled",  ex);
+      Events.raiseError("isWorkScheduled",  ex, this.context);
     }
     return false;
   }
