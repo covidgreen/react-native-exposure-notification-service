@@ -70,7 +70,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
   private void deleteOldData() {
     try {
-      Tracing.currentContext = getApplicationContext();
       long DAY_IN_MS = 1000 * 60 * 60 * 24;
       long storeExposuresFor = SharedPrefs.getLong("storeExposuresFor", this.getApplicationContext());
       long daysBeforeNowInMs = System.currentTimeMillis() - storeExposuresFor * DAY_IN_MS;
