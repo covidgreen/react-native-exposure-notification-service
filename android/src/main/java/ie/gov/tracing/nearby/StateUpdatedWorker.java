@@ -61,7 +61,7 @@ public class StateUpdatedWorker extends ListenableWorker {
           }
           return result;
       } catch (Exception ex) {
-          Events.raiseError("Cannot parse double array", ex, this.context);
+          Events.raiseError("Cannot parse double array", ex);
       }
       return null;
   }
@@ -171,7 +171,7 @@ public class StateUpdatedWorker extends ListenableWorker {
   }
 
   private Result processError(Exception ex) {
-      Events.raiseError("error receiving notification", ex);
+      Events.raiseError("error receiving notification", ex, this.context);
       return Result.failure();
   }
 
