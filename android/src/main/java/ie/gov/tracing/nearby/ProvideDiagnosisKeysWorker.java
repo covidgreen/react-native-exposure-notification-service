@@ -50,6 +50,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private final SecureRandom secureRandom;
   private final ExposureNotificationRepository repository;
   public static long nextSince = 0;
+  private final Context context;
 
   public ProvideDiagnosisKeysWorker(@NonNull Context context,
                                     @NonNull WorkerParameters workerParams) {
@@ -58,6 +59,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     submitter = new DiagnosisKeyFileSubmitter(context);
     secureRandom = new SecureRandom();
     repository = new ExposureNotificationRepository(context);
+    this.context = context;
   }
 
   private String generateRandomToken() {
@@ -75,8 +77,9 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
               new Date(daysBeforeNowInMs));
       repository.deleteExposuresBefore(daysBeforeNowInMs);
       repository.deleteTokensBefore(daysBeforeNowInMs);
+
     } catch(Exception ex) {
-      Events.raiseError("deleteOldData",  ex);
+      Events.raiseError("deleteOldData",  ex, this.context);
     }
   }
 
@@ -97,7 +100,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
       SharedPrefs.setString("lastRun", newLastRun, Tracing.currentContext);
     } catch(Exception ex) {
-      Events.raiseError("lastRun",  ex);
+      Events.raiseError("lastRun",  ex, this.context);
     }
   }
 
@@ -151,7 +154,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   }
 
   private Result processFailure(Exception ex) {
-    Events.raiseError("error processing file: ",  ex);
+    Events.raiseError("error processing file: ",  ex, this.context);
     return Result.failure();
   }
 
@@ -172,7 +175,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         }
       }
     } catch(Exception ex) {
-      Events.raiseError("deleteExports - error deleting files", ex);
+      Events.raiseError("deleteExports - error deleting files", ex, this.context);
     }
   }
 
@@ -200,7 +203,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       SharedPrefs.setLong("dailyActiveTrace", System.currentTimeMillis(), this.getApplicationContext());
 
     } catch(Exception ex) {
-      Events.raiseError("saveDailyMetric - error", ex);
+      Events.raiseError("saveDailyMetric - error", ex, this.context);
     }
   }
 

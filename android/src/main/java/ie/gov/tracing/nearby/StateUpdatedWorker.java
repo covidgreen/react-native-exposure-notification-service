@@ -172,7 +172,7 @@ public class StateUpdatedWorker extends ListenableWorker {
   }
 
   private Result processError(Exception ex) {
-      Events.raiseError("error receiving notification", ex);
+      Events.raiseError("error receiving notification", ex, this.context);
       return Result.failure();
   }
 
