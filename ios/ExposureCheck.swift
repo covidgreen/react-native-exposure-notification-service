@@ -563,6 +563,7 @@ class ExposureCheck: AsyncOperation {
       os_log("Metric opt out", log: OSLog.exposure, type: .error)
       return completion(.success(true))
     }
+    os_log("Sending metric, %@", log:OSLog.checkExposure, type: .info, event)
     self.sessionManager.request(self.serverURL(.metrics), method: .post , parameters: ["os": "ios", "event": event, "version": self.configData.version, "payload": payload ?? []], encoding: JSONEncoding.default)
       .validate()
       .response() { response in
