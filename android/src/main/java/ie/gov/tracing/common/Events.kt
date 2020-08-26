@@ -31,15 +31,15 @@ class Events {
         }
 
         private fun allowed(eventName: String): Boolean {
-            var isDebuggable = false
+            /*var isDebuggable = false
             try {
                 isDebuggable = 0 != Tracing.currentContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
             } catch (ex: Exception) {}
 
             if (isDebuggable) return true // allow all events in debug
             if(eventName == ON_STATUS_CHANGED || eventName == ON_EXPOSURE) return true // allow these debug or release
-
-            return false
+            */
+            return true
         }
 
         @JvmStatic

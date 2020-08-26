@@ -118,7 +118,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       final String auth = SharedPrefs.getString("authToken", this.getApplicationContext());
       if (auth.isEmpty()) {
         // config not yet populated so don't run
-        return Futures.immediateFailedFuture(new NotEnabledException());
+        return Futures.immediateFailedFuture(new NotEnabledException("Config not defined"));
       }
 
       deleteOldData();
@@ -136,7 +136,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                   return diagnosisKeys.download();
                 } else {
                   // Stop here because things aren't enabled. Will still return successful though.
-                  return Futures.immediateFailedFuture(new NotEnabledException());
+                  return Futures.immediateFailedFuture(new NotEnabledException("ENS not enabled"));
                 }
               },
                       AppExecutors.getBackgroundExecutor())
