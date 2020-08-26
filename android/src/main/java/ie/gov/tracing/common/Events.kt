@@ -36,7 +36,7 @@ class Events {
                 isDebuggable = 0 != Tracing.currentContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
             } catch (ex: Exception) {}
 
-            if (eventValue == "ERROR" && !isDebuggable) return false // allow all events in debug
+            if (eventName == "ERROR" && !isDebuggable) return false // allow all events in debug
             // if(eventName == ON_STATUS_CHANGED || eventName == ON_EXPOSURE) return true // allow these debug or release
             
             return true
