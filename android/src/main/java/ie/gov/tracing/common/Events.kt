@@ -11,9 +11,7 @@ import ie.gov.tracing.Tracing
 import ie.gov.tracing.storage.SharedPrefs
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.util.HashMap
 import ie.gov.tracing.network.Fetcher
-import android.content.Context
 
 // central logging and events
 class Events {
@@ -75,19 +73,8 @@ class Events {
 
         @JvmStatic
         fun raiseError(message: String, ex: Exception) {
-            raiseError(message, ex, null)
-        }
-
-        @JvmStatic
-        fun raiseError(message: String, ex: Exception, context: Context?) {
             Log.e(TAG, "Error: $message: $ex")
             try {
-                if (context != null) {
-                    var payload: HashMap<String, Any> = HashMap<String, Any>()
-                    payload.put("description", "$message: $ex")
-                    Fetcher.saveMetric("LOG_ERROR", context, payload)
-                }
-
                 if(allowed(ERROR)) { // if debugging allow stacktrace
                     var sw = StringWriter()
                     val pw = PrintWriter(sw)

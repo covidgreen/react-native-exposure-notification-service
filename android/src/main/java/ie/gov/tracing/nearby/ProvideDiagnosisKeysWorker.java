@@ -17,6 +17,7 @@ import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.util.HashMap;
 import java.io.File;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -79,7 +80,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       repository.deleteTokensBefore(daysBeforeNowInMs);
 
     } catch(Exception ex) {
-      Events.raiseError("deleteOldData",  ex, this.context);
+      Events.raiseError("deleteOldData",  ex);
     }
   }
 
@@ -100,7 +101,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
       SharedPrefs.setString("lastRun", newLastRun, Tracing.currentContext);
     } catch(Exception ex) {
-      Events.raiseError("lastRun",  ex, this.context);
+      Events.raiseError("lastRun",  ex);
     }
   }
 
@@ -118,7 +119,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       final String auth = SharedPrefs.getString("authToken", this.getApplicationContext());
       if (auth.isEmpty()) {
         // config not yet populated so don't run
-        return Futures.immediateFailedFuture(new NotEnabledException("Config not defined"));
+        return Futures.immediateFailedFuture(new ConfigNotSetException());
       }
 
       deleteOldData();
@@ -136,7 +137,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                   return diagnosisKeys.download();
                 } else {
                   // Stop here because things aren't enabled. Will still return successful though.
-                  return Futures.immediateFailedFuture(new NotEnabledException("ENS not enabled"));
+                  return Futures.immediateFailedFuture(new NotEnabledException());
                 }
               },
                       AppExecutors.getBackgroundExecutor())
@@ -154,7 +155,11 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   }
 
   private Result processFailure(Exception ex) {
-    Events.raiseError("error processing file: ",  ex, this.context);
+    HashMap<String, Object> payload = new HashMap<>();
+    payload.put("description", "error processing file: $ex");
+    Fetcher.saveMetric("LOG_ERROR", context, payload);
+
+    Events.raiseError("error processing file: ",  ex);
     return Result.failure();
   }
 
@@ -175,7 +180,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         }
       }
     } catch(Exception ex) {
-      Events.raiseError("deleteExports - error deleting files", ex, this.context);
+      Events.raiseError("deleteExports - error deleting files", ex);
     }
   }
 
@@ -203,7 +208,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       SharedPrefs.setLong("dailyActiveTrace", System.currentTimeMillis(), this.getApplicationContext());
 
     } catch(Exception ex) {
-      Events.raiseError("saveDailyMetric - error", ex, this.context);
+      Events.raiseError("saveDailyMetric - error", ex);
     }
   }
 
@@ -279,4 +284,5 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   }
 
   private static class NotEnabledException extends Exception {}
+  private static class ConfigNotSetException extends Exception {}
 }
