@@ -271,6 +271,9 @@ class ExposureCheck: AsyncOperation {
     }
   
     private func trackDailyMetrics() {
+      guard !self.isCancelled else {
+        return self.cancelProcessing()
+      }
       guard self.configData != nil else {
         // don't track daily trace if config not setup
         return self.finish()
@@ -551,7 +554,11 @@ class ExposureCheck: AsyncOperation {
     guard !self.isCancelled else {
       return self.cancelProcessing()
     }
-    
+    guard self.configData != nil else {
+      // don't track daily trace if config not setup
+      return self.finish()
+    }
+
     if (!self.configData.analyticsOptin) {
       os_log("Metric opt out", log: OSLog.exposure, type: .error)
       return completion(.success(true))
