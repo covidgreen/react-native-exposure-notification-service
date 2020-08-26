@@ -4,7 +4,6 @@ import React, {
   createContext,
   useCallback,
   useContext,
-  useRef,
   SetStateAction
 } from 'react';
 import {
@@ -123,10 +122,9 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   notificationTitle,
   notificationDescription,
   callbackNumber = '',
-  analyticsOptin = false,
+  analyticsOptin = false
 }) => {
   const [state, setState] = useState<State>(initialState);
-  const unknownStatusTimer = useRef<any>(null);
 
   useEffect(() => {
     function handleEvent(
@@ -171,7 +169,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     }
 
     checkSupportAndStart();
-
   }, [state.permissions, isReady]);
 
   const supportsExposureApi = async function () {
@@ -189,7 +186,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       supported: is,
       isAuthorised
     }));
-    await validateStatus(status)
+    await validateStatus(status);
     if (enabled) {
       await configure();
       getCloseContacts();
@@ -202,9 +199,20 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     const isAuthorised = await ExposureNotification.isAuthorised();
     const canSupport = await ExposureNotification.canSupport();
 
-    const isStarting = (isAuthorised === AuthorisedStatus.unknown || isAuthorised === AuthorisedStatus.granted) && newStatus.state === StatusState.unavailable && newStatus.type?.includes(StatusType.starting)
-    const initialised = !isStarting || !canSupport
-    setState((s) => ({...s, status: newStatus, enabled, isAuthorised, canSupport, initialised}));
+    const isStarting =
+      (isAuthorised === AuthorisedStatus.unknown ||
+        isAuthorised === AuthorisedStatus.granted) &&
+      newStatus.state === StatusState.unavailable &&
+      newStatus.type?.includes(StatusType.starting);
+    const initialised = !isStarting || !canSupport;
+    setState((s) => ({
+      ...s,
+      status: newStatus,
+      enabled,
+      isAuthorised,
+      canSupport,
+      initialised
+    }));
   };
 
   const start = async () => {
@@ -245,7 +253,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         notificationTitle,
         notificationDesc: notificationDescription,
         callbackNumber,
-        analyticsOptin,
+        analyticsOptin
       };
 
       await ExposureNotification.configure(config);

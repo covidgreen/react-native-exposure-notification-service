@@ -11,9 +11,7 @@ import ie.gov.tracing.Tracing
 import ie.gov.tracing.storage.SharedPrefs
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.util.HashMap
 import ie.gov.tracing.network.Fetcher
-import android.content.Context
 
 // central logging and events
 class Events {
@@ -36,15 +34,15 @@ class Events {
                 isDebuggable = 0 != Tracing.currentContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
             } catch (ex: Exception) {}
 
-            if (isDebuggable) return true // allow all events in debug
-            if(eventName == ON_STATUS_CHANGED || eventName == ON_EXPOSURE) return true // allow these debug or release
-
-            return false
+            if (eventName == "ERROR" && !isDebuggable) return false // allow all events in debug
+            // if(eventName == ON_STATUS_CHANGED || eventName == ON_EXPOSURE) return true // allow these debug or release
+            
+            return true
         }
 
         @JvmStatic
         fun raiseEvent(eventName: String, eventValue: String?): Boolean {
-            Log.d(TAG, eventValue)
+            Log.d(TAG, "$eventName: $eventValue")
             if(!allowed(eventName)) return false
             val map = Arguments.createMap()
             try {
@@ -59,8 +57,10 @@ class Events {
 
         @JvmStatic
         fun raiseEvent(eventName: String, eventValue: ReadableMap?): Boolean {
+            Log.d(TAG, eventName)
             if(!allowed(eventName)) return false
             val map = Arguments.createMap()
+            
             try {
                 map.putMap(eventName, eventValue)
                 raiseEvent(map)
@@ -73,18 +73,8 @@ class Events {
 
         @JvmStatic
         fun raiseError(message: String, ex: Exception) {
-            raiseError(message, ex, null)
-        }
-
-        @JvmStatic
-        fun raiseError(message: String, ex: Exception, context: Context?) {
+            Log.e(TAG, "Error: $message: $ex")
             try {
-                if (context != null) {
-                    var payload: HashMap<String, Any> = HashMap<String, Any>();
-                    payload.put("description", "$message: $ex");
-                    Fetcher.saveMetric("LOG_ERROR", context, payload);
-                }
-
                 if(allowed(ERROR)) { // if debugging allow stacktrace
                     var sw = StringWriter()
                     val pw = PrintWriter(sw)
@@ -97,8 +87,7 @@ class Events {
                     SharedPrefs.setString("lastError", "$ex - $sw", Tracing.currentContext)
                     raiseEvent(ERROR, "$message: $ex - $sw")
                 } else { // otherwise just log generic message
-
-                    Log.e(TAG, "error: $ex")
+                    raiseEvent(ERROR, "$message: $ex")
                 }
             } catch (ex: Exception) {
                 Log.e(TAG, ex.toString())

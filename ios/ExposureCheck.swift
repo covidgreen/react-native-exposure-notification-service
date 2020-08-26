@@ -87,23 +87,17 @@ class ExposureCheck: AsyncOperation {
     }
        
     override func main() {
-      
+      self.configData = Storage.shared.readSettings(self.storageContext)
+       guard self.configData != nil else {
+          self.finishNoProcessing("No config set so can't proceeed with checking exposures", false)
+          return
+       }
+
        guard ENManager.authorizationStatus == .authorized else {
             self.finishNoProcessing("Not authorised so can't run exposure checks")
             return
        }
-        
-       guard ExposureManager.shared.manager.exposureNotificationEnabled else {
-            self.finishNoProcessing("Exposure notifications not enabled")
-            return
-       }
-
-       self.configData = Storage.shared.readSettings(self.storageContext)
-       guard self.configData != nil else {
-          self.finishNoProcessing("No config set so can't proceeed with checking exposures")
-          return
-       }
-    
+      
        let serverDomain: String = getDomain(self.configData.serverURL)
        let manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
        self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)), serverTrustManager: manager)
@@ -277,6 +271,9 @@ class ExposureCheck: AsyncOperation {
     }
   
     private func trackDailyMetrics() {
+      guard !self.isCancelled else {
+        return self.cancelProcessing()
+      }
       guard self.configData != nil else {
         // don't track daily trace if config not setup
         return self.finish()
@@ -557,11 +554,16 @@ class ExposureCheck: AsyncOperation {
     guard !self.isCancelled else {
       return self.cancelProcessing()
     }
-    
+    guard self.configData != nil else {
+      // don't track daily trace if config not setup
+      return self.finish()
+    }
+
     if (!self.configData.analyticsOptin) {
       os_log("Metric opt out", log: OSLog.exposure, type: .error)
       return completion(.success(true))
     }
+    os_log("Sending metric, %@", log:OSLog.checkExposure, type: .info, event)
     self.sessionManager.request(self.serverURL(.metrics), method: .post , parameters: ["os": "ios", "event": event, "version": self.configData.version, "payload": payload ?? []], encoding: JSONEncoding.default)
       .validate()
       .response() { response in
