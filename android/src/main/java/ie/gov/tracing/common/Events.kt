@@ -31,20 +31,20 @@ class Events {
         }
 
         private fun allowed(eventName: String): Boolean {
-            /*var isDebuggable = false
+            var isDebuggable = false
             try {
                 isDebuggable = 0 != Tracing.currentContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
             } catch (ex: Exception) {}
 
-            if (isDebuggable) return true // allow all events in debug
-            if(eventName == ON_STATUS_CHANGED || eventName == ON_EXPOSURE) return true // allow these debug or release
-            */
+            if (eventValue == "ERROR" && !isDebuggable) return false // allow all events in debug
+            // if(eventName == ON_STATUS_CHANGED || eventName == ON_EXPOSURE) return true // allow these debug or release
+            
             return true
         }
 
         @JvmStatic
         fun raiseEvent(eventName: String, eventValue: String?): Boolean {
-            Log.d(TAG, eventValue)
+            Log.d(TAG, "$eventName: $eventValue")
             if(!allowed(eventName)) return false
             val map = Arguments.createMap()
             try {
@@ -59,8 +59,10 @@ class Events {
 
         @JvmStatic
         fun raiseEvent(eventName: String, eventValue: ReadableMap?): Boolean {
+            Log.d(TAG, eventName)
             if(!allowed(eventName)) return false
             val map = Arguments.createMap()
+            
             try {
                 map.putMap(eventName, eventValue)
                 raiseEvent(map)
@@ -78,11 +80,12 @@ class Events {
 
         @JvmStatic
         fun raiseError(message: String, ex: Exception, context: Context?) {
+            Log.e(TAG, "Error: $message: $ex")
             try {
                 if (context != null) {
-                    var payload: HashMap<String, Any> = HashMap<String, Any>();
-                    payload.put("description", "$message: $ex");
-                    Fetcher.saveMetric("LOG_ERROR", context, payload);
+                    var payload: HashMap<String, Any> = HashMap<String, Any>()
+                    payload.put("description", "$message: $ex")
+                    Fetcher.saveMetric("LOG_ERROR", context, payload)
                 }
 
                 if(allowed(ERROR)) { // if debugging allow stacktrace
@@ -97,8 +100,7 @@ class Events {
                     SharedPrefs.setString("lastError", "$ex - $sw", Tracing.currentContext)
                     raiseEvent(ERROR, "$message: $ex - $sw")
                 } else { // otherwise just log generic message
-
-                    Log.e(TAG, "error: $ex")
+                    raiseEvent(ERROR, "$message: $ex")
                 }
             } catch (ex: Exception) {
                 Log.e(TAG, ex.toString())
