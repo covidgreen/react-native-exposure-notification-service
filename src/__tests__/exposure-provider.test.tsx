@@ -64,6 +64,7 @@ jest.mock('../exposure-notification-module', () => ({
   start: jest.fn().mockResolvedValue(true),
   stop: jest.fn().mockResolvedValue(true),
   checkExposure: jest.fn(),
+  simulateExposure: jest.fn(),
   getDiagnosisKeys: jest.fn().mockResolvedValue([{keyData: 'mockKeyData'}]),
   deleteAllData: jest.fn().mockResolvedValue(true),
   deleteExposureData: jest.fn().mockResolvedValue(true),
@@ -258,6 +259,7 @@ describe('useExposure', () => {
       },
       readPermissions: expect.any(Function),
       setExposureState: expect.any(Function),
+      simulateExposure: expect.any(Function),
       start: expect.any(Function),
       status: {
         state: 'active'
@@ -610,4 +612,18 @@ describe('useExposure', () => {
       expect(getPermissions).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('simulateExposure()', () => {
+    it('simulates an exposure event triggering', async () => {
+      const {result} = await renderExposureHook();
+      mocked(ExposureNotificationModule.simulateExposure).mockClear();
+      await act(async () => {
+        await result.current.simulateExposure(10);
+      });
+      expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledTimes(1);
+      expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledWith(
+        10
+      );
+    });
+  });  
 });
