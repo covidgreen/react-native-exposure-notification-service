@@ -315,7 +315,7 @@ class Tracing {
                 val oldCheckFrequency = getLong("exposureCheckFrequency", context)
                 Config.configure(params)
                 val newCheckFrequency = getLong("exposureCheckFrequency", context)
-
+                Events.raiseEvent(Events.INFO, "old: $oldCheckFrequency, new: $newCheckFrequency")
                 if(newCheckFrequency != oldCheckFrequency) {
                     scheduleCheckExposure()
                 }
