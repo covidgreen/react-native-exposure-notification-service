@@ -5502,7 +5502,7 @@ react-is@^16.12.0, react-is@^16.8.1, react-is@^16.8.4, react-is@^16.9.0:
   integrity sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
 
 "react-native-exposure-notification-service@file:..":
-  version "1.1.0-9"
+  version "1.1.19"
 
 react-native-gesture-handler@~1.6.0:
   version "1.6.1"
@@ -5513,6 +5513,11 @@ react-native-gesture-handler@~1.6.0:
     hoist-non-react-statics "^2.3.1"
     invariant "^2.2.4"
     prop-types "^15.7.2"
+
+react-native-permissions@^2.1.5:
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/react-native-permissions/-/react-native-permissions-2.1.5.tgz#6cfc4f1ab1590f4952299b7cdc9698525ad540e0"
+  integrity sha512-b9KO/4UEV9qddl+kcSybmdk8nlAifclSDBR2rSvc5KZM06vIaJWJNIzK2ZwPXqDQ5yD3CJLuKTRj7Fz+jM9qyQ==
 
 react-native-reanimated@~1.7.0:
   version "1.7.1"

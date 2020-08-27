@@ -219,6 +219,18 @@ On successful matches, this will raise a notification to the user, and also rais
 
 ---
 
+##### `simulateExposure()`
+
+```javascript
+ExposureNotificationModule.simulateExposure();
+```
+
+Used to manually generate an exposure alert during testing to make it easier to validate UX flows around exposure events.
+
+This will raise a notification to the user, and also raise an `exposure` event to the app.
+
+---
+
 ##### `getCloseContacts()`
 
 ```javascript

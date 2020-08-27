@@ -81,6 +81,8 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
 
   checkExposure(readDetails?: boolean, skipTimeCheck?: boolean): void;
 
+  simulateExposure(timeDelay?: number): void;
+
   getCloseContacts(): Promise<CloseContact[]>;
 
   status(): Promise<Status>;

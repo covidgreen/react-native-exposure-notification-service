@@ -114,6 +114,12 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void simulateExposure(Integer timeDelay) {
+        if(nearbyNotSupported()) return;
+        Tracing.simulateExposure(timeDelay.longValue());
+    }
+
+    @ReactMethod
     public void authoriseExposure(Promise promise) {
         if(nearbyNotSupported()){
             promise.resolve(false);

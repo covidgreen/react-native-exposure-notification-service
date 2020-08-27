@@ -1,7 +1,7 @@
 package ie.gov.tracing.nearby;
 
 import android.content.Context;
-import android.content.SharedPreferences;
+
 
 import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.exposurenotification.ExposureConfiguration;
@@ -69,17 +69,17 @@ public class ExposureNotificationClientWrapper {
     Events.raiseEvent(Events.INFO, "mapping exposure configuration with " + config);
     // error will be thrown here if config is not complete
     ExposureConfiguration exposureConfiguration =
-              new ExposureConfiguration.ExposureConfigurationBuilder()
-                      .setAttenuationScores(config.getAttenuationLevelValues())
-                      .setDaysSinceLastExposureScores(config.getDaysSinceLastExposureLevelValues())
-                      .setTransmissionRiskScores(config.getTransmissionRiskLevelValues())
-                      .setDurationScores(config.getDurationLevelValues())
-                      .setMinimumRiskScore(config.getMinimumRiskScore())
-                      .setDurationWeight(config.getDurationWeight())
-                      .setAttenuationWeight(config.getAttenuationWeight())
-                      .setTransmissionRiskWeight(config.getTransmissionRiskWeight())
-                      .setDaysSinceLastExposureWeight(config.getDaysSinceLastExposureWeight())
-                      .setDurationAtAttenuationThresholds(config.getDurationAtAttenuationThresholds()).build();
+            new ExposureConfiguration.ExposureConfigurationBuilder()
+                    .setAttenuationScores(config.getAttenuationLevelValues())
+                    .setDaysSinceLastExposureScores(config.getDaysSinceLastExposureLevelValues())
+                    .setTransmissionRiskScores(config.getTransmissionRiskLevelValues())
+                    .setDurationScores(config.getDurationLevelValues())
+                    .setMinimumRiskScore(config.getMinimumRiskScore())
+                    .setDurationWeight(config.getDurationWeight())
+                    .setAttenuationWeight(config.getAttenuationWeight())
+                    .setTransmissionRiskWeight(config.getTransmissionRiskWeight())
+                    .setDaysSinceLastExposureWeight(config.getDaysSinceLastExposureWeight())
+                    .setDurationAtAttenuationThresholds(config.getDurationAtAttenuationThresholds()).build();
 
     // we use these when we receive match broadcasts from exposure API
     SharedPrefs.setString("thresholdWeightings", Arrays.toString(config.getThresholdWeightings()), appContext);
@@ -88,7 +88,7 @@ public class ExposureNotificationClientWrapper {
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with: " + exposureConfiguration);
 
     return exposureNotificationClient
-              .provideDiagnosisKeys(files, exposureConfiguration, token);
+            .provideDiagnosisKeys(files, exposureConfiguration, token);
   }
 
   Task<ExposureSummary> getExposureSummary(String token) {
@@ -98,6 +98,7 @@ public class ExposureNotificationClientWrapper {
   /*
   Task<List<ExposureInformation>> getExposureInformation(String token) {
     return exposureNotificationClient.getExposureInformation(token);
-  }*/
+  }
+  */
 
 }

@@ -23,6 +23,7 @@ import ie.gov.tracing.storage.SharedPrefs
 import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import ie.gov.tracing.nearby.StateUpdatedWorker
 
 class Listener: ActivityEventListener {
     override fun onNewIntent(intent: Intent?) {}
@@ -328,6 +329,13 @@ class Tracing {
         fun checkExposure(readExposureDetails: Boolean = false) {
             extraDetails = readExposureDetails
             ProvideDiagnosisKeysWorker.startOneTimeWorkRequest()
+        }
+
+        @JvmStatic
+        fun simulateExposure(timeDelay: Long = 0) {
+            extraDetails = false
+            StateUpdatedWorker.simulateExposure(timeDelay)
+
         }
 
         private fun getExposureKeyAsMap(tek: TemporaryExposureKey): WritableMap {
