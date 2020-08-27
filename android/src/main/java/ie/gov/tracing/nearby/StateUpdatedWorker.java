@@ -11,14 +11,20 @@ import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationCompat.Builder;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.work.ExistingWorkPolicy;
 import androidx.work.ListenableWorker;
 import androidx.work.WorkerParameters;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
+import androidx.work.Data;
 import ie.gov.tracing.R;
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
+import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -72,16 +78,27 @@ public class StateUpdatedWorker extends ListenableWorker {
     Tracing.currentContext = getApplicationContext();
 
     final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
-    final Boolean simulate = getInputData().getBoolean("simulate");
+    final boolean simulate = getInputData().getBoolean("simulate", false);
     if (token == null) {
       return Futures.immediateFuture(Result.failure());
     } else {
       return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-          ExposureNotificationClientWrapper.get(context).getExposureSummary(token, simulate),
+          ExposureNotificationClientWrapper.get(context).getExposureSummary(token),
           DEFAULT_API_TIMEOUT.toMillis(),
           TimeUnit.MILLISECONDS,
           AppExecutors.getScheduledExecutor()))
           .transformAsync((exposureSummary) -> {
+              if (simulate) {
+                ExposureSummary.ExposureSummaryBuilder builder = new ExposureSummary.ExposureSummaryBuilder();
+                int[] dummyAttenuations = new int[]{30, 30, 30};
+                builder.setAttenuationDurations(dummyAttenuations);
+                builder.setDaysSinceLastExposure(1);
+                builder.setMatchedKeyCount(1);
+                builder.setMaximumRiskScore(10);
+                builder.setSummationRiskScore(10);
+                exposureSummary = builder.build();
+              }
+
               if (exposureSummary == null) {
                   Events.raiseEvent(Events.INFO, "exposureSummary - no exposure summary, deleting token.");
                   return repository.deleteTokenEntityAsync(token);
@@ -221,4 +238,18 @@ public class StateUpdatedWorker extends ListenableWorker {
   private void showNotification() {
     showNotification(context);
   }
+
+   public static void simulateExposure(Long timeDelay) {
+        Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure");
+
+        WorkManager workManager = WorkManager.getInstance(Tracing.context);
+
+        OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
+                .setInitialDelay(Duration.ofSeconds(timeDelay))
+                .setInputData(
+                        new Data.Builder().putBoolean("simulate", true).putString(ExposureNotificationClient.EXTRA_TOKEN, "dummy")
+                                .build())
+                .build();
+        workManager.enqueueUniqueWork("SimulateWorker", ExistingWorkPolicy.REPLACE, workRequest);
+   }
 }

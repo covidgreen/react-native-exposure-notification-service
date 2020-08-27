@@ -54,7 +54,7 @@ RCT_EXTERN_METHOD(deleteExposureData:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(triggerUpdate:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(simulateExposure:(NSNumber *)timeDelay)
+RCT_EXTERN_METHOD(simulateExposure:(NSInteger *)timeDelay)
 
 @end
 
