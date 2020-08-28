@@ -19,7 +19,8 @@ import ExposureNotification, {
   StatusState,
   Status,
   CloseContact,
-  StatusType
+  StatusType,
+  KeyServerType
 } from './exposure-notification-module';
 
 import {getPermissions, requestPermissions} from './utils/permissions';
@@ -105,6 +106,8 @@ export interface ExposureProviderProps {
   traceConfiguration: TraceConfiguration;
   appVersion: string;
   serverUrl: string;
+  keyServerUrl: KeyServerType;
+  keyServerType: string;
   authToken: string;
   refreshToken: string;
   notificationTitle: string;
@@ -119,6 +122,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   traceConfiguration,
   appVersion,
   serverUrl,
+  keyServerUrl,
+  keyServerType = KeyServerType.nearform,
   authToken = '',
   refreshToken = '',
   notificationTitle,
@@ -246,6 +251,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       const config = {
         exposureCheckFrequency: traceConfiguration.exposureCheckInterval,
         serverURL: serverUrl,
+        keyServerUrl,
+        keyServerType,
         authToken,
         refreshToken,
         storeExposuresFor: traceConfiguration.storeExposuresFor,

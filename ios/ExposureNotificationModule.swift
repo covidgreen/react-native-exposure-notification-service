@@ -47,6 +47,8 @@ public class ExposureNotificationModule: RCTEventEmitter {
       let configData = Storage.Config(
         refreshToken: refresh,
         serverURL: serverURL,
+        keyServerUrl: configDict["serverURL"] as? String ?? serverURL,
+        keyServerType: configDict["keyServerType"] as? String ?? Storage.KeyServerType.NearForm,
         checkExposureInterval: configDict["exposureCheckFrequency"] as? Int ?? 120,
         storeExposuresFor: configDict["storeExposuresFor"] as? Int ?? 14,
         notificationTitle: configDict["notificationTitle"] as? String ?? "Close Contact Warning",

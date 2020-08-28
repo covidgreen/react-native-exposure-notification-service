@@ -50,7 +50,7 @@ class ExposureCheck: AsyncOperation {
         let unzipPath: URL
     }
 
-    public func serverURL(_ url: endPoints) -> String {
+    private func serverURL(_ url: endPoints) -> String {
       switch url {
         case .metrics:
           return self.configData.serverURL + "/metrics"
@@ -67,6 +67,24 @@ class ExposureCheck: AsyncOperation {
       }
     }
   
+    private func keyServerUrlNearForm(_ url: endPoints) -> String {
+      switch url {
+        case .exposures:
+          return self.configData.serverURL + "/exposures"
+        case .dataFiles:
+          return self.configData.serverURL + "/data/"
+      }
+    }
+
+    private func keyServerUrlGoogle(_ url: endPoints) -> String {
+      switch url {
+        case .exposures:
+          return self.configData.serverURL + "/v1/index.txt"
+        case .dataFiles:
+          return self.configData.serverURL + "/v1/"
+      }
+    }
+
     private let defaultSession = URLSession(configuration: .default)
     private var dataTask: URLSessionDataTask?
     private var configData: Storage.Config!

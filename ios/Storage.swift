@@ -9,6 +9,8 @@ public class Storage {
     public struct Config: Codable {
         let refreshToken: String
         let serverURL: String
+        let keyServerUrl: String
+        let keyServerType: Int
         let checkExposureInterval: Int
         let storeExposuresFor: Int
         let notificationTitle: String
@@ -31,6 +33,11 @@ public class Storage {
         let number: String
     }
     
+    public enum KeyServerType {
+      NearForm
+      GoogleRefServer
+    }
+
     public static let shared = Storage()
     
     public func readSettings(_ context: NSManagedObjectContext) -> Config! {
@@ -58,6 +65,8 @@ public class Storage {
             settings = Config(
               refreshToken:refreshToken,
               serverURL: data[0].value(forKey: "serverURL") as! String,
+              keyServerUrl: data[0].value(forKey: "keyServerUrl") as? String ?? data[0].value(forKey: "serverURL") as! String,
+              keyServerType: data[0].value(forKey: "keyServerType") as? Int ?? 0,
               checkExposureInterval: data[0].value(forKey: "checkExposureInterval") as! Int,
               storeExposuresFor: data[0].value(forKey: "storeExposuresFor") as! Int,
               notificationTitle: data[0].value(forKey: "notificationTitle") as! String,
@@ -196,6 +205,8 @@ public class Storage {
          keychain.set(config.refreshToken, forKey: "nm:refreshToken", withAccess: .accessibleAfterFirstUnlock)
         
          managedObject.setValue(config.serverURL, forKey: "serverURL")
+         managedObject.setValue(config.keyServerUrl, forKey: "keyServerUrl")
+         managedObject.setValue(config.keyServeType, forKey: "keyServerType")
          managedObject.setValue(config.checkExposureInterval, forKey: "checkExposureInterval")
          managedObject.setValue(config.storeExposuresFor, forKey: "storeExposuresFor")
          managedObject.setValue(config.notificationTitle, forKey: "notificationTitle")
