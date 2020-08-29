@@ -124,6 +124,8 @@ Use to configure the module. This method is synchronous, and should be called be
 
 - `exposureCheckFrequency`: a number representing the period between exposure downloads in minutes
 - `serverURL`: a string representing the the server api url (should not have trailing /)
+- `keyServerUrl`: a string representing the the key server api url (should not have trailing /). Will defauilt to serverURL
+- `keyServerType`: a string representing the the key server type, options are nearform or google. Defaults to nearform
 - `authToken`: a string representing the current authorization token
 - `refreshToken`: a string representing a token used to refresh the authorization token
 - `storeExposuresFor`: a number representing the number of days to store data for
