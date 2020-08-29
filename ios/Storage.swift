@@ -10,7 +10,7 @@ public class Storage {
         let refreshToken: String
         let serverURL: String
         let keyServerUrl: String
-        let keyServerType: Int
+        let keyServerType: KeyServerType
         let checkExposureInterval: Int
         let storeExposuresFor: Int
         let notificationTitle: String
@@ -33,9 +33,9 @@ public class Storage {
         let number: String
     }
     
-    public enum KeyServerType {
-      NearForm
-      GoogleRefServer
+    public enum KeyServerType: String, Codable {
+      case NearForm = "nearform"
+      case GoogleRefServer = "google"
     }
 
     public static let shared = Storage()
@@ -66,7 +66,7 @@ public class Storage {
               refreshToken:refreshToken,
               serverURL: data[0].value(forKey: "serverURL") as! String,
               keyServerUrl: data[0].value(forKey: "keyServerUrl") as? String ?? data[0].value(forKey: "serverURL") as! String,
-              keyServerType: data[0].value(forKey: "keyServerType") as? Int ?? 0,
+              keyServerType: data[0].value(forKey: "keyServerType") as? KeyServerType ?? KeyServerType.NearForm,
               checkExposureInterval: data[0].value(forKey: "checkExposureInterval") as! Int,
               storeExposuresFor: data[0].value(forKey: "storeExposuresFor") as! Int,
               notificationTitle: data[0].value(forKey: "notificationTitle") as! String,
@@ -206,7 +206,7 @@ public class Storage {
         
          managedObject.setValue(config.serverURL, forKey: "serverURL")
          managedObject.setValue(config.keyServerUrl, forKey: "keyServerUrl")
-         managedObject.setValue(config.keyServeType, forKey: "keyServerType")
+         managedObject.setValue(config.keyServerType, forKey: "keyServerType")
          managedObject.setValue(config.checkExposureInterval, forKey: "checkExposureInterval")
          managedObject.setValue(config.storeExposuresFor, forKey: "storeExposuresFor")
          managedObject.setValue(config.notificationTitle, forKey: "notificationTitle")
