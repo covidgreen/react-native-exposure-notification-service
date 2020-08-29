@@ -16,7 +16,7 @@ export enum KeyServerType {
 export interface ConfigurationOptions {
   exposureCheckFrequency: number;
   serverURL: string;
-  keyServerURL: string;
+  keyServerUrl: string;
   keyServerType: KeyServerType;
   authToken: string;
   refreshToken: string;
