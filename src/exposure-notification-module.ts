@@ -8,9 +8,16 @@ export enum AuthorisedStatus {
   unknown = 'unknown'
 }
 
+export enum KeyServerType {
+  nearform = 'nearform',
+  google = 'google'
+}
+
 export interface ConfigurationOptions {
   exposureCheckFrequency: number;
   serverURL: string;
+  keyServerUrl: string;
+  keyServerType: KeyServerType;
   authToken: string;
   refreshToken: string;
   storeExposuresFor: number;

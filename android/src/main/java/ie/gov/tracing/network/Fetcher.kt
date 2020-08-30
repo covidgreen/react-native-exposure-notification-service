@@ -48,13 +48,19 @@ class Fetcher {
 
         fun downloadFile(filename: String, context: Context): File? {
             try {
-                val serverUrl = SharedPrefs.getString("serverUrl", context)
+                val keyServerUrl = SharedPrefs.getString("keyServerUrl", context)
+                val keyServerType = SharedPrefs.getString("keyServerType", context)
                 val authToken = SharedPrefs.getString("authToken", context)
-                val fileUrl = "${serverUrl}/data/$filename"
+                var fileUrl = "${keyServerUrl}/data/$filename"
+                if (keyServerType == "google") {
+                    fileUrl = "${keyServerUrl}/$filename"
+                } 
                 Events.raiseEvent(Events.INFO, "downloadFile - $fileUrl")
                 val url = URL(fileUrl)
                 val urlConnection = url.openConnection() as HttpURLConnection
-                urlConnection.setRequestProperty("Authorization", "Bearer $authToken")
+                if (keyServerType == "nearform") {
+                    urlConnection.setRequestProperty("Authorization", "Bearer $authToken")
+                }
                 urlConnection.setRequestProperty("Accept", "application/zip")
 
                 val keyFile = File(context.filesDir, String.format(FILE_PATTERN, uniq()))
@@ -137,16 +143,21 @@ class Fetcher {
         }
 
         @JvmStatic
-        fun fetch(endpoint: String, retry: Boolean = false, context: Context): String? {
+        fun fetch(endpoint: String, retry: Boolean = false, keyFile: Boolean = false, context: Context): String? {
             try {
-                val serverUrl = SharedPrefs.getString("serverUrl", context)
+                var serverUrl = SharedPrefs.getString("serverUrl", context)
+                if (keyFile) {
+                    serverUrl = SharedPrefs.getString("keyServerUrl", context)
+                }
+                val keyServerType = SharedPrefs.getString("keyServerType", context)
                 val authToken = SharedPrefs.getString("authToken", context)
 
                 Events.raiseEvent(Events.INFO, "fetch - fetching from: ${serverUrl}$endpoint")
                 val url = URL("${serverUrl}$endpoint")
                 val urlConnection = url.openConnection() as HttpURLConnection
-                urlConnection.setRequestProperty("Authorization", "Bearer $authToken")
-
+                if ((keyServerType == "nearform" && keyFile) || !keyFile) {
+                    urlConnection.setRequestProperty("Authorization", "Bearer $authToken")
+                }                
                 Events.raiseEvent(Events.INFO, "fetch - response: ${urlConnection.responseCode}")
 
                 if (urlConnection.responseCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
@@ -165,7 +176,7 @@ class Fetcher {
                     return if (newAuthToken != null) {
                         SharedPrefs.setString("authToken", newAuthToken, context)
                         // recursively call again with retry set
-                        fetch(endpoint, true, context)
+                        fetch(endpoint, true, keyFile, context)
                     } else {
                         Events.raiseEvent(Events.ERROR, "fetch - Unauthorized")
                         null

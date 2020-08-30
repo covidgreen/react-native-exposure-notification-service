@@ -121,8 +121,15 @@ public class StateUpdatedWorker extends ListenableWorker {
 
               int[] ad = exposureSummary.getAttenuationDurationsInMinutes();
 
-              double[] tw = doubleArrayFromString(SharedPrefs.getString("thresholdWeightings", context));
-              long timeThreshold = SharedPrefs.getLong("timeThreshold", context);
+              double[] tw;
+              long timeThreshold;
+              if (simulate) {
+                  tw = doubleArrayFromString("[1, 1, 0]");
+                  timeThreshold = 15;
+              } else {
+                  tw = doubleArrayFromString(SharedPrefs.getString("thresholdWeightings", context));
+                  timeThreshold = SharedPrefs.getLong("timeThreshold", context);
+              }
 
               if (tw == null || tw.length != 3 || timeThreshold <= 0) {
                   Events.raiseEvent(Events.INFO, "exposureSummary - timeThreshold or " +

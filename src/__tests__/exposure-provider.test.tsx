@@ -34,7 +34,7 @@ import {
   useExposure
 } from '../exposure-provider';
 
-import ExposureNotificationModule from '../exposure-notification-module';
+import ExposureNotificationModule, { KeyServerType } from '../exposure-notification-module';
 import {getPermissions, requestPermissions} from '../utils/permissions';
 import {PermissionStatus} from '../types';
 
@@ -59,6 +59,9 @@ jest.mock('../exposure-notification-module', () => ({
   AuthorisedStatus: {
     unknown: 'unknown'
   },
+  KeyServerType: {
+    nearform: 'nearform'
+  },  
   authoriseExposure: jest.fn().mockResolvedValue(true),
   configure: jest.fn().mockResolvedValue(true),
   start: jest.fn().mockResolvedValue(true),
@@ -83,6 +86,8 @@ jest.mock('../exposure-notification-module', () => ({
 const mockConfig = {
   isReady: true,
   serverUrl: 'https://test.server.url',
+  keyServerUrl: 'https://key.server.url',
+  keyServerType: KeyServerType.nearform,
   authToken: 'testAuthToken',
   refreshToken: 'testRefreshToken',
   appVersion: '0.0.1-test',
@@ -204,6 +209,8 @@ describe('<ExposureProvider />', () => {
       notificationTitle: mockConfig.notificationTitle,
       refreshToken: mockConfig.refreshToken,
       serverURL: mockConfig.serverUrl,
+      keyServerUrl: mockConfig.keyServerUrl,
+      keyServerType: mockConfig.keyServerType,
       storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
       version: mockConfig.appVersion
     });
@@ -360,6 +367,8 @@ describe('useExposure', () => {
         notificationTitle: mockConfig.notificationTitle,
         refreshToken: mockConfig.refreshToken,
         serverURL: mockConfig.serverUrl,
+        keyServerUrl: mockConfig.keyServerUrl,
+        keyServerType: mockConfig.keyServerType,
         storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
         version: mockConfig.appVersion
       });

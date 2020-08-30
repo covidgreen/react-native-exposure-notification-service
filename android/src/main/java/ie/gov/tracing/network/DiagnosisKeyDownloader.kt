@@ -14,11 +14,30 @@ import java.io.File
 data class ServerFile(val id: Long, val path: String)
 
 internal class DiagnosisKeyDownloader(private val context: Context) {
+    private fun processGoogleList(fileList: List<String>): Array<ServerFile> {
+        var since = SharedPrefs.getLong("since", context)
+        var fileLimit = SharedPrefs.getLong("fileLimit", context)
+        val files = mutableListOf<ServerFile>()
+
+        fileList.forEach { serverFile ->
+            val f = File(serverFile)
+            val name = f.nameWithoutExtension
+            val nameParts = name.split("-")
+            Events.raiseEvent(Events.INFO, "checking google file - ${serverFile} - ${name}, ${nameParts[0]}, ${nameParts[1]}, ${since}")
+            if (nameParts[0].toLong() >= since) {
+              val sf = ServerFile(nameParts[1].toLong(), serverFile)
+              files.add(sf)
+            }
+        }
+        return files.subList(0, fileLimit.toInt()).toTypedArray()
+    }
+
     fun download(): ListenableFuture<List<File>> {
         ProvideDiagnosisKeysWorker.nextSince = 0 // this will be greater than 0 on success
 
         var since = SharedPrefs.getLong("since", context)
         var fileLimit = SharedPrefs.getLong("fileLimit", context)
+        val keyServerType = SharedPrefs.getString("keyServerType", context)
 
         Events.raiseEvent(Events.INFO, "download - get exports to process since: $since")
 
@@ -27,16 +46,26 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
         // 2. download the files to process
         // 3. increment sync to largest processed index
         // 4. return the list of files to pass to the submitter
-        val data = Fetcher.fetch("/exposures/?since=$since&limit=$fileLimit", false, context)
+        var url = "/exposures/?since=$since&limit=$fileLimit"
+        if (keyServerType == "google") {
+            url = "/v1/index.txt"
+        } 
+        val data = Fetcher.fetch(url, false, true, context)
 
         val files = mutableListOf<File>()
         if(data != null) {
-            val serverFiles = Gson().fromJson(data, Array<ServerFile>::class.java)
-            Events.raiseEvent(Events.INFO, "download - success, processing files: ${serverFiles.size}")
+            var serverFiles: Array<ServerFile>
+            if (keyServerType == "google") {
+                val fileList = data.split("\n")
+                serverFiles = processGoogleList(fileList)
+            } else {
+                serverFiles = Gson().fromJson(data, Array<ServerFile>::class.java)
+                Events.raiseEvent(Events.INFO, "download - success, processing files: ${serverFiles.size}")
 
+            }
             serverFiles.forEach { serverFile ->
                 try {
-                    Events.raiseEvent(Events.INFO, "download - downloading file: ${serverFile.path}")
+                    Events.raiseEvent(Events.INFO, "download - downloading file: ${serverFile}")
                     val file = Fetcher.downloadFile(serverFile.path, context)
                     if (file != null) {
                         files.add(file)
@@ -47,7 +76,6 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
                     Events.raiseError("download - Error downloading file: ${serverFile.path}", ex)
                 }
             }
-
             if (files.size > 0) {
                 Events.raiseEvent(Events.INFO, "success downloading incrementing since to: $since")
                 ProvideDiagnosisKeysWorker.nextSince = since

@@ -18,6 +18,7 @@ export {
   ConfigurationOptions,
   DiagnosisKey,
   CloseContact,
+  KeyServerType,
   StatusState,
   StatusType,
   Status

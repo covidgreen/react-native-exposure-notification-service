@@ -15,6 +15,16 @@ class Config {
                 SharedPrefs.setBoolean("analyticsOptin", params.getBoolean("analyticsOptin"), Tracing.context)
                 SharedPrefs.setString("version", params.getString("version")!!, Tracing.context)
                 SharedPrefs.setString("serverUrl", params.getString("serverURL")!!, Tracing.context)
+                var keyServer = params.getString("keyServerUrl")!!
+                if (keyServer.isEmpty()) {
+                    keyServer = params.getString("serverURL")!!
+                }
+                var keyServerType = params.getString("keyServerType")!!
+                if (keyServerType.isEmpty()) {
+                    keyServerType = "nearform"
+                }
+                SharedPrefs.setString("keyServerUrl", keyServer, Tracing.context)
+                SharedPrefs.setString("keyServerType", keyServerType, Tracing.context)
                 SharedPrefs.setString("notificationTitle", params.getString("notificationTitle")!!, Tracing.context)
                 SharedPrefs.setString("notificationDesc", params.getString("notificationDesc")!!, Tracing.context)
                 // this is sensitive user data, our shared prefs class is uses EncryptedSharedPreferences and MasterKeys

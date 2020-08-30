@@ -50,14 +50,25 @@ class ExposureCheck: AsyncOperation {
         let unzipPath: URL
     }
 
-    public func serverURL(_ url: endPoints) -> String {
+    private func serverURL(_ url: endPoints) -> String {
       switch url {
         case .metrics:
           return self.configData.serverURL + "/metrics"
         case .exposures:
-          return self.configData.serverURL + "/exposures"
+            switch self.configData.keyServerType {
+            case .GoogleRefServer:
+                return self.configData.keyServerUrl + "/v1/index.txt"
+            default:
+                return self.configData.serverURL + "/exposures"
+            }
+                
         case .dataFiles:
-          return self.configData.serverURL + "/data/"
+            switch self.configData.keyServerType {
+            case .GoogleRefServer:
+                return self.configData.keyServerUrl + "/"
+            default:
+                return self.configData.serverURL + "/data/"
+            }
         case .callback:
           return self.configData.serverURL + "/callback"
         case .settings:
@@ -100,8 +111,14 @@ class ExposureCheck: AsyncOperation {
             return
        }
       
-       let serverDomain: String = getDomain(self.configData.serverURL)
-       let manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
+       let serverDomain: String = Storage.getDomain(self.configData.serverURL)
+       let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
+       var manager: ServerTrustManager
+       if (self.configData.keyServerType != Storage.KeyServerType.NearForm) {
+          manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator(), keyServerDomain: DefaultTrustEvaluator()])
+       } else {
+          manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
+       }
        self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)), serverTrustManager: manager)
         
        os_log("Running with params %@, %@, %@", log: OSLog.checkExposure, type: .debug, self.configData.serverURL, self.configData.authToken, self.configData.refreshToken)
@@ -318,36 +335,28 @@ class ExposureCheck: AsyncOperation {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
-      
-      var lastId = self.configData.lastExposureIndex!
-      os_log("Checking for exposures since %d", log: OSLog.checkExposure, type: .debug, lastId)
+      os_log("Key server type set to %@", log: OSLog.checkExposure, type: .debug, self.configData.keyServerType.rawValue)
+      switch self.configData.keyServerType {
+      case .GoogleRefServer:
+        getGoogleExposureFiles(completion)
+      default:
+        getNearFormExposureFiles(completion)
+      }
+    }
+
+    private func getNearFormExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
+      guard !self.isCancelled else {
+        return self.cancelProcessing()
+      }
+
+      let lastId = self.configData.lastExposureIndex ?? 0
+      os_log("Checking for exposures against nearform server since %d", log: OSLog.checkExposure, type: .debug, lastId)
       self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": self.configData.fileLimit])
       .validate()
       .responseDecodable(of: [CodableExposureFiles].self) { response in
         switch response.result {
           case .success:
-            let files = response.value!
-            if files.count > 0 {
-              os_log("Files available to process, %d", log: OSLog.checkExposure, type: .debug, files.count)
-              lastId = files.last!.id
-              let urls: [URL] = files.map{ url in
-                lastId = max(url.id, lastId)
-                return URL(string: self.serverURL(.dataFiles) + url.path)!
-              }
-            
-              self.downloadFilesForProcessing(urls) { result in
-                switch result {
-                case let .success(localURLS):
-                  completion(.success((localURLS, lastId)))
-                case let .failure(error):
-                  completion(.failure(error))
-                }
-              }
-            } else {
-                /// no keys to be processed
-                os_log("No key files returned from server, last file index: %d", log: OSLog.checkExposure, type: .info, lastId)
-                completion(.success(([], lastId)))
-            }
+            self.processFileLinks(response.value!, completion)
           case let .failure(error):
               os_log("Failure occurred while reading exposure files %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
               completion(.failure(error))
@@ -355,6 +364,92 @@ class ExposureCheck: AsyncOperation {
       }
     }
 
+    private func getGoogleExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
+      guard !self.isCancelled else {
+        return self.cancelProcessing()
+      }
+
+      os_log("Checking for exposures against google server type, %@", log: OSLog.checkExposure, type: .debug, self.serverURL(.exposures))
+      self.sessionManager.request(self.serverURL(.exposures))
+      .validate()
+        .responseString { response in
+          switch response.result {
+          case .success:
+            let files = self.findFilesToProcess(response.value!)
+
+            self.processFileLinks(files, completion)
+          case let .failure(error):
+              os_log("Failure occurred while reading exposure files %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+              completion(.failure(error))
+        }
+      }
+    }
+
+    private func processFileLinks(_ files: [CodableExposureFiles], _ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
+        var lastId = self.configData.lastExposureIndex ?? 0
+        if files.count > 0 {
+          os_log("Files available to process, %d", log: OSLog.checkExposure, type: .debug, files.count)
+          lastId = files.last!.id
+          let urls: [URL] = files.map{ url in
+            lastId = max(url.id, lastId)
+            return URL(string: self.serverURL(.dataFiles) + url.path)!
+          }
+        
+          self.downloadFilesForProcessing(urls) { result in
+            switch result {
+            case let .success(localURLS):
+              completion(.success((localURLS, lastId)))
+            case let .failure(error):
+              completion(.failure(error))
+            }
+          }
+        } else {
+            /// no keys to be processed
+            os_log("No key files returned from server, last file index: %d", log: OSLog.checkExposure, type: .info, lastId)
+            completion(.success(([], lastId)))
+        }
+    }
+    
+    private func findFilesToProcess(_ fileList: String) -> [CodableExposureFiles] {
+        /// fileList if of format
+        /*
+         v1/1597846020-1597846080-00001.zip
+         v1/1597847700-1597847760-00001.zip
+         v1/1597848660-1597848720-00001.zip
+        */
+        let listData = fileList.split(separator: "\n").map { String($0) }
+        
+        var filesToProcess: [CodableExposureFiles] = []
+        for key in listData {
+            let fileURL = URL(fileURLWithPath: key)
+            let fileName = fileURL.deletingPathExtension().lastPathComponent
+            os_log("Parsing google file entry item %@, %@", log: OSLog.checkExposure, type: .debug, String(key), fileName)
+            let idVal = self.parseGoogleFileName(fileName)
+            if idVal > -1  {
+                let fileItem = CodableExposureFiles(id: idVal, path: String(key))
+                filesToProcess.append(fileItem)
+            }
+        }
+        return Array(filesToProcess.prefix(self.configData.fileLimit))
+
+    }
+    
+    private func parseGoogleFileName(_ key: String) -> Int {
+        /// key format is 1598375820-1598375880-00001
+        /// start time - end time - ??
+        /// we look for any start times > than the last end time we stored
+        /// return the end time as the last id
+        let keyParts = key.split(separator: "-").map { String($0) }
+        let lastId = self.configData.lastExposureIndex ?? 0
+        
+        if (Int(keyParts[0]) ?? 0 >= lastId) {
+            return Int(keyParts[1]) ?? 0
+        } else {
+            return -1
+        }
+        
+    }
+    
     private func downloadFilesForProcessing(_ files: [URL], _ completion: @escaping (Result<[URL], Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
@@ -616,9 +711,12 @@ class RequestInterceptor: Alamofire.RequestInterceptor {
 
         var urlRequest = urlRequest
 
-        /// Set the Authorization header value using the access token.
-        urlRequest.setValue("Bearer " + self.config.authToken, forHTTPHeaderField: "Authorization")
-      
+        let keyServerHost = Storage.getDomain(self.config.keyServerUrl)
+        if (urlRequest.url?.host == keyServerHost && self.config.keyServerType == Storage.KeyServerType.NearForm) {
+            /// Set the Authorization header value using the access token, only on nearform server requests
+            urlRequest.setValue("Bearer " + self.config.authToken, forHTTPHeaderField: "Authorization")
+        }
+        
         completion(.success(urlRequest))
     }
 
