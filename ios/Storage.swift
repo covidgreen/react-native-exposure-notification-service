@@ -40,6 +40,11 @@ public class Storage {
 
     public static let shared = Storage()
     
+    public static func getDomain(_ url: String) -> String {
+        let url = URL(string: url)
+        return url!.host!
+    }
+    
     public func readSettings(_ context: NSManagedObjectContext) -> Config! {
        var settings: Config!
        
@@ -61,13 +66,13 @@ public class Storage {
             let refreshToken = keychain.get("nm:refreshToken") ?? ""
             let defaultDate = Date().addingTimeInterval(-1*24*60*60)
             
-            
+            let keyType = data[0].value(forKey: "keyServerType") as? String ?? KeyServerType.NearForm.rawValue
+              
             settings = Config(
               refreshToken:refreshToken,
               serverURL: data[0].value(forKey: "serverURL") as! String,
               keyServerUrl: data[0].value(forKey: "keyServerUrl") as? String ?? data[0].value(forKey: "serverURL") as! String,
-              keyServerType: data[0].value(forKey: "keyServerType") as? KeyServerType ?? KeyServerType.NearForm,
-              checkExposureInterval: data[0].value(forKey: "checkExposureInterval") as! Int,
+              keyServerType: Storage.KeyServerType(rawValue: keyType)!,checkExposureInterval: data[0].value(forKey: "checkExposureInterval") as! Int,
               storeExposuresFor: data[0].value(forKey: "storeExposuresFor") as! Int,
               notificationTitle: data[0].value(forKey: "notificationTitle") as! String,
               notificationDesc: data[0].value(forKey: "notificationDesc") as! String,
@@ -206,7 +211,7 @@ public class Storage {
         
          managedObject.setValue(config.serverURL, forKey: "serverURL")
          managedObject.setValue(config.keyServerUrl, forKey: "keyServerUrl")
-         managedObject.setValue(config.keyServerType, forKey: "keyServerType")
+         managedObject.setValue(config.keyServerType.rawValue, forKey: "keyServerType")
          managedObject.setValue(config.checkExposureInterval, forKey: "checkExposureInterval")
          managedObject.setValue(config.storeExposuresFor, forKey: "storeExposuresFor")
          managedObject.setValue(config.notificationTitle, forKey: "notificationTitle")

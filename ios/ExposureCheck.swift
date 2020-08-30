@@ -57,7 +57,7 @@ class ExposureCheck: AsyncOperation {
         case .exposures:
             switch self.configData.keyServerType {
             case .GoogleRefServer:
-                return self.configData.serverURL + "/v1/index.txt"
+                return self.configData.keyServerUrl + "/v1/index.txt"
             default:
                 return self.configData.serverURL + "/exposures"
             }
@@ -65,7 +65,7 @@ class ExposureCheck: AsyncOperation {
         case .dataFiles:
             switch self.configData.keyServerType {
             case .GoogleRefServer:
-                return self.configData.serverURL + "/v1"
+                return self.configData.keyServerUrl + "/"
             default:
                 return self.configData.serverURL + "/data/"
             }
@@ -111,8 +111,14 @@ class ExposureCheck: AsyncOperation {
             return
        }
       
-       let serverDomain: String = getDomain(self.configData.serverURL)
-       let manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
+       let serverDomain: String = Storage.getDomain(self.configData.serverURL)
+       let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
+       var manager: ServerTrustManager
+       if (self.configData.keyServerType != Storage.KeyServerType.NearForm) {
+          manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator(), keyServerDomain: DefaultTrustEvaluator()])
+       } else {
+          manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
+       }
        self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)), serverTrustManager: manager)
         
        os_log("Running with params %@, %@, %@", log: OSLog.checkExposure, type: .debug, self.configData.serverURL, self.configData.authToken, self.configData.refreshToken)
@@ -329,7 +335,7 @@ class ExposureCheck: AsyncOperation {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
-
+      os_log("Key server type set to %@", log: OSLog.checkExposure, type: .debug, self.configData.keyServerType.rawValue)
       switch self.configData.keyServerType {
       case .GoogleRefServer:
         getGoogleExposureFiles(completion)
@@ -363,7 +369,7 @@ class ExposureCheck: AsyncOperation {
         return self.cancelProcessing()
       }
 
-      os_log("Checking for exposures against google server type", log: OSLog.checkExposure, type: .debug)
+      os_log("Checking for exposures against google server type, %@", log: OSLog.checkExposure, type: .debug, self.serverURL(.exposures))
       self.sessionManager.request(self.serverURL(.exposures))
       .validate()
         .responseString { response in
@@ -705,9 +711,12 @@ class RequestInterceptor: Alamofire.RequestInterceptor {
 
         var urlRequest = urlRequest
 
-        /// Set the Authorization header value using the access token.
-        urlRequest.setValue("Bearer " + self.config.authToken, forHTTPHeaderField: "Authorization")
-      
+        let keyServerHost = Storage.getDomain(self.config.keyServerUrl)
+        if (urlRequest.url?.host == keyServerHost && self.config.keyServerType == Storage.KeyServerType.NearForm) {
+            /// Set the Authorization header value using the access token, only on nearform server requests
+            urlRequest.setValue("Bearer " + self.config.authToken, forHTTPHeaderField: "Authorization")
+        }
+        
         completion(.success(urlRequest))
     }
 
