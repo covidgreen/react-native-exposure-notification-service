@@ -14,22 +14,22 @@ import java.io.File
 data class ServerFile(val id: Long, val path: String)
 
 internal class DiagnosisKeyDownloader(private val context: Context) {
-    private fun processGoogleList(fileList: string[]): ServerFile[] {
+    private fun processGoogleList(fileList: List<String>): Array<ServerFile> {
         var since = SharedPrefs.getLong("since", context)
         var fileLimit = SharedPrefs.getLong("fileLimit", context)
         val files = mutableListOf<ServerFile>()
 
         fileList.forEach { serverFile ->
-            File f = new File(serverFile)
+            val f = File(serverFile)
             val name = f.nameWithoutExtension
             val nameParts = name.split("-")
             Events.raiseEvent(Events.INFO, "checking google file - ${serverFile} - ${name}, ${nameParts[0]}, ${nameParts[1]}, ${since}")
-            if (Long(nameParts[0]) >= since) {
-              ServerFile sf = new ServerFile(Long(nameParts[0), serverFile)
+            if (nameParts[0].toLong() >= since) {
+              val sf = ServerFile(nameParts[1].toLong(), serverFile)
               files.add(sf)
             }
         }
-        return files.subList(0, fileLimit)
+        return files.subList(0, fileLimit.toInt()).toTypedArray()
     }
 
     fun download(): ListenableFuture<List<File>> {
@@ -46,17 +46,15 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
         // 2. download the files to process
         // 3. increment sync to largest processed index
         // 4. return the list of files to pass to the submitter
-        var url
+        var url = "/exposures/?since=$since&limit=$fileLimit"
         if (keyServerType == "google") {
             url = "/v1/index.txt"
-        } else {
-            url = "/exposures/?since=$since&limit=$fileLimit"
-        }
+        } 
         val data = Fetcher.fetch(url, false, context)
 
         val files = mutableListOf<File>()
         if(data != null) {
-            var serverFiles
+            var serverFiles: Array<ServerFile>
             if (keyServerType == "google") {
                 val fileList = data.split("\n")
                 serverFiles = processGoogleList(fileList)

@@ -51,11 +51,9 @@ class Fetcher {
                 val keyServerUrl = SharedPrefs.getString("keyServerUrl", context)
                 val keyServerType = SharedPrefs.getString("keyServerType", context)
                 val authToken = SharedPrefs.getString("authToken", context)
-                var fileUrl 
+                var fileUrl = "${keyServerUrl}/data/$filename"
                 if (keyServerUrl == "google") {
                     fileUrl = "${keyServerUrl}/filename"
-                } else {
-                    fileUrl = "${keyServerUrl}/data/$filename"
                 } 
                 Events.raiseEvent(Events.INFO, "downloadFile - $fileUrl")
                 val url = URL(fileUrl)
