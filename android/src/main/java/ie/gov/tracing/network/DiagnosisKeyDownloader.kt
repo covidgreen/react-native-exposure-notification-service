@@ -50,7 +50,7 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
         if (keyServerType == "google") {
             url = "/v1/index.txt"
         } 
-        val data = Fetcher.fetch(url, false, context)
+        val data = Fetcher.fetch(url, false, true, context)
 
         val files = mutableListOf<File>()
         if(data != null) {
