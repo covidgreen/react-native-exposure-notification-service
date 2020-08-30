@@ -155,7 +155,7 @@ class Fetcher {
                 Events.raiseEvent(Events.INFO, "fetch - fetching from: ${serverUrl}$endpoint")
                 val url = URL("${serverUrl}$endpoint")
                 val urlConnection = url.openConnection() as HttpURLConnection
-                if (keyServerType == "nearform" && keyFile) {
+                if ((keyServerType == "nearform" && keyFile) || !keyFile) {
                     urlConnection.setRequestProperty("Authorization", "Bearer $authToken")
                 }                
                 Events.raiseEvent(Events.INFO, "fetch - response: ${urlConnection.responseCode}")
