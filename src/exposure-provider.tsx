@@ -170,6 +170,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         isReady &&
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
+        await configure();
         start();
       }
     }
