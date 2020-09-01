@@ -435,8 +435,7 @@ class ExposureCheck: AsyncOperation {
             }
         }
         if (self.configData.lastExposureIndex <= 0) {
-            let startIndex = max(0, (filesToProcess.count - self.configData.fileLimit))
-            return Array(filesToProcess.suffix(startIndex))
+            return Array(filesToProcess.suffix(self.configData.fileLimit))
         } else {
             return Array(filesToProcess.prefix(self.configData.fileLimit))
         }
