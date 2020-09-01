@@ -192,10 +192,11 @@ public class ExposureProcessor {
                                   rejecter reject: @escaping RCTPromiseRejectBlock) {
        
        let context = Storage.PersistentContainer.shared.newBackgroundContext()
-       guard let config = Storage.shared.readSettings(context) else {
-         return resolve([])
+       var exposurePeriod:Int = 14
+       if let config = Storage.shared.readSettings(context) {
+         exposurePeriod = config.storeExposuresFor
        }
-       let info = Storage.shared.getExposures(config.storeExposuresFor).reversed()
+       let info = Storage.shared.getExposures(exposurePeriod).reversed()
        
        let exposures = info.compactMap { exposure -> [String: Any]? in
          var item: [String: Any] = [

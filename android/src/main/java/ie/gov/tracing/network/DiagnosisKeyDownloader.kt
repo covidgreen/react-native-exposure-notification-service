@@ -9,6 +9,7 @@ import ie.gov.tracing.common.Events
 import ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker
 import ie.gov.tracing.storage.SharedPrefs
 import java.io.File
+import kotlin.math.max
 
 @Keep
 data class ServerFile(val id: Long, val path: String)
@@ -29,7 +30,12 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
               files.add(sf)
             }
         }
-        return files.subList(0, fileLimit.toInt()).toTypedArray()
+        if (since <= 0) {
+            val startIndex = max(0, files.size - fileLimit.toInt())
+            return files.subList(startIndex, fileLimit.toInt()).toTypedArray()
+        } else {
+            return files.subList(0, fileLimit.toInt()).toTypedArray()
+        }
     }
 
     fun download(): ListenableFuture<List<File>> {

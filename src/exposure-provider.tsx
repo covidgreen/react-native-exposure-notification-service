@@ -170,7 +170,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         isReady &&
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
-        await configure();
         start();
       }
     }
@@ -195,7 +194,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     }));
     await validateStatus(status);
     if (enabled) {
-      await configure();
       getCloseContacts();
     }
   };
@@ -302,7 +300,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   const getCloseContacts = async () => {
     try {
       if (state.permissions.exposure.status === PermissionStatus.Allowed) {
-        await configure();
         const contacts = await ExposureNotification.getCloseContacts();
         setState((s) => ({...s, contacts}));
         return contacts;
