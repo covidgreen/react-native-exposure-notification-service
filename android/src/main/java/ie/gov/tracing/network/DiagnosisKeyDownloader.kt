@@ -30,6 +30,9 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
               files.add(sf)
             }
         }
+        if (files.size == 0) {
+            return files.toTypedArray()
+        }        
         if (since <= 0) {
             val startIndex = max(0, files.size - fileLimit.toInt())
             return files.subList(startIndex, fileLimit.toInt()).toTypedArray()
