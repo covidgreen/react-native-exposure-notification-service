@@ -130,6 +130,9 @@ class ExposureCheck: AsyncOperation {
             return
        }
       
+       // clean out any expired exposures
+       Storage.shared.deleteOldExposures(self.configData.storeExposuresFor)
+        
        if (self.simulateExposureOnly) {
            os_log("Simulating exposure alert", log: OSLog.exposure, type: .debug)
            simulateExposureEvent()
@@ -423,15 +426,19 @@ class ExposureCheck: AsyncOperation {
         for key in listData {
             let fileURL = URL(fileURLWithPath: key)
             let fileName = fileURL.deletingPathExtension().lastPathComponent
-            os_log("Parsing google file entry item %@, %@", log: OSLog.checkExposure, type: .debug, String(key), fileName)
             let idVal = self.parseGoogleFileName(fileName)
+            os_log("Parsing google file entry item %@, %@, %d", log: OSLog.checkExposure, type: .debug, String(key), fileName, idVal)
+
             if idVal > -1  {
                 let fileItem = CodableExposureFiles(id: idVal, path: String(key))
                 filesToProcess.append(fileItem)
             }
         }
-        return Array(filesToProcess.prefix(self.configData.fileLimit))
-
+        if (self.configData.lastExposureIndex <= 0) {
+            return Array(filesToProcess.suffix(self.configData.fileLimit))
+        } else {
+            return Array(filesToProcess.prefix(self.configData.fileLimit))
+        }
     }
     
     private func parseGoogleFileName(_ key: String) -> Int {

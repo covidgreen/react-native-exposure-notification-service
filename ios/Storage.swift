@@ -258,7 +258,26 @@ public class Storage {
 
       os_log("All stored details cleared", log: OSLog.storage, type: .info)
     }
+
+    public func deleteOldExposures(_ storeExposuresFor: Int) {
+        let calendar = Calendar.current
+        let dateToday = calendar.startOfDay(for: Date())
+        let oldestAllowed = calendar.date(byAdding: .day, value: (0 - storeExposuresFor), to: dateToday)
+        
+        let context = PersistentContainer.shared.newBackgroundContext()
+        let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "Exposures")
+        fetchRequest.predicate = NSPredicate(format: "exposureDate < %@", oldestAllowed! as CVarArg)
+        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+        
+        do {
+          try context.execute(deleteRequest)
+        } catch let error as NSError {
+          os_log("Error deleting the old stored exposures: %@", log: OSLog.storage, type: .error, error.localizedDescription)
+        }
     
+        os_log("Old exposure details cleared", log: OSLog.storage, type: .info)
+    }
+
     @available(iOS 13.5, *)
     public func saveExposureDetails(_ context: NSManagedObjectContext, _ exposureInfo: ExposureProcessor.ExposureInfo) {
       var managedObject: NSManagedObject
@@ -340,23 +359,6 @@ public class Storage {
       return exposures
     }
   
-    /*private lazy var persistentContainer: NSPersistentContainer? = {
-        let modelURL = Bundle(for: type(of: self)).url(forResource: "ExposureNotification", withExtension: "momd")!
-        let managedObjectModel = NSManagedObjectModel(contentsOf: modelURL)!
-        let container = NSPersistentContainer(name: "ExposureNotification", managedObjectModel: managedObjectModel)
-        container.loadPersistentStores(completionHandler: { (storeDescription, error) in
-            if let error = error {
-                fatalError("Unresolved error \(error)")
-            }
-            
-            os_log("Successfully loaded persistent store at: %@", log: OSLog.storage, type: .debug, storeDescription.url?.description ?? "nil")
-        })
-        container.viewContext.automaticallyMergesChangesFromParent = true
-        container.viewContext.mergePolicy = NSMergePolicy(merge: NSMergePolicyType.mergeByPropertyStoreTrumpMergePolicyType)
-        return container
-    }()*/
-    
-    
     public class PersistentContainer: NSPersistentContainer {
 
         static let shared: PersistentContainer = {
