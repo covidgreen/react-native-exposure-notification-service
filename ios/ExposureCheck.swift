@@ -126,7 +126,7 @@ class ExposureCheck: AsyncOperation {
        guard (self.configData.lastRunDate!.addingTimeInterval(TimeInterval(self.configData.checkExposureInterval * 60)) < Date() || self.skipTimeCheck) else {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            self.finishNoProcessing("Check was run at \(formatter.string(from: self.configData.lastRunDate!)), interval is \(self.configData.checkExposureInterval), its too soon to check again")
+            self.finishNoProcessing("Check was run at \(formatter.string(from: self.configData.lastRunDate!)), interval is \(self.configData.checkExposureInterval), its too soon to check again", false)
             return
        }
       
@@ -660,7 +660,7 @@ class ExposureCheck: AsyncOperation {
         case .success:
           os_log("Request for callback sent", log: OSLog.checkExposure, type: .debug)
           Storage.shared.flagNotificationRaised(self.storageContext)
-          self.saveMetric(event: "CALLBACK_REQUEST", completion: completion)
+          completion(.success(true))
         case let .failure(error):
           os_log("Unable to send callback request, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
           completion(.failure(error))
@@ -687,7 +687,14 @@ class ExposureCheck: AsyncOperation {
       return completion(.success(true))
     }
     os_log("Sending metric, %@", log:OSLog.checkExposure, type: .info, event)
-    self.sessionManager.request(self.serverURL(.metrics), method: .post , parameters: ["os": "ios", "event": event, "version": self.configData.version, "payload": payload ?? []], encoding: JSONEncoding.default)
+    var params: Parameters = [:]
+    params["os"] = "ios"
+    params["event"] = event
+    params["version"] = self.configData.version
+    if let packet = payload {
+        params["payload"] = packet
+    }
+    self.sessionManager.request(self.serverURL(.metrics), method: .post , parameters: params, encoding: JSONEncoding.default)
       .validate()
       .response() { response in
         switch response.result {

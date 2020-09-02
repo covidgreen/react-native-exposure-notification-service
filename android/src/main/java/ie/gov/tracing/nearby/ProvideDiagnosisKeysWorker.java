@@ -156,7 +156,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
   private Result processFailure(Exception ex) {
     HashMap<String, Object> payload = new HashMap<>();
-    payload.put("description", "error processing file: $ex");
+    payload.put("description", "error processing file: " + ex);
     Fetcher.saveMetric("LOG_ERROR", context, payload);
 
     Events.raiseError("error processing file: ",  ex);

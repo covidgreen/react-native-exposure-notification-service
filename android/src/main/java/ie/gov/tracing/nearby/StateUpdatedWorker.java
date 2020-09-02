@@ -197,7 +197,7 @@ public class StateUpdatedWorker extends ListenableWorker {
 
   private Result processError(Exception ex) {
       HashMap<String, Object> payload = new HashMap<>();
-      payload.put("description", "error receiving notification: $ex");
+      payload.put("description", "error receiving notification: " + ex);
       Fetcher.saveMetric("LOG_ERROR", context, payload);
 
       Events.raiseError("error receiving notification", ex);
