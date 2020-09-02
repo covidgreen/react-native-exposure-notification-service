@@ -10,6 +10,7 @@ import ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker
 import ie.gov.tracing.storage.SharedPrefs
 import java.io.File
 import kotlin.math.max
+import kotlin.math.min
 
 @Keep
 data class ServerFile(val id: Long, val path: String)
@@ -39,7 +40,7 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
             return files.subList(startIndex, endIndex).toTypedArray()
         } else {
             val endIndex = min(files.size, fileLimit.toInt())
-            return files.subList(0, fileLimit.toInt()).toTypedArray()
+            return files.subList(0, endIndex).toTypedArray()
         }
     }
 
