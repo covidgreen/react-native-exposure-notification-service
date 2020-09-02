@@ -255,7 +255,6 @@ class Fetcher {
                 Events.raiseEvent(Events.INFO, "triggerCallback - success")
                 SharedPrefs.setLong("notificationSent", System.currentTimeMillis(), context)
 
-                saveMetric("CALLBACK_REQUEST", context)
             } catch(ex: Exception) {
                 Events.raiseError("triggerCallback - error", ex)
             }
