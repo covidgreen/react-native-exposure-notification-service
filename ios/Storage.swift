@@ -352,9 +352,9 @@ public class Storage {
           return info
         }
       } catch  {
-        os_log("Could not retrieve settings: %@", log: OSLog.storage, type: .error, error.localizedDescription)
+        os_log("Could not retrieve exposures: %@", log: OSLog.storage, type: .error, error.localizedDescription)
       }
-      os_log("Fetching settings from store", log: OSLog.storage, type: .debug)
+      /// os_log("Fetching exposures from store", log: OSLog.storage, type: .debug)
 
       return exposures
     }
