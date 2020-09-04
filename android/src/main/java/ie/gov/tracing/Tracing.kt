@@ -24,6 +24,7 @@ import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import ie.gov.tracing.nearby.StateUpdatedWorker
+import android.bluetooth.BluetoothAdapter;
 
 class Listener: ActivityEventListener {
     override fun onNewIntent(intent: Intent?) {}
@@ -583,6 +584,18 @@ class Tracing {
         fun getExposureStatus(promise: Promise? = null): ReadableMap {
             val result: WritableMap = Arguments.createMap()
             try {
+                // check bluetooth
+                BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled()) {
+                    exposureStatus = EXPOSURE_STATUS_DISABLED
+                    exposureDisabledReason = "bluetooth";
+                }
+
+                if (isLocationEnableRequired(getApplication())) {
+                    exposureStatus = EXPOSURE_STATUS_DISABLED
+                    exposureDisabledReason = "bluetooth";
+                }                
+
                 result.putString("state", exposureStatus)
                 result.putString("type", exposureDisabledReason)
                 promise?.resolve(result)

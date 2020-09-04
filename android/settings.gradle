@@ -1,1 +1,1 @@
-include ':mylibrary', ':play-services-nearby-18.0.3-eap'
+include ':mylibrary', ':play-services-nearby-exposurenotification-1.6.1-eap'

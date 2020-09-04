@@ -95,6 +95,10 @@ public class ExposureNotificationClientWrapper {
     return exposureNotificationClient.getExposureSummary(token);
   }
 
+  public boolean deviceSupportsLocationlessScanning() {
+    return exposureNotificationClient.deviceSupportsLocationlessScanning();
+  }
+  
   /*
   Task<List<ExposureInformation>> getExposureInformation(String token) {
     return exposureNotificationClient.getExposureInformation(token);
