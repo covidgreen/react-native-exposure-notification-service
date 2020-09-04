@@ -24,6 +24,10 @@ import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import ie.gov.tracing.nearby.StateUpdatedWorker
+import android.bluetooth.BluetoothAdapter;
+import android.location.LocationManager
+import android.os.Build
+import androidx.core.location.LocationManagerCompat
 
 class Listener: ActivityEventListener {
     override fun onNewIntent(intent: Intent?) {}
@@ -579,17 +583,45 @@ class Tracing {
             }
         }
 
+       /**
+         * When it comes to Location and BLE, there are the following conditions:
+         * - Location on is only necessary to use bluetooth for Android M+.
+         * - Starting with Android S, there may be support for locationless BLE scanning
+         * => We only go into an error state if these conditions require us to have location on, but
+         * it is not activated on device.
+         */
+        private fun isLocationEnableRequired(): Boolean {
+            val locationManager: LocationManager = Tracing.context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            return (!exposureWrapper.deviceSupportsLocationlessScanning()
+                    && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && locationManager != null && !LocationManagerCompat.isLocationEnabled(locationManager))
+        }
+
         @JvmStatic
         fun getExposureStatus(promise: Promise? = null): ReadableMap {
             val result: WritableMap = Arguments.createMap()
+            val typeData: WritableArray = Arguments.createArray()
             try {
+                // check bluetooth
+                val bluetoothAdapter: BluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
+                    exposureStatus = EXPOSURE_STATUS_DISABLED
+                    exposureDisabledReason = "bluetooth";
+                }
+
+                if (isLocationEnableRequired()) {
+                    exposureStatus = EXPOSURE_STATUS_DISABLED
+                    exposureDisabledReason = "bluetooth";
+                }                
+
                 result.putString("state", exposureStatus)
-                result.putString("type", exposureDisabledReason)
+                typeData.pushString(exposureDisabledReason)
+                result.putArray("type", typeData)
                 promise?.resolve(result)
             } catch (ex: Exception) {
                 Events.raiseError("getExposureStatus", ex)
                 result.putString("state", EXPOSURE_STATUS_UNKNOWN)
-                result.putString("type", "error")
+                typeData.pushString("error")
+                result.putArray("type", typeData)
                 promise?.resolve(result)
             }
             return result
