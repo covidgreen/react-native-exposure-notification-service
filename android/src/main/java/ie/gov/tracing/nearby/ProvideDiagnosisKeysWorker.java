@@ -1,5 +1,13 @@
 package ie.gov.tracing.nearby;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.os.Build;
+import android.R;
+
 import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.work.Constraints;
@@ -110,8 +118,12 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   public ListenableFuture<Result> startWork() {
       Tracing.currentContext = getApplicationContext();
       Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
+      // Mark the Worker as important
+      String progress = "Starting Download";
+      setForegroundAsync(createForegroundInfo(progress));
 
       updateLastRun();
+
       SharedPrefs.remove("lastApiError", Tracing.currentContext);
       SharedPrefs.remove("lastError", Tracing.currentContext);
 
@@ -152,6 +164,51 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                       AppExecutors.getBackgroundExecutor())
               .catching(Exception.class, this::processFailure,
                       AppExecutors.getBackgroundExecutor());
+  }
+
+  @NonNull
+  private ForegroundInfo createForegroundInfo(@NonNull String progress) {
+      // Build a notification using bytesRead and contentLength
+
+      Context context = getApplicationContext();
+      String id = "COVIDTRACKING";
+      String title = "Covid Tracker";//context.getString(R.string.notification_title);
+      String cancel = "Cancel";//context.getString(R.string.cancel_download);
+      // This PendingIntent can be used to cancel the worker
+      PendingIntent intent = WorkManager.getInstance(context)
+              .createCancelPendingIntent(getId());
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        createChannel(id);
+      }
+
+      Notification notification = new NotificationCompat.Builder(context, id)
+              .setContentTitle(title)
+              .setTicker(title)
+              //.setSmallIcon(R.drawable.ic_work_notification)
+              .setOngoing(true)
+              // Add the cancel action to the notification which can
+              // be used to cancel the worker
+              .addAction(android.R.drawable.ic_delete, cancel, intent)
+              .build();
+
+      //return new ForegroundInfo(NOTIFICATION_ID, notification,
+        //    FOREGROUND_SERVICE_TYPE_LOCATION);
+      return new ForegroundInfo(notification);
+  }
+
+  @RequiresApi(Build.VERSION_CODES.O)
+  private void createChannel(String id) {
+    // Create a Notification channel
+    NotificationChannel channel = new NotificationChannel(
+            id,
+            "COVID Tracker Notification Channel", NotificationManager.IMPORTANCE_DEFAULT
+    );
+    //channel.description = "COVIDTracker Notification Channel"
+    NotificationManager notificationManager = (NotificationManager) getApplicationContext().getSystemService(
+            Context.NOTIFICATION_SERVICE
+    );
+    notificationManager.createNotificationChannel(channel);
   }
 
   private Result processFailure(Exception ex) {

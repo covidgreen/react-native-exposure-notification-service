@@ -118,6 +118,7 @@ public class ExposureProcessor {
                 return reject("START", "Error starting notification services", error)
             } else {
                 os_log("Service started", log: OSLog.exposure, type: .debug)
+                self.scheduleCheckExposure()
                 resolve(true)
             }
         }
