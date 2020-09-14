@@ -6,10 +6,11 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.os.Build;
-import android.R;
 
 import android.content.Context;
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.core.app.NotificationCompat;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.ExistingWorkPolicy;
@@ -17,6 +18,7 @@ import androidx.work.ListenableWorker;
 import androidx.work.NetworkType;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.PeriodicWorkRequest;
+import androidx.work.ForegroundInfo;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 import androidx.work.WorkerParameters;
@@ -36,6 +38,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import org.threeten.bp.Duration;
+import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
 
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
@@ -46,6 +49,7 @@ import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.ExposureNotificationRepository;
 import ie.gov.tracing.storage.SharedPrefs;
 import ie.gov.tracing.storage.TokenEntity;
+import ie.gov.tracing.R;
 
 public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   static final Duration DEFAULT_API_TIMEOUT = Duration.ofSeconds(15);
@@ -53,6 +57,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private static final String WORKER_NAME = "ProvideDiagnosisKeysWorker";
   private static final BaseEncoding BASE64_LOWER = BaseEncoding.base64();
   private static final int RANDOM_TOKEN_BYTE_LENGTH = 32;
+  private static final String FOREGROUND_NOTIFICATION_ID =
+          "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID";
 
   private final DiagnosisKeyDownloader diagnosisKeys;
   private final DiagnosisKeyFileSubmitter submitter;
@@ -69,6 +75,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     secureRandom = new SecureRandom();
     repository = new ExposureNotificationRepository(context);
     this.context = context;
+    setForegroundAsync(createForegroundInfo());
   }
 
   private String generateRandomToken() {
@@ -118,9 +125,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   public ListenableFuture<Result> startWork() {
       Tracing.currentContext = getApplicationContext();
       Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
-      // Mark the Worker as important
-      String progress = "Starting Download";
-      setForegroundAsync(createForegroundInfo(progress));
+
+      setForegroundAsync(createForegroundInfo());
 
       updateLastRun();
 
@@ -167,34 +173,19 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   }
 
   @NonNull
-  private ForegroundInfo createForegroundInfo(@NonNull String progress) {
-      // Build a notification using bytesRead and contentLength
-
-      Context context = getApplicationContext();
-      String id = "COVIDTRACKING";
-      String title = "Covid Tracker";//context.getString(R.string.notification_title);
-      String cancel = "Cancel";//context.getString(R.string.cancel_download);
-      // This PendingIntent can be used to cancel the worker
-      PendingIntent intent = WorkManager.getInstance(context)
-              .createCancelPendingIntent(getId());
-
+  private ForegroundInfo createForegroundInfo() {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        createChannel(id);
+        createChannel(FOREGROUND_NOTIFICATION_ID);
       }
-
-      Notification notification = new NotificationCompat.Builder(context, id)
-              .setContentTitle(title)
-              .setTicker(title)
-              //.setSmallIcon(R.drawable.ic_work_notification)
+      Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.Foreground created");
+      Notification notification = new NotificationCompat.Builder(this.context, FOREGROUND_NOTIFICATION_ID)
+              .setContentTitle(this.context.getString(R.string.notification_checking))
+              .setProgress(1, 0, true)
+              .setSmallIcon(R.mipmap.ic_notification)
               .setOngoing(true)
-              // Add the cancel action to the notification which can
-              // be used to cancel the worker
-              .addAction(android.R.drawable.ic_delete, cancel, intent)
               .build();
 
-      //return new ForegroundInfo(NOTIFICATION_ID, notification,
-        //    FOREGROUND_SERVICE_TYPE_LOCATION);
-      return new ForegroundInfo(notification);
+      return new ForegroundInfo(1, notification, FOREGROUND_SERVICE_TYPE_LOCATION);
   }
 
   @RequiresApi(Build.VERSION_CODES.O)
@@ -202,10 +193,9 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     // Create a Notification channel
     NotificationChannel channel = new NotificationChannel(
             id,
-            "COVID Tracker Notification Channel", NotificationManager.IMPORTANCE_DEFAULT
+            this.context.getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW
     );
-    //channel.description = "COVIDTracker Notification Channel"
-    NotificationManager notificationManager = (NotificationManager) getApplicationContext().getSystemService(
+    NotificationManager notificationManager = (NotificationManager) this.context.getSystemService(
             Context.NOTIFICATION_SERVICE
     );
     notificationManager.createNotificationChannel(channel);

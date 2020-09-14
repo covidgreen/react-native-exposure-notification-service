@@ -22,6 +22,9 @@
                 <action android:name="com.google.android.gms.exposurenotification.ACTION_REQUEST_DIAGNOSIS_KEYS" />
             </intent-filter>
         </receiver>
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="location" />        
     </application>
 
 </manifest>
