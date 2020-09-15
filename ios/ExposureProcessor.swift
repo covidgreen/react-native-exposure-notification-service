@@ -122,6 +122,7 @@ public class ExposureProcessor {
                 resolve(true)
             }
         }
+        self.scheduleCheckExposure()
     }
     
     public func stop(_ resolve: @escaping RCTPromiseResolveBlock,
