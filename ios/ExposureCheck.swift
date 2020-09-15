@@ -105,11 +105,6 @@ class ExposureCheck: AsyncOperation {
           self.finishNoProcessing("No config set so can't proceeed with checking exposures", false)
           return
        }
-
-       guard ENManager.authorizationStatus == .authorized else {
-            self.finishNoProcessing("Not authorised so can't run exposure checks")
-            return
-       }
       
        let serverDomain: String = Storage.getDomain(self.configData.serverURL)
        let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
@@ -129,7 +124,12 @@ class ExposureCheck: AsyncOperation {
             self.finishNoProcessing("Check was run at \(formatter.string(from: self.configData.lastRunDate!)), interval is \(self.configData.checkExposureInterval), its too soon to check again", false)
             return
        }
-      
+
+       guard ENManager.authorizationStatus == .authorized else {
+            self.finishNoProcessing("Not authorised so can't run exposure checks")
+            return
+       }
+
        // clean out any expired exposures
        Storage.shared.deleteOldExposures(self.configData.storeExposuresFor)
         
@@ -679,7 +679,7 @@ class ExposureCheck: AsyncOperation {
     }
     guard self.configData != nil else {
       // don't track daily trace if config not setup
-      return self.finish()
+      return completion(.success(true))
     }
 
     if (!self.configData.analyticsOptin) {
