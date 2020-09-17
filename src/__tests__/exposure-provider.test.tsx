@@ -76,7 +76,9 @@ jest.mock('../exposure-notification-module', () => ({
   exposureEnabled: jest.fn().mockResolvedValue(true),
   isAuthorised: jest.fn().mockResolvedValue(true),
   getLogData: jest.fn().mockResolvedValue({}),
-  triggerUpdate: jest.fn().mockResolvedValue(true),
+  version: jest.fn().mockResolvedValue({}),
+  bundleId: jest.fn().mockResolvedValue({version: '123', build: '5'}),
+  triggerUpdate: jest.fn().mockResolvedValue('testbundle'),
   status: jest.fn().mockResolvedValue({
     state: 'active'
   }),
@@ -274,7 +276,9 @@ describe('useExposure', () => {
       stop: expect.any(Function),
       supported: true,
       supportsExposureApi: expect.any(Function),
-      triggerUpdate: expect.any(Function)
+      triggerUpdate: expect.any(Function),
+      buildVersion: expect.any(Function),
+      bundleId: expect.any(Function)
     });
   });
 
@@ -635,4 +639,26 @@ describe('useExposure', () => {
       );
     });
   });  
+
+  describe('buildVersion()', () => {
+    it('gets the app build version details', async () => {
+      const {result} = await renderExposureHook();
+      mocked(ExposureNotificationModule.version).mockClear();
+      await act(async () => {
+        await result.current.buildVersion();
+      });
+      expect(ExposureNotificationModule.version).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('bundleId()', () => {
+    it('gets the app bundle id', async () => {
+      const {result} = await renderExposureHook();
+      mocked(ExposureNotificationModule.bundleId).mockClear();
+      await act(async () => {
+        await result.current.bundleId();
+      });
+      expect(ExposureNotificationModule.bundleId).toHaveBeenCalledTimes(1);
+    });
+  });   
 });
