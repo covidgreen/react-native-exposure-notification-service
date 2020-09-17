@@ -19,6 +19,7 @@ import ExposureNotification, {
   StatusState,
   Status,
   CloseContact,
+  Version,
   StatusType,
   KeyServerType
 } from './exposure-notification-module';
@@ -58,6 +59,8 @@ export interface ExposureContextValue extends State {
   getLogData: () => Promise<{[key: string]: any}>;
   triggerUpdate: () => Promise<string | undefined>;
   deleteExposureData: () => Promise<void>;
+  buildVersion: () => Promise<Version>;
+  bundleId: () => Promise<string>;
   readPermissions: () => Promise<void>;
   askPermissions: () => Promise<void>;
   setExposureState: (setStateAction: SetStateAction<State>) => void;
@@ -96,6 +99,8 @@ export const ExposureContext = createContext<ExposureContextValue>({
   getLogData: () => Promise.resolve({}),
   triggerUpdate: () => Promise.resolve(undefined),
   deleteExposureData: () => Promise.resolve(),
+  buildVersion: () => Promise.resolve(undefined),
+  bundleId: () => Promise.resolve(''),
   readPermissions: () => Promise.resolve(),
   askPermissions: () => Promise.resolve(),
   setExposureState: () => {}
@@ -348,6 +353,24 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     }
   };
 
+  const buildVersion = async () => {
+    try {
+      const result = await ExposureNotification.version();
+      return result;
+    } catch (e) {
+      console.log('build version error', e);
+    }
+  };
+
+  const bundleId = async () => {
+    try {
+      const result = await ExposureNotification.bundleId();
+      return result;
+    } catch (e) {
+      console.log('bundle id error', e);
+    }
+  };
+
   const readPermissions = useCallback(async () => {
     console.log('Read permissions...');
 
@@ -384,6 +407,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     getLogData,
     triggerUpdate,
     deleteExposureData,
+    buildVersion,
+    bundleId,
     readPermissions,
     askPermissions,
     setExposureState: setState

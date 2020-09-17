@@ -63,6 +63,11 @@ export interface Status {
   type?: StatusType[];
 }
 
+export interface Version {
+  version: String;
+  build: String;
+}
+
 export interface ExposureNotificationModule extends EventSubscriptionVendor {
   canSupport(): Promise<boolean>;
 
@@ -95,6 +100,10 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
   status(): Promise<Status>;
 
   getLogData(): Promise<any>;
+
+  bundleId(): Promise<string>;
+  
+  version(): Promise<Version>;
 
   /**
    * @platform android

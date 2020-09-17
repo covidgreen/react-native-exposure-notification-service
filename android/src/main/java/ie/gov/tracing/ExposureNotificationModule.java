@@ -200,4 +200,30 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
         }
         promise.resolve(true);
     }
+
+    @ReactMethod
+    public void version(Promise promise) {
+        String versionNum, buildNum;
+        try {
+            versionNum = getPackageInfo().versionName;
+            buildNum = getPackageInfo().versionCode;
+        catch (Exception e) {
+            versionNum = 'unknown';
+            buildNum = 'unknown';
+        }
+        WritableMap data = Arguments.createMap();
+        data.putString("version", versionNum)
+        data.putString("build", buildNum)
+        promise.resolve(data);
+
+    }
+
+    @ReactMethod
+    public void bundleId(Promise promise) {
+        promise.resolve(reactContext.getApplicationContext().getPackageName()););
+    }
+
+    private PackageInfo getPackageInfo() throws Exception {
+        return reactContext.getApplicationContext().getPackageManager().getPackageInfo(reactContext.getApplicationContext().getPackageName(), 0);
+    }
 }
