@@ -239,11 +239,15 @@ class Fetcher {
                     }
                 }
 
-                val dayInMs = 1000 * 60 * 60 * 24
-                val notificationDate = exposureEntity.createdTimestampMs
-                val daysSinceExposure = notificationDate - (exposureEntity.daysSinceLastExposure() * dayInMs)
+                val calendar = Calendar.getInstance()
+                calendar.add(Calendar.DAY_OF_YEAR, 0 - exposureEntity.daysSinceLastExposure())
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.MILLISECOND, 0);
+                val daysSinceExposure = calendar.time
 
-                Events.raiseEvent(Events.INFO, "triggerCallback - sending: ${Date(daysSinceExposure)}")
+                Events.raiseEvent(Events.INFO, "triggerCallback - sending: ${daysSinceExposure} ${Date(daysSinceExposure)}")
                 val callbackParams = Callback(callbackNum, daysSinceExposure, payload)
                 val success = post("/callback", Gson().toJson(callbackParams), context)
 
