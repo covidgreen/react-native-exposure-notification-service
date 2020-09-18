@@ -214,6 +214,7 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
         WritableMap data = Arguments.createMap();
         data.putString("version", versionNum)
         data.putString("build", buildNum)
+        data.putString("display", versionNum + "." + buildNum)
         promise.resolve(data);
 
     }

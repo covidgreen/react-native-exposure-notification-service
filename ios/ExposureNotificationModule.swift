@@ -220,6 +220,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
         var version: [String: String] = [:]
         version["version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         version["build"] = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        version["display"] = "\(version["version"] ?? "unknown").\(version["build"] ?? "unknown")"
         
         resolve(version)
     }

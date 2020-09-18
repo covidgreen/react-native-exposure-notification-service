@@ -31,7 +31,9 @@ import NativeEventEmitter from 'react-native/Libraries/EventEmitter/NativeEventE
 import {
   ExposureProvider,
   ExposureProviderProps,
-  useExposure
+  useExposure,
+  getBundleId,
+  getVersion
 } from '../exposure-provider';
 
 import ExposureNotificationModule, { KeyServerType } from '../exposure-notification-module';
@@ -76,9 +78,9 @@ jest.mock('../exposure-notification-module', () => ({
   exposureEnabled: jest.fn().mockResolvedValue(true),
   isAuthorised: jest.fn().mockResolvedValue(true),
   getLogData: jest.fn().mockResolvedValue({}),
-  version: jest.fn().mockResolvedValue({}),
-  bundleId: jest.fn().mockResolvedValue({version: '123', build: '5'}),
-  triggerUpdate: jest.fn().mockResolvedValue('testbundle'),
+  bundleId: jest.fn().mockResolvedValue('testbundle'),
+  version: jest.fn().mockResolvedValue({version: '123', build: '5'}),
+  triggerUpdate: jest.fn().mockResolvedValue(true),
   status: jest.fn().mockResolvedValue({
     state: 'active'
   }),
@@ -276,9 +278,7 @@ describe('useExposure', () => {
       stop: expect.any(Function),
       supported: true,
       supportsExposureApi: expect.any(Function),
-      triggerUpdate: expect.any(Function),
-      buildVersion: expect.any(Function),
-      bundleId: expect.any(Function)
+      triggerUpdate: expect.any(Function)
     });
   });
 
@@ -640,25 +640,21 @@ describe('useExposure', () => {
     });
   });  
 
-  describe('buildVersion()', () => {
+  describe('getVersion()', () => {
     it('gets the app build version details', async () => {
-      const {result} = await renderExposureHook();
       mocked(ExposureNotificationModule.version).mockClear();
-      await act(async () => {
-        await result.current.buildVersion();
-      });
+      const val = await getVersion()
       expect(ExposureNotificationModule.version).toHaveBeenCalledTimes(1);
+      expect(val).toEqual({build: '5', version: '123'})
     });
   });
 
   describe('bundleId()', () => {
     it('gets the app bundle id', async () => {
-      const {result} = await renderExposureHook();
       mocked(ExposureNotificationModule.bundleId).mockClear();
-      await act(async () => {
-        await result.current.bundleId();
-      });
+      const val = await getBundleId()
       expect(ExposureNotificationModule.bundleId).toHaveBeenCalledTimes(1);
+      expect(val).toEqual('testbundle')
     });
   });   
 });
