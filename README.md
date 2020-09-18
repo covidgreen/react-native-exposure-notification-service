@@ -550,6 +550,18 @@ Checks the current status of `exposure` and `notifications` permissions and upda
 
 Requests permissions from the user for `exposure` and `notifications` permissions and updates the context
 
+##### `getVersion()`
+
+`() => Promise<Version>`
+
+Returns the version number for the app
+
+##### `getBundleId()`
+
+`() => Promise<string>`
+
+Returns the bundle identifier / package name for the app
+
 ##### `setExposureState()`
 
 `(setStateAction: SetStateAction<State>) => void`

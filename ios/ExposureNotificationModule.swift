@@ -209,7 +209,22 @@ public class ExposureNotificationModule: RCTEventEmitter {
             resolve(true)
         }
     }
-  
+
+    @objc public func bundleId(_ resolve: @escaping RCTPromiseResolveBlock,
+                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
+        resolve(Bundle.main.bundleIdentifier!)
+    }
+    
+    @objc public func version(_ resolve: @escaping RCTPromiseResolveBlock,
+                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
+        var version: [String: String] = [:]
+        version["version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        version["build"] = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        version["display"] = "\(version["version"] ?? "unknown").\(version["build"] ?? "unknown")"
+        
+        resolve(version)
+    }
+    
     private func setupNotifications() {
         notificationCenter.addObserver(self,
               selector: #selector(onStatusChanged),
