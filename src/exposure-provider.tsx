@@ -27,7 +27,8 @@ import {getPermissions, requestPermissions} from './utils/permissions';
 import {
   ExposurePermissions,
   PermissionStatus,
-  TraceConfiguration
+  TraceConfiguration,
+  Version
 } from './types';
 
 const emitter = new NativeEventEmitter(ExposureNotification);
@@ -115,6 +116,24 @@ export interface ExposureProviderProps {
   callbackNumber?: string;
   analyticsOptin?: boolean;
 }
+
+export const getVersion = async () => {
+  try {
+    const result = await ExposureNotification.version();
+    return result;
+  } catch (e) {
+    console.log('build version error', e);
+  }
+};
+
+export const getBundleId = async () => {
+  try {
+    const result = await ExposureNotification.bundleId();
+    return result;
+  } catch (e) {
+    console.log('bundle id error', e);
+  }
+};
 
 export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   children,

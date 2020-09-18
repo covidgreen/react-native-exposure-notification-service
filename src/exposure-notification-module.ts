@@ -1,4 +1,5 @@
 import {NativeModules, EventSubscriptionVendor} from 'react-native';
+import { Version } from './types'
 
 export enum AuthorisedStatus {
   granted = 'granted',
@@ -95,6 +96,10 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
   status(): Promise<Status>;
 
   getLogData(): Promise<any>;
+
+  version(): Promise<Version>;
+
+  bundleId(): Promise<string>;
 
   /**
    * @platform android

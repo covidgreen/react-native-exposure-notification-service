@@ -2,14 +2,17 @@ export {
   ExposureProvider,
   ExposureContext,
   ExposureContextValue,
-  useExposure
+  useExposure,
+  getBundleId,
+  getVersion
 } from './exposure-provider';
 
 export {
   TraceConfiguration,
   PermissionStatus,
   PermissionDetails,
-  ExposurePermissions
+  ExposurePermissions,
+  Version
 } from './types';
 
 export {
@@ -23,3 +26,5 @@ export {
   StatusType,
   Status
 } from './exposure-notification-module';
+
+
