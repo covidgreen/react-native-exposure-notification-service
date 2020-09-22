@@ -33,6 +33,9 @@ RCT_EXTERN_METHOD(exposureEnabled:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(getDiagnosisKeys:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(getTestDiagnosisKeys:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(status:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 

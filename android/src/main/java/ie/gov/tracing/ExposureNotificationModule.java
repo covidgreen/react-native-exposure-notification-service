@@ -167,6 +167,12 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void getDiagnosisKeys(Promise promise) {
+        promise.resolve(Arguments.createArray());
+        return;
+    }
+
+    @ReactMethod
     public void getCloseContacts(Promise promise) {
         if(nearbyNotSupported()){
             promise.resolve(Arguments.createArray());

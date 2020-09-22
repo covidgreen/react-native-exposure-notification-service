@@ -174,6 +174,40 @@ public class ExposureProcessor {
           }
       }
     }
+
+    public func getTestDiagnosisKeys(_ resolve: @escaping RCTPromiseResolveBlock,
+                                           rejecter reject: @escaping RCTPromiseRejectBlock) {
+        
+      guard ENManager.authorizationStatus == .authorized else {
+          os_log("Not authorised so can't get keys", log: OSLog.exposure, type: .info)
+          return reject("Auth", "User has not authorised ENS", nil)
+      }
+
+      ExposureManager.shared.manager.getTestDiagnosisKeys { temporaryExposureKeys, error in
+          if let error = error as? ENError, error.code == .notAuthorized {
+              os_log("User did authorise the extraction of keys, %@", log: OSLog.exposure, type: .error, error.localizedDescription)
+              return reject("Auth", "User did not authorize key extraction", error)
+          } else if let error = error {
+              os_log("Unexpected error occurred getting the keys, %@", log: OSLog.exposure, type: .error, error.localizedDescription)
+              return reject("getKeys", "Error extracting keys", error)
+          } else {
+              guard temporaryExposureKeys != nil else {
+                 return resolve([])
+              }
+
+              let codableDiagnosisKeys = temporaryExposureKeys!.compactMap { diagnosisKey -> [String: Any]? in
+                return [
+                  "keyData": diagnosisKey.keyData.base64EncodedString(),
+                  "rollingPeriod": diagnosisKey.rollingPeriod,
+                  "rollingStartNumber": diagnosisKey.rollingStartNumber,
+                  "transmissionRiskLevel": diagnosisKey.transmissionRiskLevel
+                ]
+              }
+
+              resolve(codableDiagnosisKeys)
+          }
+      }
+    }
   
     public func getLogData(_ resolve: @escaping RCTPromiseResolveBlock,
                            rejecter reject: @escaping RCTPromiseRejectBlock) {

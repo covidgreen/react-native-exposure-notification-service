@@ -208,6 +208,18 @@ Used to retrieve a devices own diagnosis keys (typically all keys before today w
 
 ---
 
+##### `getTestDiagnosisKeys()`
+
+```javascript
+const keys = await ExposureNotificationModule.getTestDiagnosisKeys();
+```
+
+Used to retrieve a devices own diagnosis test keys (typically all keys before today within a 14 day window). This returns a promise that resolves to an array of maps containing the key `keyData`, encoded as a base64 string. This key should be used in export files for exposure matching. If the user denies the request, the returned promise will reject.
+
+**Note:** this function is for development/testing purposes only
+
+---
+
 ##### `checkExposure()`
 
 ```javascript

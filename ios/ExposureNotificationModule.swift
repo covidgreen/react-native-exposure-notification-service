@@ -144,6 +144,15 @@ public class ExposureNotificationModule: RCTEventEmitter {
            resolve([])
        }
     }
+
+    @objc public func getTestDiagnosisKeys(_ resolve: @escaping RCTPromiseResolveBlock,
+                                        rejecter reject: @escaping RCTPromiseRejectBlock) {
+       if #available(iOS 13.5, *) {
+           ExposureProcessor.shared.getTestDiagnosisKeys(resolve, rejecter: reject)
+       } else {
+           resolve([])
+       }
+    }
     
     @objc public func getCloseContacts(_ resolve: @escaping RCTPromiseResolveBlock,
                                      rejecter reject: @escaping RCTPromiseRejectBlock) {
