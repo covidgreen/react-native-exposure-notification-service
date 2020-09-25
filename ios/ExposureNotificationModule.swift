@@ -276,6 +276,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
               status["state"] = "unavailable"
         }
         if ExposureManager.shared.isPaused() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
+           status["state"] = "disabled"]
            status["type"] = ["paused"]
         }
         os_log("Status of exposure service has changed %@", log: OSLog.exposure, type: .debug, status)

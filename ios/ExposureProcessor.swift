@@ -98,6 +98,7 @@ public class ExposureProcessor {
             result["type"] = ["starting"]
       }
       if ExposureManager.shared.isPaused() && (result["state"] as! String == "disabled" || result["state"] as! String == "unknown") {
+         result["state"] = "disabled"
          result["type"] = ["paused"]
       }
         
