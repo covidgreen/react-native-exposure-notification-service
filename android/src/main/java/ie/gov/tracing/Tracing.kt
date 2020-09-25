@@ -135,8 +135,8 @@ class Tracing {
         private const val STATUS_STOPPING = "STOPPING"
 
         var status = STATUS_STOPPED
-        private var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
-        private var exposureDisabledReason = "starting"
+        var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
+        var exposureDisabledReason = "starting"
 
         private lateinit var exposureWrapper: ExposureNotificationClientWrapper
 
