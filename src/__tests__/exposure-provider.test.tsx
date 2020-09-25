@@ -517,7 +517,17 @@ describe('useExposure', () => {
       expect(result.current.contacts).toEqual(mockCloseContacts);
     });
 
-    it('does not load close contacts if permissions are not granted', async () => {
+    it('does load close contacts if permissions are not granted', async () => {
+      const mockCloseContacts = [
+        {
+          exposureAlertDate: 'exposureAlertDate',
+          attenuationDurations: [1, 2, 3],
+          daysSinceLastExposure: 1,
+          matchedKeyCount: 1,
+          maxRiskScore: 1,
+          summationRiskScore: 1
+        }
+      ];
       mocked(getPermissions).mockResolvedValueOnce({
         exposure: {status: PermissionStatus.NotAllowed},
         notifications: {status: PermissionStatus.Allowed}
@@ -527,10 +537,8 @@ describe('useExposure', () => {
       await act(async () => {
         await result.current.getCloseContacts();
       });
-      expect(
-        ExposureNotificationModule.getCloseContacts
-      ).not.toHaveBeenCalled();
-      expect(result.current.contacts).toEqual([]);
+      expect(ExposureNotificationModule.getCloseContacts).toHaveBeenCalled();
+      expect(result.current.contacts).toEqual(mockCloseContacts);
     });
 
     it('does not throw', async () => {

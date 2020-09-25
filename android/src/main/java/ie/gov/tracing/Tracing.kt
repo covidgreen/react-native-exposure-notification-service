@@ -25,6 +25,7 @@ import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import ie.gov.tracing.nearby.StateUpdatedWorker
+import android.content.IntentFilter
 import android.bluetooth.BluetoothAdapter;
 import android.location.LocationManager
 import android.os.Build
@@ -107,7 +108,7 @@ class BleStatusReceiver : BroadcastReceiver() {
             Tracing.getExposureStatus(null)
         }
 
-        Events.raiseError("bleStatusUpdate", intent.action)
+        Events.raiseEvent(Events.INFO,"bleStatusUpdate - $intent.action")
     }
 }
 
@@ -277,7 +278,7 @@ class Tracing {
         fun start(promise: Promise?) {
             try {
                 setNewStatus(STATUS_STARTING)
-                SharedPrefs.setBoolean("servicePaused", false, context))
+                SharedPrefs.setBoolean("servicePaused", false, context)
                 if (promise != null) {
                     resolutionPromise = null
                     startPromise = promise
@@ -293,7 +294,7 @@ class Tracing {
         fun pause(promise: Promise?) {
             try {
                 setNewStatus(STATUS_STOPPING)
-                SharedPrefs.setBoolean("servicePaused", true, context))
+                SharedPrefs.setBoolean("servicePaused", true, context)
                 val permissionHelperCallback: Callback = object : Callback {
                     override fun onFailure(t: Throwable) {
                         Events.raiseError("paused", Exception(t))
@@ -319,7 +320,7 @@ class Tracing {
         fun stop() {
             try {
                 setNewStatus(STATUS_STOPPING)
-                SharedPrefs.setBoolean("servicePaused", false, context))
+                SharedPrefs.setBoolean("servicePaused", false, context)
                 val permissionHelperCallback: Callback = object : Callback {
                     override fun onFailure(t: Throwable) {
                         Events.raiseError("stop", Exception(t))

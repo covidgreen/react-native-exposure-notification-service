@@ -83,7 +83,7 @@ public class Storage {
               datesLastRan: data[0].value(forKey: "datesLastRan") as? String ?? "",
               lastExposureIndex: data[0].value(forKey: "lastIndex") as? Int,
               notificationRaised: data[0].value(forKey: "notificationRaised") as? Bool,
-              paused: data[0].value(forKey: "servicePaused") as? Bool,
+              paused: data[0].value(forKey: "servicePaused") as? Bool ?? false,
               callbackNumber: callbackNum,
               analyticsOptin: data[0].value(forKey: "analyticsOptin") as? Bool,
               dailyTrace: data[0].value(forKey: "dailyTrace") as? Date,

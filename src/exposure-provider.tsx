@@ -191,8 +191,11 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
         await configure();
+        const latestStatus = await ExposureNotification.status();
 
-        if (state.status.type?.indexOf(StatusType.paused) == -1) {
+        if (
+          !(latestStatus && latestStatus.type?.indexOf(StatusType.paused) > -1)
+        ) {
           start();
         }
       }
@@ -216,9 +219,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       isAuthorised
     }));
     await validateStatus(status);
-    if (enabled) {
-      getCloseContacts();
-    }
+    await getCloseContacts();
   };
 
   const validateStatus = async (status?: Status) => {
@@ -233,6 +234,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       newStatus.state === StatusState.unavailable &&
       newStatus.type?.includes(StatusType.starting);
     const initialised = !isStarting || !canSupport;
+
     setState((s) => ({
       ...s,
       status: newStatus,
@@ -331,12 +333,9 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const getCloseContacts = async () => {
     try {
-      if (state.permissions.exposure.status === PermissionStatus.Allowed) {
-        const contacts = await ExposureNotification.getCloseContacts();
-        setState((s) => ({...s, contacts}));
-        return contacts;
-      }
-      return [];
+      const contacts = await ExposureNotification.getCloseContacts();
+      setState((s) => ({...s, contacts}));
+      return contacts;
     } catch (err) {
       console.log('getCloseContacts err', err);
       return null;
