@@ -85,6 +85,15 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void pause(Promise promise) {
+        if(nearbyNotSupported()){
+            promise.resolve(false);
+            return;
+        }
+        Tracing.pause(promise);
+    }
+
+    @ReactMethod
     public void stop() {
         if(nearbyNotSupported()) return;
         Tracing.stop();
@@ -229,5 +238,5 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
 
     private PackageInfo getPackageInfo() throws Exception {
         return Tracing.reactContext.getApplicationContext().getPackageManager().getPackageInfo(Tracing.reactContext.getApplicationContext().getPackageName(), 0);
-    }
+    }ly
 }

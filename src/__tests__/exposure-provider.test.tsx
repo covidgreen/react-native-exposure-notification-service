@@ -36,7 +36,9 @@ import {
   getVersion
 } from '../exposure-provider';
 
-import ExposureNotificationModule, { KeyServerType } from '../exposure-notification-module';
+import ExposureNotificationModule, {
+  KeyServerType
+} from '../exposure-notification-module';
 import {getPermissions, requestPermissions} from '../utils/permissions';
 import {PermissionStatus} from '../types';
 
@@ -63,7 +65,7 @@ jest.mock('../exposure-notification-module', () => ({
   },
   KeyServerType: {
     nearform: 'nearform'
-  },  
+  },
   authoriseExposure: jest.fn().mockResolvedValue(true),
   configure: jest.fn().mockResolvedValue(true),
   start: jest.fn().mockResolvedValue(true),
@@ -77,6 +79,7 @@ jest.mock('../exposure-notification-module', () => ({
   isSupported: jest.fn().mockResolvedValue(true),
   exposureEnabled: jest.fn().mockResolvedValue(true),
   isAuthorised: jest.fn().mockResolvedValue(true),
+  pause: jest.fn().mockResolvedValue(true),
   getLogData: jest.fn().mockResolvedValue({}),
   bundleId: jest.fn().mockResolvedValue('testbundle'),
   version: jest.fn().mockResolvedValue({version: '123', build: '5'}),
@@ -276,6 +279,7 @@ describe('useExposure', () => {
         state: 'active'
       },
       stop: expect.any(Function),
+      pause: expect.any(Function),
       supported: true,
       supportsExposureApi: expect.any(Function),
       triggerUpdate: expect.any(Function)
@@ -349,6 +353,33 @@ describe('useExposure', () => {
         new Error('oops!')
       );
       await expect(result.current.stop()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('pause()', () => {
+    it('pauses the exposure module', async () => {
+      const {result} = await renderExposureHook();
+      await act(async () => {
+        await result.current.pause();
+      });
+      expect(ExposureNotificationModule.pause).toHaveBeenCalledTimes(1);
+    });
+
+    it('validates the status', async () => {
+      const {result} = await renderExposureHook();
+      mocked(ExposureNotificationModule.status).mockClear();
+      await act(async () => {
+        await result.current.pause();
+      });
+      expect(ExposureNotificationModule.status).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw', async () => {
+      const {result} = await renderExposureHook();
+      mocked(ExposureNotificationModule.pause).mockRejectedValueOnce(
+        new Error('oops!')
+      );
+      await expect(result.current.pause()).resolves.toBeUndefined();
     });
   });
 
@@ -633,28 +664,30 @@ describe('useExposure', () => {
       await act(async () => {
         await result.current.simulateExposure(10);
       });
-      expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledTimes(1);
+      expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledTimes(
+        1
+      );
       expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledWith(
         10
       );
     });
-  });  
+  });
 
   describe('getVersion()', () => {
     it('gets the app build version details', async () => {
       mocked(ExposureNotificationModule.version).mockClear();
-      const val = await getVersion()
+      const val = await getVersion();
       expect(ExposureNotificationModule.version).toHaveBeenCalledTimes(1);
-      expect(val).toEqual({build: '5', version: '123'})
+      expect(val).toEqual({build: '5', version: '123'});
     });
   });
 
   describe('bundleId()', () => {
     it('gets the app bundle id', async () => {
       mocked(ExposureNotificationModule.bundleId).mockClear();
-      const val = await getBundleId()
+      const val = await getBundleId();
       expect(ExposureNotificationModule.bundleId).toHaveBeenCalledTimes(1);
-      expect(val).toEqual('testbundle')
+      expect(val).toEqual('testbundle');
     });
-  });   
+  });
 });

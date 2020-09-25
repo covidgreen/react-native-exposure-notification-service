@@ -27,8 +27,7 @@ import {getPermissions, requestPermissions} from './utils/permissions';
 import {
   ExposurePermissions,
   PermissionStatus,
-  TraceConfiguration,
-  Version
+  TraceConfiguration
 } from './types';
 
 const emitter = new NativeEventEmitter(ExposureNotification);
@@ -47,6 +46,7 @@ interface State {
 export interface ExposureContextValue extends State {
   start: () => void;
   stop: () => void;
+  pause: () => void;
   configure: () => void;
   checkExposure: (readDetails: boolean, skipTimeCheck: boolean) => void;
   simulateExposure: (timeDelay: number) => void;
@@ -85,6 +85,7 @@ export const ExposureContext = createContext<ExposureContextValue>({
   ...initialState,
   start: () => {},
   stop: () => {},
+  pause: () => {},
   configure: () => {},
   checkExposure: () => {},
   simulateExposure: () => {},
@@ -190,10 +191,12 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
         await configure();
-        start();
+
+        if (state.status.type?.indexOf(StatusType.paused) == -1) {
+          start();
+        }
       }
     }
-
     checkSupportAndStart();
   }, [state.permissions, isReady]);
 
@@ -245,6 +248,15 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       await ExposureNotification.start();
       await validateStatus();
       await getCloseContacts();
+    } catch (err) {
+      console.log('start err', err);
+    }
+  };
+
+  const pause = async () => {
+    try {
+      await ExposureNotification.pause();
+      await validateStatus();
     } catch (err) {
       console.log('start err', err);
     }
@@ -391,6 +403,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     ...state,
     start,
     stop,
+    pause,
     configure,
     checkExposure,
     simulateExposure,
