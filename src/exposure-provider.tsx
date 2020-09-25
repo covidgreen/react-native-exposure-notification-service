@@ -44,9 +44,9 @@ interface State {
 }
 
 export interface ExposureContextValue extends State {
-  start: () => void;
+  start: () => Promise<void>;
   stop: () => void;
-  pause: () => void;
+  pause: () => Promise<void>;
   configure: () => void;
   checkExposure: (readDetails: boolean, skipTimeCheck: boolean) => void;
   simulateExposure: (timeDelay: number) => void;
@@ -260,7 +260,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       await ExposureNotification.pause();
       await validateStatus();
     } catch (err) {
-      console.log('start err', err);
+      console.log('pause err', err);
     }
   };
 
