@@ -107,9 +107,8 @@ class BleStatusReceiver : BroadcastReceiver() {
         if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
             Tracing.getExposureStatus(null)
         }
-        Tracing.setExposureStatus(Tracing.exposureStatus, Tracing.exposureDisabledReason)
-        
         Events.raiseEvent(Events.INFO,"bleStatusUpdate - $intent.action")
+        Tracing.setExposureStatus(Tracing.exposureStatus, Tracing.exposureDisabledReason)
     }
 }
 
