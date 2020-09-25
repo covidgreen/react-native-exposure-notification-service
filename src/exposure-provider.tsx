@@ -44,9 +44,9 @@ interface State {
 }
 
 export interface ExposureContextValue extends State {
-  start: () => Promise<void>;
+  start: () => Promise<boolean>;
   stop: () => void;
-  pause: () => Promise<void>;
+  pause: () => Promise<boolean>;
   configure: () => void;
   checkExposure: (readDetails: boolean, skipTimeCheck: boolean) => void;
   simulateExposure: (timeDelay: number) => void;
@@ -83,9 +83,9 @@ const initialState = {
 
 export const ExposureContext = createContext<ExposureContextValue>({
   ...initialState,
-  start: () => {},
+  start: () => Promise.resolve(false),
   stop: () => {},
-  pause: () => {},
+  pause: () => Promise.resolve(false),
   configure: () => {},
   checkExposure: () => {},
   simulateExposure: () => {},
@@ -247,9 +247,11 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const start = async () => {
     try {
-      await ExposureNotification.start();
+      const result = await ExposureNotification.start();
       await validateStatus();
       await getCloseContacts();
+
+      return result;
     } catch (err) {
       console.log('start err', err);
     }
@@ -257,8 +259,9 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const pause = async () => {
     try {
-      await ExposureNotification.pause();
+      const result = await ExposureNotification.pause();
       await validateStatus();
+      return result;
     } catch (err) {
       console.log('pause err', err);
     }
