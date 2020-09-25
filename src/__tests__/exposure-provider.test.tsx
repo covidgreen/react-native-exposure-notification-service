@@ -373,14 +373,6 @@ describe('useExposure', () => {
       });
       expect(ExposureNotificationModule.status).toHaveBeenCalledTimes(1);
     });
-
-    it('does not throw', async () => {
-      const {result} = await renderExposureHook();
-      mocked(ExposureNotificationModule.pause).mockRejectedValueOnce(
-        new Error('oops!')
-      );
-      await expect(result.current.pause()).resolves.toBeUndefined();
-    });
   });
 
   describe('configure()', () => {
@@ -517,7 +509,7 @@ describe('useExposure', () => {
       expect(result.current.contacts).toEqual(mockCloseContacts);
     });
 
-    it('does load close contacts if permissions are not granted', async () => {
+    it('does load close contacts regardless if permissions granted or not', async () => {
       const mockCloseContacts = [
         {
           exposureAlertDate: 'exposureAlertDate',

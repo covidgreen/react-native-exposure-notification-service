@@ -140,6 +140,8 @@ public class ExposureProcessor {
         ExposureManager.shared.manager.setExposureNotificationEnabled(false) { error in
             if let error = error as? ENError {
                 os_log("Error pausing./stopping notification services, %@", log: OSLog.exposure, type: .error, error.localizedDescription)
+                /// clear pause flag if we failed to stop ens
+                Storage.shared.flagPauseStatus(context, false)
                 return reject("PAUSE", "Error pausing notification services", error)
             } else {
                 os_log("Service paused", log: OSLog.exposure, type: .debug)
