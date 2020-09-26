@@ -21,6 +21,7 @@ public class Storage {
         var datesLastRan: String!
         var lastExposureIndex: Int!
         var notificationRaised: Bool!
+        var paused: Bool!
         var callbackNumber: String!
         var analyticsOptin: Bool!
         var dailyTrace: Date?
@@ -82,6 +83,7 @@ public class Storage {
               datesLastRan: data[0].value(forKey: "datesLastRan") as? String ?? "",
               lastExposureIndex: data[0].value(forKey: "lastIndex") as? Int,
               notificationRaised: data[0].value(forKey: "notificationRaised") as? Bool,
+              paused: data[0].value(forKey: "servicePaused") as? Bool ?? false,
               callbackNumber: callbackNum,
               analyticsOptin: data[0].value(forKey: "analyticsOptin") as? Bool,
               dailyTrace: data[0].value(forKey: "dailyTrace") as? Date,
@@ -177,6 +179,29 @@ public class Storage {
       }
       os_log("Flagged that user has been notified", log: OSLog.storage, type: .debug)
 
+    }
+
+    public func flagPauseStatus(_ context: NSManagedObjectContext, _ paused: Bool) {
+      let fetchRequest =
+      NSFetchRequest<NSManagedObject>(entityName: "Settings")
+
+      do {
+          let settingsResult = try context.fetch(fetchRequest)
+
+          if settingsResult.count > 0 {
+            let managedObject = settingsResult[0]
+
+            managedObject.setValue(paused, forKey: "servicePaused")
+            
+            try context.save()
+          } else {
+              os_log("No settings have been stored, can't flag pause status", log: OSLog.storage, type: .debug)
+          }
+          
+      } catch {
+        os_log("Could not flag as paused. %@", log: OSLog.storage, type: .error, error.localizedDescription)
+      }
+      os_log("Flagged that service has been paused - %d", log: OSLog.storage, type: .debug, paused)
     }
 
     public func updateAppSettings(_ config: Config) {

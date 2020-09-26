@@ -97,6 +97,11 @@ public class ExposureProcessor {
             result["state"] = "unavailable"
             result["type"] = ["starting"]
       }
+      if ExposureManager.shared.isPaused() && (result["state"] as! String == "disabled" || result["state"] as! String == "unknown") {
+         result["state"] = "disabled"
+         result["type"] = ["paused"]
+      }
+        
       os_log("Status is %d", log: OSLog.checkExposure, type: .debug, ExposureManager.shared.manager.exposureNotificationStatus.rawValue)
       
       self.keyValueObservers.append(ExposureManager.shared.manager.observe(\.exposureNotificationStatus) { manager, change in
@@ -111,7 +116,8 @@ public class ExposureProcessor {
             os_log("Not authorised so can't start", log: OSLog.exposure, type: .info)
             return reject("NOTAUTH", "Not authorised to start", nil)
         }
-        
+        let context = Storage.PersistentContainer.shared.newBackgroundContext()
+        Storage.shared.flagPauseStatus(context, false)
         ExposureManager.shared.manager.setExposureNotificationEnabled(true) { error in
             if let error = error as? ENError {
                 os_log("Error starting notification services, %@", log: OSLog.exposure, type: .error, error.localizedDescription)
@@ -124,6 +130,28 @@ public class ExposureProcessor {
         }
         self.scheduleCheckExposure()
     }
+
+    public func pause(_ resolve: @escaping RCTPromiseResolveBlock,
+                        rejecter reject: @escaping RCTPromiseRejectBlock) {
+        guard ENManager.authorizationStatus == .authorized else {
+            os_log("Not authorised so can't pause", log: OSLog.exposure, type: .info)
+            return reject("NOTAUTH", "Not authorised to start", nil)
+        }
+        let context = Storage.PersistentContainer.shared.newBackgroundContext()
+        Storage.shared.flagPauseStatus(context, true)
+        ExposureManager.shared.manager.setExposureNotificationEnabled(false) { error in
+            if let error = error as? ENError {
+                os_log("Error pausing./stopping notification services, %@", log: OSLog.exposure, type: .error, error.localizedDescription)
+                /// clear pause flag if we failed to stop ens
+                Storage.shared.flagPauseStatus(context, false)
+                return reject("PAUSE", "Error pausing notification services", error)
+            } else {
+                os_log("Service paused", log: OSLog.exposure, type: .debug)
+                resolve(true)
+            }
+        }
+        
+    }
     
     public func stop(_ resolve: @escaping RCTPromiseResolveBlock,
                     rejecter reject: @escaping RCTPromiseRejectBlock) {
@@ -131,12 +159,14 @@ public class ExposureProcessor {
             os_log("Not authorised so can't stop", log: OSLog.exposure, type: .info)
             return reject("NOTAUTH", "Not authorised to stop", nil)
         }
+        let context = Storage.PersistentContainer.shared.newBackgroundContext()
+        Storage.shared.flagPauseStatus(context, false)
         ExposureManager.shared.manager.setExposureNotificationEnabled(false) { error in
             if let error = error as? ENError {
               os_log("Error stopping notification services, %@", log: OSLog.setup, type: .error, error.localizedDescription)
               return reject("STOP", "Error stopping notification services", error)
             } else {
-               os_log("Service stopped", log: OSLog.setup, type: .debug)
+              os_log("Service stopped", log: OSLog.setup, type: .debug)
               resolve(true)
             }
         }

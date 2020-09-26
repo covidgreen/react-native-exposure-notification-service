@@ -26,5 +26,3 @@ export {
   StatusType,
   Status
 } from './exposure-notification-module';
-
-
