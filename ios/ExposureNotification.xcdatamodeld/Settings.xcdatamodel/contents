@@ -26,11 +26,12 @@
         <attribute name="notificationRaised" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="notificationTitle" optional="YES" attributeType="String"/>
         <attribute name="serverURL" optional="YES" attributeType="String"/>
+        <attribute name="servicePaused" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="storeExposuresFor" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="version" optional="YES" attributeType="String"/>
     </entity>
     <elements>
         <element name="Exposures" positionX="-54" positionY="-9" width="128" height="178"/>
-        <element name="Settings" positionX="-63" positionY="-18" width="128" height="283"/>
+        <element name="Settings" positionX="-63" positionY="-18" width="128" height="298"/>
     </elements>
 </model>

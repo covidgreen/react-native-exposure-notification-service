@@ -176,6 +176,16 @@ Used to stop contact tracing and all scheduled tasks. Exposure notifications mus
 
 ---
 
+##### `pause()`
+
+```javascript
+ExposureNotificationModule.pause();
+```
+
+Used to pause contact tracing. Use start() to unpause.
+
+---
+
 ##### `deleteAllData()`
 
 ```javascript

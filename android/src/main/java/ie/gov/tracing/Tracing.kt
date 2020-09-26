@@ -3,6 +3,7 @@ package ie.gov.tracing
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.BroadcastReceiver
 import android.content.IntentSender.SendIntentException
 import androidx.work.await
 import com.facebook.react.bridge.*
@@ -24,6 +25,7 @@ import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import ie.gov.tracing.nearby.StateUpdatedWorker
+import android.content.IntentFilter
 import android.bluetooth.BluetoothAdapter;
 import android.location.LocationManager
 import android.os.Build
@@ -98,6 +100,18 @@ class Listener: ActivityEventListener {
     }
 }
 
+class BleStatusReceiver : BroadcastReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+
+        if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
+            Tracing.getExposureStatus(null)
+        }
+        Events.raiseEvent(Events.INFO,"bleStatusUpdate - $intent.action")
+        Tracing.setExposureStatus(Tracing.exposureStatus, Tracing.exposureDisabledReason)
+    }
+}
+
 class Tracing {
     companion object {
         const val MIN_PLAY_SERVICES_VERSION = 201817017
@@ -110,6 +124,7 @@ class Tracing {
         const val STATUS_STARTED = "STARTED"
         const val STATUS_STARTING = "STARTING"
         const val STATUS_STOPPED = "STOPPED"
+        const val STATUS_PAUSED = "PAUSED"
 
         private const val EXPOSURE_STATUS_UNKNOWN = "unknown"
         private const val EXPOSURE_STATUS_ACTIVE = "active"
@@ -120,8 +135,8 @@ class Tracing {
         private const val STATUS_STOPPING = "STOPPING"
 
         var status = STATUS_STOPPED
-        private var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
-        private var exposureDisabledReason = "starting"
+        var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
+        var exposureDisabledReason = "starting"
 
         private lateinit var exposureWrapper: ExposureNotificationClientWrapper
 
@@ -238,6 +253,12 @@ class Tracing {
                 currentContext = context // this is overridden depending on path into codebase
 
                 scheduleCheckExposure()
+
+                val br: BroadcastReceiver = BleStatusReceiver()
+                val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED).apply {
+                    addAction(Intent.EXTRA_INTENT)
+                }
+                context.registerReceiver(br, filter)                
             } catch (ex: Exception) {
                 Events.raiseError("init", ex)
             }
@@ -257,6 +278,7 @@ class Tracing {
         fun start(promise: Promise?) {
             try {
                 setNewStatus(STATUS_STARTING)
+                SharedPrefs.setBoolean("servicePaused", false, context)
                 if (promise != null) {
                     resolutionPromise = null
                     startPromise = promise
@@ -269,10 +291,36 @@ class Tracing {
         }
 
         @JvmStatic
+        fun pause(promise: Promise?) {
+            try {
+                setNewStatus(STATUS_STOPPING)
+                SharedPrefs.setBoolean("servicePaused", true, context)
+                val permissionHelperCallback: Callback = object : Callback {
+                    override fun onFailure(t: Throwable) {
+                        Events.raiseError("paused", Exception(t))
+                        setNewStatus(STATUS_PAUSED)
+                        promise?.resolve(true)
+                    }
+
+                    override fun onSuccess(status: String) {
+                        Events.raiseEvent(Events.INFO, "exposure tracing $status")
+                        ProvideDiagnosisKeysWorker.stopScheduler()
+                        setNewStatus(STATUS_PAUSED)
+                        promise?.resolve(true)
+                    }
+                }
+                ExposureNotificationHelper(permissionHelperCallback).stopExposure()
+            } catch (ex: Exception) {
+                Events.raiseError("paused", ex)
+                promise?.resolve(false)
+            }
+        }
+
+        @JvmStatic
         fun stop() {
             try {
                 setNewStatus(STATUS_STOPPING)
-
+                SharedPrefs.setBoolean("servicePaused", false, context)
                 val permissionHelperCallback: Callback = object : Callback {
                     override fun onFailure(t: Throwable) {
                         Events.raiseError("stop", Exception(t))
@@ -600,6 +648,10 @@ class Tracing {
         fun getExposureStatus(promise: Promise? = null): ReadableMap {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
+            val isPaused = SharedPrefs.getBoolean("servicePaused", context)
+            if (isPaused) {
+                exposureDisabledReason = "paused"
+            }
             try {
                 // check bluetooth
                 val bluetoothAdapter: BluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -615,13 +667,13 @@ class Tracing {
 
                 result.putString("state", exposureStatus)
                 typeData.pushString(exposureDisabledReason)
-                result.putArray("type", typeData)
+                result.putArray("type", typeData)                
                 promise?.resolve(result)
             } catch (ex: Exception) {
                 Events.raiseError("getExposureStatus", ex)
                 result.putString("state", EXPOSURE_STATUS_UNKNOWN)
                 typeData.pushString("error")
-                result.putArray("type", typeData)
+                result.putArray("type", typeData)                
                 promise?.resolve(result)
             }
             return result
