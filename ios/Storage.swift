@@ -49,7 +49,7 @@ public class Storage {
         var version: [String: String] = [:]
         version["version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
         version["build"] = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
-        version["display"] = "\(version["version"]).\(version["build"])"
+        version["display"] = "\(version["version"] ?? "unknown").\(version["build"] ?? "unknown")"
                
         return version
     }

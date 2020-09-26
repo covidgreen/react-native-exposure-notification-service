@@ -268,7 +268,7 @@ class Fetcher {
         fun saveMetric(event: String, context: Context, payload: Map<String, Any>? = null) {
             try {
                 val analytics = SharedPrefs.getBoolean("analyticsOptin", context)
-                val version = Tracing.version().getString("display")
+                val version = Tracing.version().getString("display").toString()
 
                 if(!analytics) {
                     Events.raiseEvent(Events.INFO, "saveMetric - not saving, no opt in")
@@ -280,11 +280,11 @@ class Fetcher {
                 val success = post("/metrics", Gson().toJson(metric), context)
 
                 if (!success) {
-                    Events.raiseEvent(Events.ERROR, "saveMetric - failed")
+                    Events.raiseEvent(Events.ERROR, "saveMetric - failed: $event")
                     return
                 }
 
-                Events.raiseEvent(Events.INFO, "saveMetric - success")
+                Events.raiseEvent(Events.INFO, "saveMetric - success, $event, $version")
             } catch(ex: Exception) {
                 Events.raiseError("triggerCallback - error", ex)
             }

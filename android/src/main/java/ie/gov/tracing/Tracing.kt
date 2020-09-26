@@ -390,21 +390,14 @@ class Tracing {
 
         }
 
-        @JvmSatic 
+        @JvmStatic
         fun version(): WritableMap {
-            String versionNum, buildNum
-            try {
-                versionNum = getPackageInfo().versionName
-                buildNum = Integer.toString(getPackageInfo().versionCode)
-            }
-            catch (Exception e) {
-                versionNum = "unknown"
-                buildNum = "unknown"
-            }
-            WritableMap data = Arguments.createMap()
-            data.putString("version", versionNum)
-            data.putString("build", buildNum)
-            data.putString("display", versionNum + "." + buildNum)
+            val versionCode = BuildConfig.VERSION_CODE.toString()
+            val versionName = BuildConfig.VERSION_NAME
+            val data = Arguments.createMap()
+            data.putString("version", versionName)
+            data.putString("build", versionCode)
+            data.putString("display", "$versionName.$versionCode")
             
             return data
         }

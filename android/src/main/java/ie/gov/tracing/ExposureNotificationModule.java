@@ -214,8 +214,8 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void version(Promise promise) {
-        WriteableMap version = Tracing.version()
-        promise.resolve(version)
+        WritableMap version = Tracing.version();
+        promise.resolve(version);
     }
 
     @ReactMethod
