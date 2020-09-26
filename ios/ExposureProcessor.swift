@@ -313,7 +313,7 @@ public class ExposureProcessor {
            os_log("Foreground exposure check is complete, %d", log: OSLog.exposure, type: .debug, lastOperation?.isCancelled ?? false)
        }
     }
-
+    
     private func scheduleCheckExposure() {
       let context = Storage.PersistentContainer.shared.newBackgroundContext()
       

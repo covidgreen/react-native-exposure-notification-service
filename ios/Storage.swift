@@ -16,7 +16,6 @@ public class Storage {
         let notificationTitle: String
         let notificationDesc: String
         var authToken: String
-        var version: String
         var fileLimit: Int
         var datesLastRan: String!
         var lastExposureIndex: Int!
@@ -44,6 +43,15 @@ public class Storage {
     public static func getDomain(_ url: String) -> String {
         let url = URL(string: url)
         return url!.host!
+    }
+    
+    public func version() -> [String: String] {
+        var version: [String: String] = [:]
+        version["version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        version["build"] = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
+        version["display"] = "\(version["version"]).\(version["build"])"
+               
+        return version
     }
     
     public func readSettings(_ context: NSManagedObjectContext) -> Config! {
@@ -78,7 +86,6 @@ public class Storage {
               notificationTitle: data[0].value(forKey: "notificationTitle") as! String,
               notificationDesc: data[0].value(forKey: "notificationDesc") as! String,
               authToken: authToken,
-              version: data[0].value(forKey: "version") as! String,
               fileLimit: data[0].value(forKey: "fileLimit") as! Int,
               datesLastRan: data[0].value(forKey: "datesLastRan") as? String ?? "",
               lastExposureIndex: data[0].value(forKey: "lastIndex") as? Int,
@@ -242,7 +249,6 @@ public class Storage {
          managedObject.setValue(config.notificationTitle, forKey: "notificationTitle")
          managedObject.setValue(config.notificationDesc, forKey: "notificationDesc")
          managedObject.setValue(config.analyticsOptin, forKey: "analyticsOptin")
-         managedObject.setValue(config.version, forKey: "version")
          managedObject.setValue(config.fileLimit, forKey: "fileLimit")
 
          try context.save()

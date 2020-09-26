@@ -13,7 +13,6 @@ class Config {
                 SharedPrefs.setLong("storeExposuresFor", params.getInt("storeExposuresFor").toLong(), Tracing.context)
                 SharedPrefs.setLong("fileLimit", params.getInt("fileLimit").toLong(), Tracing.context)
                 SharedPrefs.setBoolean("analyticsOptin", params.getBoolean("analyticsOptin"), Tracing.context)
-                SharedPrefs.setString("version", params.getString("version")!!, Tracing.context)
                 SharedPrefs.setString("serverUrl", params.getString("serverURL")!!, Tracing.context)
                 var keyServer = params.getString("keyServerUrl")!!
                 if (keyServer.isEmpty()) {

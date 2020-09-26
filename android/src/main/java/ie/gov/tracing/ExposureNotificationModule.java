@@ -214,21 +214,8 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void version(Promise promise) {
-        String versionNum, buildNum;
-        try {
-            versionNum = getPackageInfo().versionName;
-            buildNum = Integer.toString(getPackageInfo().versionCode);
-        }
-        catch (Exception e) {
-            versionNum = "unknown";
-            buildNum = "unknown";
-        }
-        WritableMap data = Arguments.createMap();
-        data.putString("version", versionNum);
-        data.putString("build", buildNum);
-        data.putString("display", versionNum + "." + buildNum);
-        promise.resolve(data);
-
+        WriteableMap version = Tracing.version()
+        promise.resolve(version)
     }
 
     @ReactMethod

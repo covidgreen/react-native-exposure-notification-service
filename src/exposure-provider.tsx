@@ -106,7 +106,6 @@ export const ExposureContext = createContext<ExposureContextValue>({
 export interface ExposureProviderProps {
   isReady: boolean;
   traceConfiguration: TraceConfiguration;
-  appVersion: string;
   serverUrl: string;
   keyServerUrl: string;
   keyServerType: KeyServerType;
@@ -140,7 +139,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   children,
   isReady = false,
   traceConfiguration,
-  appVersion,
   serverUrl,
   keyServerUrl,
   keyServerType = KeyServerType.nearform,
@@ -293,7 +291,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         storeExposuresFor: traceConfiguration.storeExposuresFor,
         fileLimit:
           Platform.OS === 'ios' ? iosLimit : traceConfiguration.fileLimit,
-        version: appVersion,
         notificationTitle,
         notificationDesc: notificationDescription,
         callbackNumber,

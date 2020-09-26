@@ -268,7 +268,7 @@ class Fetcher {
         fun saveMetric(event: String, context: Context, payload: Map<String, Any>? = null) {
             try {
                 val analytics = SharedPrefs.getBoolean("analyticsOptin", context)
-                val version = SharedPrefs.getString("version", context)
+                val version = Tracing.version().getString("display")
 
                 if(!analytics) {
                     Events.raiseEvent(Events.INFO, "saveMetric - not saving, no opt in")

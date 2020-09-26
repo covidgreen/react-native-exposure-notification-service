@@ -690,7 +690,7 @@ class ExposureCheck: AsyncOperation {
     var params: Parameters = [:]
     params["os"] = "ios"
     params["event"] = event
-    params["version"] = self.configData.version
+    params["version"] = Storage.shared.version()["display"]
     if let packet = payload {
         params["payload"] = packet
     }
