@@ -140,6 +140,12 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         return Futures.immediateFailedFuture(new ConfigNotSetException());
       }
 
+      final Boolean paused = SharedPrefs.getBoolean("servicePaused", this.getApplicationContext());
+      if (paused) {
+        // ENS is paused
+        return Futures.immediateFailedFuture(new ENSPaused());
+      }
+
       deleteOldData();
 
       final String token = generateRandomToken();
@@ -332,4 +338,5 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
   private static class NotEnabledException extends Exception {}
   private static class ConfigNotSetException extends Exception {}
+  private static class ENSPaused extends Exception {}
 }

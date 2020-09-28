@@ -130,6 +130,11 @@ class ExposureCheck: AsyncOperation {
             return
        }
 
+       guard !ExposureManager.shared.isPaused() else {
+            self.finishNoProcessing("ENS is paused", false)
+            return
+       }
+        
        // clean out any expired exposures
        Storage.shared.deleteOldExposures(self.configData.storeExposuresFor)
         
