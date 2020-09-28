@@ -27,8 +27,10 @@ import kotlinx.coroutines.runBlocking
 import ie.gov.tracing.nearby.StateUpdatedWorker
 import android.content.IntentFilter
 import android.bluetooth.BluetoothAdapter;
+import android.content.pm.PackageInfo
 import android.location.LocationManager
 import android.os.Build
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.location.LocationManagerCompat
 
 class Listener: ActivityEventListener {
@@ -395,10 +397,9 @@ class Tracing {
             var versionName: String
             var versionCode: String
             try {
-                versionName = context.getPackageManager()
-                        .getPackageInfo(context.getPackageName(), 0).versionName
-                versionCode = context.getPackageManager()
-                        .getPackageInfo(context.getPackageName(), 0).longVersionCode.toString()
+                val pinfo: PackageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0)
+                versionName = pinfo.versionName
+                versionCode = PackageInfoCompat.getLongVersionCode(pinfo).toString()           
             } catch(e: Exception) {
                 versionName = "unknown"
                 versionCode = "unknown"
