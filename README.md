@@ -334,9 +334,10 @@ function Root() {
         storeExposuresFor: 14,
         fileLimit: 1,
         fileLimitiOS: 2
-      }}
-      appVersion="1.0.0"
+      }
       serverUrl="https://your.exposure.api/api"
+      keyServerUrl="https://your.exposure.api/api"
+      keyServerType=KeyServerType.nearform
       authToken="your-api-auth-token"
       refreshToken="your-api-refresh-token"
       notificationTitle="Close contact detected"

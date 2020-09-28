@@ -29,4 +29,5 @@ export interface ExposurePermissions {
 export interface Version {
   version: String;
   build: String;
+  display: String;
 }

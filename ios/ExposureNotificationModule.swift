@@ -54,7 +54,6 @@ public class ExposureNotificationModule: RCTEventEmitter {
         notificationTitle: configDict["notificationTitle"] as? String ?? "Close Contact Warning",
         notificationDesc: configDict["notificationDesc"] as? String ?? "The COVID Tracker App has detected that you may have been exposed to someone who has tested positive for COVID-19.",
         authToken: token,
-        version: (configDict["version"] as? String ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)!,
         fileLimit: configDict["fileLimit"] as? Int ?? 3,
         callbackNumber: configDict["callbackNumber"] as? String ?? "",
         analyticsOptin: configDict["analyticsOptin"] as? Bool ?? false
@@ -227,10 +226,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
     
     @objc public func version(_ resolve: @escaping RCTPromiseResolveBlock,
                                     rejecter reject: @escaping RCTPromiseRejectBlock) {
-        var version: [String: String] = [:]
-        version["version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        version["build"] = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
-        version["display"] = "\(version["version"] ?? "unknown").\(version["build"] ?? "unknown")"
+        let version = Storage.shared.version()
         
         resolve(version)
     }

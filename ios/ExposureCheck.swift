@@ -130,6 +130,11 @@ class ExposureCheck: AsyncOperation {
             return
        }
 
+       guard !ExposureManager.shared.isPaused() else {
+            self.finishNoProcessing("ENS is paused", false)
+            return
+       }
+        
        // clean out any expired exposures
        Storage.shared.deleteOldExposures(self.configData.storeExposuresFor)
         
@@ -690,7 +695,7 @@ class ExposureCheck: AsyncOperation {
     var params: Parameters = [:]
     params["os"] = "ios"
     params["event"] = event
-    params["version"] = self.configData.version
+    params["version"] = Storage.shared.version()["display"]
     if let packet = payload {
         params["payload"] = packet
     }

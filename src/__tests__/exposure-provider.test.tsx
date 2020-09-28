@@ -97,7 +97,6 @@ const mockConfig = {
   keyServerType: KeyServerType.nearform,
   authToken: 'testAuthToken',
   refreshToken: 'testRefreshToken',
-  appVersion: '0.0.1-test',
   traceConfiguration: {
     exposureCheckInterval: 120,
     storeExposuresFor: 14,
@@ -218,8 +217,7 @@ describe('<ExposureProvider />', () => {
       serverURL: mockConfig.serverUrl,
       keyServerUrl: mockConfig.keyServerUrl,
       keyServerType: mockConfig.keyServerType,
-      storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
-      version: mockConfig.appVersion
+      storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor
     });
   });
 
@@ -396,8 +394,7 @@ describe('useExposure', () => {
         serverURL: mockConfig.serverUrl,
         keyServerUrl: mockConfig.keyServerUrl,
         keyServerType: mockConfig.keyServerType,
-        storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
-        version: mockConfig.appVersion
+        storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor
       });
     });
 

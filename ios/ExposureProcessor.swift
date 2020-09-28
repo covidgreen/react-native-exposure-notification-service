@@ -124,6 +124,7 @@ public class ExposureProcessor {
                 return reject("START", "Error starting notification services", error)
             } else {
                 os_log("Service started", log: OSLog.exposure, type: .debug)
+                self.scheduleCheckExposure()
                 resolve(true)
             }
         }
@@ -312,7 +313,7 @@ public class ExposureProcessor {
            os_log("Foreground exposure check is complete, %d", log: OSLog.exposure, type: .debug, lastOperation?.isCancelled ?? false)
        }
     }
-
+    
     private func scheduleCheckExposure() {
       let context = Storage.PersistentContainer.shared.newBackgroundContext()
       

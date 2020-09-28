@@ -390,6 +390,27 @@ class Tracing {
 
         }
 
+        @JvmStatic
+        fun version(): WritableMap {
+            var versionName: String
+            var versionCode: String
+            try {
+                versionName = context.getPackageManager()
+                        .getPackageInfo(context.getPackageName(), 0).versionName
+                versionCode = context.getPackageManager()
+                        .getPackageInfo(context.getPackageName(), 0).longVersionCode.toString()
+            } catch(e: Exception) {
+                versionName = "unknown"
+                versionCode = "unknown"
+            }
+            val data = Arguments.createMap()
+            data.putString("version", versionName)
+            data.putString("build", versionCode)
+            data.putString("display", "$versionName.$versionCode")
+            
+            return data
+        }
+
         private fun getExposureKeyAsMap(tek: TemporaryExposureKey): WritableMap {
             val result: WritableMap = Arguments.createMap()
             result.putString("keyData", BaseEncoding.base64().encode(tek.keyData))

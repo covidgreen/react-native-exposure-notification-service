@@ -1,7 +1,16 @@
 package ie.gov.tracing.nearby;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.os.Build;
+
 import android.content.Context;
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.core.app.NotificationCompat;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.ExistingWorkPolicy;
@@ -9,6 +18,7 @@ import androidx.work.ListenableWorker;
 import androidx.work.NetworkType;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.PeriodicWorkRequest;
+import androidx.work.ForegroundInfo;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 import androidx.work.WorkerParameters;
@@ -28,6 +38,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import org.threeten.bp.Duration;
+import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
 
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
@@ -38,6 +49,7 @@ import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.ExposureNotificationRepository;
 import ie.gov.tracing.storage.SharedPrefs;
 import ie.gov.tracing.storage.TokenEntity;
+import ie.gov.tracing.R;
 
 public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   static final Duration DEFAULT_API_TIMEOUT = Duration.ofSeconds(15);
@@ -45,6 +57,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private static final String WORKER_NAME = "ProvideDiagnosisKeysWorker";
   private static final BaseEncoding BASE64_LOWER = BaseEncoding.base64();
   private static final int RANDOM_TOKEN_BYTE_LENGTH = 32;
+  private static final String FOREGROUND_NOTIFICATION_ID =
+          "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID";
 
   private final DiagnosisKeyDownloader diagnosisKeys;
   private final DiagnosisKeyFileSubmitter submitter;
@@ -61,6 +75,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     secureRandom = new SecureRandom();
     repository = new ExposureNotificationRepository(context);
     this.context = context;
+    setForegroundAsync(createForegroundInfo());
   }
 
   private String generateRandomToken() {
@@ -111,7 +126,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       Tracing.currentContext = getApplicationContext();
       Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
 
+      setForegroundAsync(createForegroundInfo());
+
       updateLastRun();
+
       SharedPrefs.remove("lastApiError", Tracing.currentContext);
       SharedPrefs.remove("lastError", Tracing.currentContext);
 
@@ -120,6 +138,12 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       if (auth.isEmpty()) {
         // config not yet populated so don't run
         return Futures.immediateFailedFuture(new ConfigNotSetException());
+      }
+
+      final Boolean paused = SharedPrefs.getBoolean("servicePaused", this.getApplicationContext());
+      if (paused) {
+        // ENS is paused
+        return Futures.immediateFailedFuture(new ENSPaused());
       }
 
       deleteOldData();
@@ -152,6 +176,35 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                       AppExecutors.getBackgroundExecutor())
               .catching(Exception.class, this::processFailure,
                       AppExecutors.getBackgroundExecutor());
+  }
+
+  @NonNull
+  private ForegroundInfo createForegroundInfo() {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        createChannel(FOREGROUND_NOTIFICATION_ID);
+      }
+      Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.Foreground created");
+      Notification notification = new NotificationCompat.Builder(this.context, FOREGROUND_NOTIFICATION_ID)
+              .setContentTitle(this.context.getString(R.string.notification_checking))
+              .setProgress(1, 0, true)
+              .setSmallIcon(R.mipmap.ic_notification)
+              .setOngoing(true)
+              .build();
+
+      return new ForegroundInfo(1, notification, FOREGROUND_SERVICE_TYPE_LOCATION);
+  }
+
+  @RequiresApi(Build.VERSION_CODES.O)
+  private void createChannel(String id) {
+    // Create a Notification channel
+    NotificationChannel channel = new NotificationChannel(
+            id,
+            this.context.getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW
+    );
+    NotificationManager notificationManager = (NotificationManager) this.context.getSystemService(
+            Context.NOTIFICATION_SERVICE
+    );
+    notificationManager.createNotificationChannel(channel);
   }
 
   private Result processFailure(Exception ex) {
@@ -285,4 +338,5 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
   private static class NotEnabledException extends Exception {}
   private static class ConfigNotSetException extends Exception {}
+  private static class ENSPaused extends Exception {}
 }
