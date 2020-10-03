@@ -88,6 +88,7 @@ public class StateUpdatedWorker extends ListenableWorker {
           TimeUnit.MILLISECONDS,
           AppExecutors.getScheduledExecutor()))
           .transformAsync((exposureSummary) -> {
+              Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results" + simulate);
               if (simulate) {
                 ExposureSummary.ExposureSummaryBuilder builder = new ExposureSummary.ExposureSummaryBuilder();
                 int[] dummyAttenuations = new int[]{30, 30, 30};

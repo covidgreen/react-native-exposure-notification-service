@@ -78,7 +78,7 @@ class Listener: ActivityEventListener {
             if (requestCode == RequestCodes.PLAY_SERVICES_UPDATE) {
                 if (resultCode == Activity.RESULT_OK) {
                     val gps = GoogleApiAvailability.getInstance()
-                    val result = gps.isGooglePlayServicesAvailable(Tracing.context.applicationContext, Tracing.MIN_PLAY_SERVICES_VERSION)
+                    val result = gps.isGooglePlayServicesAvailable(Tracing.context.applicationContext)
                     Tracing.base.playServicesVersion = gps.getApkVersion(Tracing.context.applicationContext)
                     Events.raiseEvent(Events.INFO,"triggerUpdate - version after activity: ${Tracing.base.playServicesVersion}")
 
@@ -116,8 +116,6 @@ class BleStatusReceiver : BroadcastReceiver() {
 
 class Tracing {
     companion object {
-        const val MIN_PLAY_SERVICES_VERSION = 201817017
-
         lateinit var context: Context
         lateinit var currentContext: Context
         lateinit var base: ExposureNotificationModule
@@ -543,7 +541,7 @@ class Tracing {
                     val gps = GoogleApiAvailability.getInstance()
                     base.playServicesVersion = gps.getApkVersion(context.applicationContext)
                     Events.raiseEvent(Events.INFO,"triggerUpdate - version: ${base.playServicesVersion}")
-                    val result = gps.isGooglePlayServicesAvailable(context.applicationContext, MIN_PLAY_SERVICES_VERSION)
+                    val result = gps.isGooglePlayServicesAvailable(context.applicationContext)
                     Events.raiseEvent(Events.INFO,"triggerUpdate - result: $result")
                     if (result == ConnectionResult.SUCCESS) {
                         try {
