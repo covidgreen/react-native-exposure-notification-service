@@ -245,6 +245,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const start = async () => {
     try {
+      console.log('Starting ENS');
       const result = await ExposureNotification.start();
       await validateStatus();
       await getCloseContacts();
@@ -296,7 +297,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         callbackNumber,
         analyticsOptin
       };
-
+      console.log('Configuring eposure module');
       await ExposureNotification.configure(config);
 
       return true;
