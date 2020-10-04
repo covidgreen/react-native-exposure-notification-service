@@ -48,8 +48,15 @@ class Fetcher {
 
         fun downloadFile(filename: String, context: Context): File? {
             try {
-                val keyServerUrl = SharedPrefs.getString("keyServerUrl", context)
-                val keyServerType = SharedPrefs.getString("keyServerType", context)
+                var keyServerUrl = SharedPrefs.getString("keyServerUrl", context)
+                val serverUrl = SharedPrefs.getString("serverUrl", context)
+                if (keyServerUrl.isEmpty()) {
+                    keyServerUrl = serverUrl
+                }
+                var keyServerType = SharedPrefs.getString("keyServerType", context)
+                if (keyServerType.isEmpty()) {
+                    keyServerType = "nearform"
+                }
                 val authToken = SharedPrefs.getString("authToken", context)
                 var fileUrl = "${keyServerUrl}/data/$filename"
                 if (keyServerType == "google") {
@@ -146,10 +153,14 @@ class Fetcher {
         fun fetch(endpoint: String, retry: Boolean = false, keyFile: Boolean = false, context: Context): String? {
             try {
                 var serverUrl = SharedPrefs.getString("serverUrl", context)
-                if (keyFile) {
-                    serverUrl = SharedPrefs.getString("keyServerUrl", context)
+                val keyServerUrl = SharedPrefs.getString("keyServerUrl", context)
+                if (keyFile && keyServerUrl.isNotEmpty()) {
+                    serverUrl = keyServerUrl
                 }
-                val keyServerType = SharedPrefs.getString("keyServerType", context)
+                var keyServerType = SharedPrefs.getString("keyServerType", context)
+                if (keyServerType.isEmpty()) {
+                    keyServerType = "nearform"
+                }
                 val authToken = SharedPrefs.getString("authToken", context)
 
                 Events.raiseEvent(Events.INFO, "fetch - fetching from: ${serverUrl}$endpoint")
