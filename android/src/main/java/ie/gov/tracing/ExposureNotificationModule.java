@@ -21,11 +21,6 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     private static int apiError = 0;
 
     public boolean nearbyNotSupported(){
-        return !(apiError == 0 && Build.VERSION.SDK_INT >= 23);
-    }
-
-    private boolean sdkNotSupported() {
-        if(Build.VERSION.SDK_INT < 23) return true;
         return false;
     }
 
@@ -205,10 +200,6 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void canSupport(Promise promise) {
-        if(sdkNotSupported()) {
-            promise.resolve(false);
-            return;
-        }
         promise.resolve(true);
     }
 

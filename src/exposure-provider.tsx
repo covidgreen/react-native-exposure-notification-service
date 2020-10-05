@@ -296,7 +296,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         callbackNumber,
         analyticsOptin
       };
-
       await ExposureNotification.configure(config);
 
       return true;

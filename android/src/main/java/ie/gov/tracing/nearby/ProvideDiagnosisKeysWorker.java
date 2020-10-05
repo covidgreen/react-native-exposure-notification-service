@@ -128,6 +128,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
       setForegroundAsync(createForegroundInfo());
 
+
+      // try save daily metric, does not affect success
+      saveDailyMetric();
+      
       updateLastRun();
 
       SharedPrefs.remove("lastApiError", Tracing.currentContext);
@@ -213,7 +217,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     Fetcher.saveMetric("LOG_ERROR", context, payload);
 
     Events.raiseError("error processing file: ",  ex);
-    return Result.failure();
+    return Result.success();
   }
 
   private void deleteExports() {
@@ -273,9 +277,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       // try delete, does not affect success
       deleteExports();
     }
-
-    // try save daily metric, does not affect success
-    saveDailyMetric();
 
     return Result.success();
   }

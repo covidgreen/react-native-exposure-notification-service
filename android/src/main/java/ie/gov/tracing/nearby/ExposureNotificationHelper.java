@@ -112,13 +112,7 @@ public class ExposureNotificationHelper implements LifecycleObserver {
         AppExecutors.getScheduledExecutor());
   }
 
-    public static ListenableFuture<Void> checkAvailability() {
-        GoogleApiAvailability gps = GoogleApiAvailability.getInstance();
-
-        return TaskToFutureAdapter.getFutureWithTimeout(
-                gps.checkApiAvailability(Nearby.getExposureNotificationClient(Tracing.reactContext)),
-                API_TIMEOUT.toMillis(),
-                TimeUnit.MILLISECONDS,
-                AppExecutors.getScheduledExecutor());
-    }
+  public static int checkAvailability() {
+    return GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(Tracing.reactContext);
+  }
 }

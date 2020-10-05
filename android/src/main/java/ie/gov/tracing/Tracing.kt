@@ -78,7 +78,7 @@ class Listener: ActivityEventListener {
             if (requestCode == RequestCodes.PLAY_SERVICES_UPDATE) {
                 if (resultCode == Activity.RESULT_OK) {
                     val gps = GoogleApiAvailability.getInstance()
-                    val result = gps.isGooglePlayServicesAvailable(Tracing.context.applicationContext, Tracing.MIN_PLAY_SERVICES_VERSION)
+                    val result = gps.isGooglePlayServicesAvailable(Tracing.context.applicationContext)
                     Tracing.base.playServicesVersion = gps.getApkVersion(Tracing.context.applicationContext)
                     Events.raiseEvent(Events.INFO,"triggerUpdate - version after activity: ${Tracing.base.playServicesVersion}")
 
@@ -116,8 +116,6 @@ class BleStatusReceiver : BroadcastReceiver() {
 
 class Tracing {
     companion object {
-        const val MIN_PLAY_SERVICES_VERSION = 201817017
-
         lateinit var context: Context
         lateinit var currentContext: Context
         lateinit var base: ExposureNotificationModule
@@ -520,13 +518,14 @@ class Tracing {
         fun isSupported(promise: Promise) = runBlocking<Unit> {
             launch {
                 try {
-                    val apiResult = ExposureNotificationHelper.checkAvailability().await()
+                    val apiResult = ExposureNotificationHelper.checkAvailability()
                     Events.raiseEvent(Events.INFO, "isSupported - checkAvailability: $apiResult")
-                    promise.resolve(true)
-                } catch (ex: AvailabilityException) {
-                    Events.raiseError("isSupported - AvailabilityException", ex)
-                    promise.resolve(false)
-                    base.setApiError(ExposureNotificationStatusCodes.API_NOT_CONNECTED)
+                    if (apiResult == ConnectionResult.SUCCESS) {
+                        promise.resolve(true)
+                    } else if (apiResult == ConnectionResult.SERVICE_INVALID || apiResult == ConnectionResult.SERVICE_DISABLED || apiResult == ConnectionResult.SERVICE_MISSING) {
+                        promise.resolve(false)
+                        base.setApiError(apiResult)
+                    }
                 } catch (ex: Exception) {
                     Events.raiseError("isSupported - Exception", ex)
                     promise.resolve(false)
@@ -543,22 +542,10 @@ class Tracing {
                     val gps = GoogleApiAvailability.getInstance()
                     base.playServicesVersion = gps.getApkVersion(context.applicationContext)
                     Events.raiseEvent(Events.INFO,"triggerUpdate - version: ${base.playServicesVersion}")
-                    val result = gps.isGooglePlayServicesAvailable(context.applicationContext, MIN_PLAY_SERVICES_VERSION)
+                    val result = gps.isGooglePlayServicesAvailable(context.applicationContext)
                     Events.raiseEvent(Events.INFO,"triggerUpdate - result: $result")
                     if (result == ConnectionResult.SUCCESS) {
-                        try {
-                            val apiResult = ExposureNotificationHelper.checkAvailability().await()
-                            Events.raiseEvent(Events.INFO, "triggerUpdate - checkAvailability: $apiResult")
-                            promise.resolve("already_installed")
-                        } catch (ex: AvailabilityException) {
-                            Events.raiseError("triggerUpdate - AvailabilityException", ex)
-                            promise.resolve("api_not_available")
-                            base.setApiError(ExposureNotificationStatusCodes.API_NOT_CONNECTED)
-                        } catch (ex: Exception) {
-                            Events.raiseError("triggerUpdate - checkAvailability exception", ex)
-                            promise.resolve("api_exception")
-                            base.setApiError(1)
-                        }
+                        promise.resolve("already_installed")
                     }
                     if (result == ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED) { // requires update
                         resolutionPromise = promise
