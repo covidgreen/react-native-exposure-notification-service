@@ -1,23 +1,17 @@
 {
   "name": "react-native-exposure-notification-service",
   "title": "React Native Exposure Notification Service",
-  "version": "1.1.33",
-  "description": "React native module providing a common interface to Apple/Google's Exposure Notification APIs",
-  "main": "dist/index.js",
-  "files": [
-    "dist",
-    "ios",
-    "android",
-    "react-native-exposure-notification-service.podspec"
-  ],
+  "version": "1.0.11",
+  "description": "React native module providing a common interface to Apple n Google's Exposure Notification APIs",
+  "main": "index.js",
   "repository": {
     "repository": {
       "type": "git",
-      "url": "git+https://github.com/covidgreen/react-native-exposure-notification-service.git",
-      "baseUrl": "https://github.com/covidgreen/react-native-exposure-notification-service"
+      "url": "git+https://github.com/HSEIreland/react-native-exposure-notification-service.git",
+      "baseUrl": "https://github.com/HSEIreland/react-native-exposure-notification-service"
     }
   },
-  "homepage": "https://github.com/covidgreen/react-native-exposure-notification-service",
+  "homepage": "https://github.com/HSEIreland/react-native-exposure-notification-service",
   "keywords": [
     "react-native",
     "exposure-notification",
@@ -25,57 +19,18 @@
     "native-module"
   ],
   "author": {
-    "HSE Ireland": "Health Service Executive (HSE)"
+    "name": "Health Service Executive (HSE)",
+    "email": "yourname@email.com"
   },
-  "contributors": [
-    "Colm Harte <colm.harte@nearform.com>",
-    "James M Snell <jasnell@gmail.com>",
-    "Gar Mac Críosta <gar.maccriosta@hse.ie>",
-    "Shaun Baker <shaun.baker@nearform.com>",
-    "Paul Negrutiu <paul.negrutiu@nearform.com>",
-    "Jack Clark <jack.clark@nearform.com>",
-    "Andrea Forni <andrea.forni@nearform.com>",
-    "Jack Murdoch <jack.murdoch@nearform.com>"
-  ],
-  "license": "Apache-2.0",
+  "license": "MIT",
   "readmeFilename": "README.md",
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "lint:fix": "npm run lint -- --fix",
-    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepare": "npm run build",
-    "test": "jest"
-  },
   "peerDependencies": {
     "react": "16.11.0",
-    "react-native": "0.62.2",
-    "react-native-permissions": "^2.1.5",
-    "typescript": "^3.9.6"
+    "react-native": "0.62.2"
   },
   "devDependencies": {
-    "@react-native-community/eslint-config": "^2.0.0",
-    "@testing-library/react-hooks": "^3.3.0",
-    "@testing-library/react-native": "^5.0.3",
-    "@types/jest": "^26.0.4",
     "@types/react-native": "^0.62.0",
-    "babel-jest": "^26.1.0",
-    "eslint": "^7.4.0",
-    "husky": "^4.2.5",
-    "jest": "^26.1.0",
-    "lint-staged": "^10.2.11",
-    "prettier": "^2.0.5",
     "react": "16.11.0",
-    "react-native": "0.62.2",
-    "react-native-permissions": "^2.1.5",
-    "react-test-renderer": "^16.13.1",
-    "ts-jest": "^26.1.2",
-    "typescript": "^3.9.6"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged",
-      "pre-push": "npm test"
-    }
+    "react-native": "0.62.2"
   }
 }

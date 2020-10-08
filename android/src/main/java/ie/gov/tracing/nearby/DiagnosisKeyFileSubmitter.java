@@ -14,28 +14,37 @@ import java.util.concurrent.TimeUnit;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.TaskToFutureAdapter;
+import ie.gov.tracing.hms.ApiAvailabilityCheckUtils;
+import ie.gov.tracing.hms.ContactShieldWrapper;
 
 class DiagnosisKeyFileSubmitter {
-  private static final Duration API_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration API_TIMEOUT = Duration.ofSeconds(10);
 
-  private final ExposureNotificationClientWrapper client;
+    private final ExposureNotificationClientWrapper gmsClient;
+    private final ContactShieldWrapper hmsClient;
+    private final boolean isGMS;
+    private final boolean isHMS;
 
-  DiagnosisKeyFileSubmitter(Context context) {
-    client = ExposureNotificationClientWrapper.get(context);
-  }
-
-  ListenableFuture<?> parseFiles(List<File> files, String token) {
-    if (files == null || files.size() == 0) {
-      Events.raiseEvent(Events.INFO, "parseFiles - No export files to process.");
-      return Futures.immediateFuture(null);
+    DiagnosisKeyFileSubmitter(Context context) {
+        isGMS = ApiAvailabilityCheckUtils.isGMS(context);
+        isHMS = ApiAvailabilityCheckUtils.isHMS(context);
+        gmsClient = isGMS ? ExposureNotificationClientWrapper.get(context) : null;
+        hmsClient = isHMS ? ContactShieldWrapper.getInstance(context) : null;
     }
 
-    Events.raiseEvent(Events.INFO, "Processing " + files.size() + " export files...");
+    ListenableFuture<?> parseFiles(List<File> files, String token) {
+        if (files == null || files.size() == 0) {
+            Events.raiseEvent(Events.INFO, "parseFiles - No export files to process.");
+            return Futures.immediateFuture(null);
+        }
 
-    return TaskToFutureAdapter.getFutureWithTimeout(
-            client.provideDiagnosisKeys(files, token),
-            API_TIMEOUT.toMillis(),
-            TimeUnit.MILLISECONDS,
-            AppExecutors.getScheduledExecutor());
-  }
+        Events.raiseEvent(Events.INFO, "Processing " + files.size() + " export files...");
+
+        return TaskToFutureAdapter.getFutureWithTimeout(
+                isGMS ? gmsClient.provideDiagnosisKeys(files, token) : null,
+                isHMS ? hmsClient.provideDiagnosisKeys(files, token) : null,
+                API_TIMEOUT.toMillis(),
+                TimeUnit.MILLISECONDS,
+                AppExecutors.getScheduledExecutor());
+    }
 }

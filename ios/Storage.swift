@@ -9,18 +9,16 @@ public class Storage {
     public struct Config: Codable {
         let refreshToken: String
         let serverURL: String
-        let keyServerUrl: String
-        let keyServerType: KeyServerType
         let checkExposureInterval: Int
         let storeExposuresFor: Int
         let notificationTitle: String
         let notificationDesc: String
         var authToken: String
+        var version: String
         var fileLimit: Int
         var datesLastRan: String!
         var lastExposureIndex: Int!
         var notificationRaised: Bool!
-        var paused: Bool!
         var callbackNumber: String!
         var analyticsOptin: Bool!
         var dailyTrace: Date?
@@ -33,26 +31,7 @@ public class Storage {
         let number: String
     }
     
-    public enum KeyServerType: String, Codable {
-      case NearForm = "nearform"
-      case GoogleRefServer = "google"
-    }
-
     public static let shared = Storage()
-    
-    public static func getDomain(_ url: String) -> String {
-        let url = URL(string: url)
-        return url!.host!
-    }
-    
-    public func version() -> [String: String] {
-        var version: [String: String] = [:]
-        version["version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-        version["build"] = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
-        version["display"] = "\(version["version"] ?? "unknown").\(version["build"] ?? "unknown")"
-               
-        return version
-    }
     
     public func readSettings(_ context: NSManagedObjectContext) -> Config! {
        var settings: Config!
@@ -75,23 +54,20 @@ public class Storage {
             let refreshToken = keychain.get("nm:refreshToken") ?? ""
             let defaultDate = Date().addingTimeInterval(-1*24*60*60)
             
-            let keyType = data[0].value(forKey: "keyServerType") as? String ?? KeyServerType.NearForm.rawValue
-              
+            
             settings = Config(
               refreshToken:refreshToken,
               serverURL: data[0].value(forKey: "serverURL") as! String,
-              keyServerUrl: data[0].value(forKey: "keyServerUrl") as? String ?? data[0].value(forKey: "serverURL") as! String,
-              keyServerType: Storage.KeyServerType(rawValue: keyType)!,
               checkExposureInterval: data[0].value(forKey: "checkExposureInterval") as! Int,
               storeExposuresFor: data[0].value(forKey: "storeExposuresFor") as! Int,
               notificationTitle: data[0].value(forKey: "notificationTitle") as! String,
               notificationDesc: data[0].value(forKey: "notificationDesc") as! String,
               authToken: authToken,
+              version: data[0].value(forKey: "version") as! String,
               fileLimit: data[0].value(forKey: "fileLimit") as! Int,
               datesLastRan: data[0].value(forKey: "datesLastRan") as? String ?? "",
               lastExposureIndex: data[0].value(forKey: "lastIndex") as? Int,
               notificationRaised: data[0].value(forKey: "notificationRaised") as? Bool,
-              paused: data[0].value(forKey: "servicePaused") as? Bool ?? false,
               callbackNumber: callbackNum,
               analyticsOptin: data[0].value(forKey: "analyticsOptin") as? Bool,
               dailyTrace: data[0].value(forKey: "dailyTrace") as? Date,
@@ -189,29 +165,6 @@ public class Storage {
 
     }
 
-    public func flagPauseStatus(_ context: NSManagedObjectContext, _ paused: Bool) {
-      let fetchRequest =
-      NSFetchRequest<NSManagedObject>(entityName: "Settings")
-
-      do {
-          let settingsResult = try context.fetch(fetchRequest)
-
-          if settingsResult.count > 0 {
-            let managedObject = settingsResult[0]
-
-            managedObject.setValue(paused, forKey: "servicePaused")
-            
-            try context.save()
-          } else {
-              os_log("No settings have been stored, can't flag pause status", log: OSLog.storage, type: .debug)
-          }
-          
-      } catch {
-        os_log("Could not flag as paused. %@", log: OSLog.storage, type: .error, error.localizedDescription)
-      }
-      os_log("Flagged that service has been paused - %d", log: OSLog.storage, type: .debug, paused)
-    }
-
     public func updateAppSettings(_ config: Config) {
         
        let context = PersistentContainer.shared.newBackgroundContext()
@@ -243,13 +196,12 @@ public class Storage {
          keychain.set(config.refreshToken, forKey: "nm:refreshToken", withAccess: .accessibleAfterFirstUnlock)
         
          managedObject.setValue(config.serverURL, forKey: "serverURL")
-         managedObject.setValue(config.keyServerUrl, forKey: "keyServerUrl")
-         managedObject.setValue(config.keyServerType.rawValue, forKey: "keyServerType")
          managedObject.setValue(config.checkExposureInterval, forKey: "checkExposureInterval")
          managedObject.setValue(config.storeExposuresFor, forKey: "storeExposuresFor")
          managedObject.setValue(config.notificationTitle, forKey: "notificationTitle")
          managedObject.setValue(config.notificationDesc, forKey: "notificationDesc")
          managedObject.setValue(config.analyticsOptin, forKey: "analyticsOptin")
+         managedObject.setValue(config.version, forKey: "version")
          managedObject.setValue(config.fileLimit, forKey: "fileLimit")
 
          try context.save()
@@ -290,26 +242,7 @@ public class Storage {
 
       os_log("All stored details cleared", log: OSLog.storage, type: .info)
     }
-
-    public func deleteOldExposures(_ storeExposuresFor: Int) {
-        let calendar = Calendar.current
-        let dateToday = calendar.startOfDay(for: Date())
-        let oldestAllowed = calendar.date(byAdding: .day, value: (0 - storeExposuresFor), to: dateToday)
-        
-        let context = PersistentContainer.shared.newBackgroundContext()
-        let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "Exposures")
-        fetchRequest.predicate = NSPredicate(format: "exposureDate < %@", oldestAllowed! as CVarArg)
-        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
-        
-        do {
-          try context.execute(deleteRequest)
-        } catch let error as NSError {
-          os_log("Error deleting the old stored exposures: %@", log: OSLog.storage, type: .error, error.localizedDescription)
-        }
     
-        os_log("Old exposure details cleared", log: OSLog.storage, type: .info)
-    }
-
     @available(iOS 13.5, *)
     public func saveExposureDetails(_ context: NSManagedObjectContext, _ exposureInfo: ExposureProcessor.ExposureInfo) {
       var managedObject: NSManagedObject
@@ -384,13 +317,30 @@ public class Storage {
           return info
         }
       } catch  {
-        os_log("Could not retrieve exposures: %@", log: OSLog.storage, type: .error, error.localizedDescription)
+        os_log("Could not retrieve settings: %@", log: OSLog.storage, type: .error, error.localizedDescription)
       }
-      /// os_log("Fetching exposures from store", log: OSLog.storage, type: .debug)
+      os_log("Fetching settings from store", log: OSLog.storage, type: .debug)
 
       return exposures
     }
   
+    /*private lazy var persistentContainer: NSPersistentContainer? = {
+        let modelURL = Bundle(for: type(of: self)).url(forResource: "ExposureNotification", withExtension: "momd")!
+        let managedObjectModel = NSManagedObjectModel(contentsOf: modelURL)!
+        let container = NSPersistentContainer(name: "ExposureNotification", managedObjectModel: managedObjectModel)
+        container.loadPersistentStores(completionHandler: { (storeDescription, error) in
+            if let error = error {
+                fatalError("Unresolved error \(error)")
+            }
+            
+            os_log("Successfully loaded persistent store at: %@", log: OSLog.storage, type: .debug, storeDescription.url?.description ?? "nil")
+        })
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergePolicy(merge: NSMergePolicyType.mergeByPropertyStoreTrumpMergePolicyType)
+        return container
+    }()*/
+    
+    
     public class PersistentContainer: NSPersistentContainer {
 
         static let shared: PersistentContainer = {

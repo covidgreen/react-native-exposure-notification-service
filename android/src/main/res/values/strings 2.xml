@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="notification_checking">Checking exposure keys</string>
+    <string name="notification_channel_name">Exposure Notification</string>
+    <string name="notification_channel_description">Exposure notification alerts.</string>
+</resources>

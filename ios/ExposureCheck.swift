@@ -50,25 +50,14 @@ class ExposureCheck: AsyncOperation {
         let unzipPath: URL
     }
 
-    private func serverURL(_ url: endPoints) -> String {
+    public func serverURL(_ url: endPoints) -> String {
       switch url {
         case .metrics:
           return self.configData.serverURL + "/metrics"
         case .exposures:
-            switch self.configData.keyServerType {
-            case .GoogleRefServer:
-                return self.configData.keyServerUrl + "/v1/index.txt"
-            default:
-                return self.configData.serverURL + "/exposures"
-            }
-                
+          return self.configData.serverURL + "/exposures"
         case .dataFiles:
-            switch self.configData.keyServerType {
-            case .GoogleRefServer:
-                return self.configData.keyServerUrl + "/"
-            default:
-                return self.configData.serverURL + "/data/"
-            }
+          return self.configData.serverURL + "/data/"
         case .callback:
           return self.configData.serverURL + "/callback"
         case .settings:
@@ -83,16 +72,14 @@ class ExposureCheck: AsyncOperation {
     private var configData: Storage.Config!
     private var readExposureDetails: Bool = false
     private var skipTimeCheck: Bool = false
-    private var simulateExposureOnly: Bool = false
     private let storageContext = Storage.PersistentContainer.shared.newBackgroundContext()
     private var sessionManager: Session!
     
-    init(_ skipTimeCheck: Bool, _ accessDetails: Bool, _ simulateExposureOnly: Bool) {
+    init(_ skipTimeCheck: Bool, _ accessDetails: Bool) {
         super.init()
     
         self.skipTimeCheck = skipTimeCheck
         self.readExposureDetails = accessDetails
-        self.simulateExposureOnly = simulateExposureOnly
     }
     
     override func cancel() {
@@ -100,52 +87,31 @@ class ExposureCheck: AsyncOperation {
     }
        
     override func main() {
-      self.configData = Storage.shared.readSettings(self.storageContext)
+      
+       guard ENManager.authorizationStatus == .authorized else {
+            self.finishNoProcessing("Not authorised so can't run exposure checks")
+            return
+       }
+        
+       self.configData = Storage.shared.readSettings(self.storageContext)
        guard self.configData != nil else {
-          self.finishNoProcessing("No config set so can't proceeed with checking exposures", false)
+          self.finishNoProcessing("No config set so can't proceeed with checking exposures")
           return
        }
-      
-       let serverDomain: String = Storage.getDomain(self.configData.serverURL)
-       let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
-       var manager: ServerTrustManager
-       if (self.configData.keyServerType != Storage.KeyServerType.NearForm) {
-          manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator(), keyServerDomain: DefaultTrustEvaluator()])
-       } else {
-          manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
-       }
-       self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)), serverTrustManager: manager)
+    
+       self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)))
         
        os_log("Running with params %@, %@, %@", log: OSLog.checkExposure, type: .debug, self.configData.serverURL, self.configData.authToken, self.configData.refreshToken)
        
        guard (self.configData.lastRunDate!.addingTimeInterval(TimeInterval(self.configData.checkExposureInterval * 60)) < Date() || self.skipTimeCheck) else {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            self.finishNoProcessing("Check was run at \(formatter.string(from: self.configData.lastRunDate!)), interval is \(self.configData.checkExposureInterval), its too soon to check again", false)
+            self.finishNoProcessing("Check was run at \(formatter.string(from: self.configData.lastRunDate!)), interval is \(self.configData.checkExposureInterval), its too soon to check again")
             return
-       }
-
-       guard ENManager.authorizationStatus == .authorized else {
-            self.finishNoProcessing("Not authorised so can't run exposure checks")
-            return
-       }
-
-       guard !ExposureManager.shared.isPaused() else {
-            self.finishNoProcessing("ENS is paused", false)
-            return
-       }
-        
-       // clean out any expired exposures
-       Storage.shared.deleteOldExposures(self.configData.storeExposuresFor)
-        
-       if (self.simulateExposureOnly) {
-           os_log("Simulating exposure alert", log: OSLog.exposure, type: .debug)
-           simulateExposureEvent()
-           return
        }
         
        os_log("Starting exposure checking", log: OSLog.exposure, type: .debug)
-
+      
        getExposureFiles { result in
             switch result {
               case let .failure(error):
@@ -155,45 +121,19 @@ class ExposureCheck: AsyncOperation {
                   self.processExposures(urls, lastIndex)
                 }
                 else {
-                  self.finishNoProcessing("No files available to process", false)
+                  self.finishNoProcessing("No files available to process")
                 }
             }
        }
     }
     
-    private func simulateExposureEvent() {
-        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: 2, attenuationDurations: [30, 30, 30], matchedKeyCount: 1,  maxRiskScore: 10, exposureDate: Date())
-      
-        info.maximumRiskScoreFullRange = 10
-        info.riskScoreSumFullRange = 10
-        info.customAttenuationDurations = [30, 30, 30]
-                
-        let thresholds = Thresholds(thresholdWeightings: [1,1,0], timeThreshold: 15)
-
-        let lastId = self.configData.lastExposureIndex!
-        return self.finishProcessing(.success((info, lastId, thresholds)))
-    }
-
-    private func getDomain(_ url: String) -> String {
-        let url = URL(string: url)
-        return url!.host!
-    }
     
-    private func finishNoProcessing(_ message: String, _ log: Bool = true) {
+    private func finishNoProcessing(_ message: String) {
       os_log("%@", log: OSLog.checkExposure, type: .info, message)
 
       Storage.shared.updateRunData(self.storageContext, message)
-
-      if (log) {
-        let payload:[String: Any] = [
-          "description": message
-        ]
-        self.saveMetric(event: "LOG_ERROR", payload: payload) { _ in
-          self.trackDailyMetrics()
-        }
-      } else {
-        self.trackDailyMetrics()
-      }
+        
+      self.trackDailyMetrics()
     }
   
     private func processExposures(_ files: [URL], _ lastIndex: Int) {
@@ -289,7 +229,8 @@ class ExposureCheck: AsyncOperation {
           let durations:[Int] = exposures.customAttenuationDurations ?? exposures.attenuationDurations
           
           guard thresholds.thresholdWeightings.count >= durations.count else {
-            return self.finishNoProcessing("Failure processing exposure keys, thresholds not correctly defined");
+            Storage.shared.updateRunData(self.storageContext, "Failure processing exposure keys, thresholds not correctly defined")
+            return self.trackDailyMetrics()
           }
           
           var contactTime = 0
@@ -311,22 +252,21 @@ class ExposureCheck: AsyncOperation {
             self.trackDailyMetrics()
           }
       case let .failure(error):
-          return self.finishNoProcessing("Failure processing exposure keys, \(error.localizedDescription)");
+          os_log("Failure processing exposure keys, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+          Storage.shared.updateRunData(self.storageContext, "Failure processing exposure keys, \(error.localizedDescription)")
+          self.trackDailyMetrics()
       }
         
     }
   
     private func trackDailyMetrics() {
-      guard !self.isCancelled else {
-        return self.cancelProcessing()
-      }
       guard self.configData != nil else {
         // don't track daily trace if config not setup
         return self.finish()
       }
         
       let calendar = Calendar.current
-      let checkDate: Date = self.configData.dailyTrace ?? calendar.date(byAdding: .day, value: -1, to: Date())!
+      let checkDate: Date = self.configData.dailyTrace ?? calendar.date(byAdding: .day, value: -2, to: Date())!
         
       if (!self.isCancelled && !calendar.isDate(Date(), inSameDayAs: checkDate)) {
          Storage.shared.updateDailyTrace(self.storageContext, date: Date())
@@ -338,33 +278,41 @@ class ExposureCheck: AsyncOperation {
       }
       
     }
-
+  
     private func getExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
-      os_log("Key server type set to %@", log: OSLog.checkExposure, type: .debug, self.configData.keyServerType.rawValue)
-      switch self.configData.keyServerType {
-      case .GoogleRefServer:
-        getGoogleExposureFiles(completion)
-      default:
-        getNearFormExposureFiles(completion)
-      }
-    }
-
-    private func getNearFormExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
-      guard !self.isCancelled else {
-        return self.cancelProcessing()
-      }
-
-      let lastId = self.configData.lastExposureIndex ?? 0
-      os_log("Checking for exposures against nearform server since %d", log: OSLog.checkExposure, type: .debug, lastId)
+      
+      var lastId = self.configData.lastExposureIndex!
+      os_log("Checking for exposures since %d", log: OSLog.checkExposure, type: .debug, lastId)
       self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": self.configData.fileLimit])
       .validate()
       .responseDecodable(of: [CodableExposureFiles].self) { response in
         switch response.result {
           case .success:
-            self.processFileLinks(response.value!, completion)
+            let files = response.value!
+            if files.count > 0 {
+              os_log("Files available to process, %d", log: OSLog.checkExposure, type: .debug, files.count)
+              lastId = files.last!.id
+              let urls: [URL] = files.map{ url in
+                lastId = max(url.id, lastId)
+                return URL(string: self.serverURL(.dataFiles) + url.path)!
+              }
+            
+              self.downloadFilesForProcessing(urls) { result in
+                switch result {
+                case let .success(localURLS):
+                  completion(.success((localURLS, lastId)))
+                case let .failure(error):
+                  completion(.failure(error))
+                }
+              }
+            } else {
+                /// no keys to be processed
+                os_log("No key files returned from server, last file index: %d", log: OSLog.checkExposure, type: .info, lastId)
+                completion(.success(([], lastId)))
+            }
           case let .failure(error):
               os_log("Failure occurred while reading exposure files %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
               completion(.failure(error))
@@ -372,96 +320,6 @@ class ExposureCheck: AsyncOperation {
       }
     }
 
-    private func getGoogleExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
-      guard !self.isCancelled else {
-        return self.cancelProcessing()
-      }
-
-      os_log("Checking for exposures against google server type, %@", log: OSLog.checkExposure, type: .debug, self.serverURL(.exposures))
-      self.sessionManager.request(self.serverURL(.exposures))
-      .validate()
-        .responseString { response in
-          switch response.result {
-          case .success:
-            let files = self.findFilesToProcess(response.value!)
-
-            self.processFileLinks(files, completion)
-          case let .failure(error):
-              os_log("Failure occurred while reading exposure files %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
-              completion(.failure(error))
-        }
-      }
-    }
-
-    private func processFileLinks(_ files: [CodableExposureFiles], _ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
-        var lastId = self.configData.lastExposureIndex ?? 0
-        if files.count > 0 {
-          os_log("Files available to process, %d", log: OSLog.checkExposure, type: .debug, files.count)
-          lastId = files.last!.id
-          let urls: [URL] = files.map{ url in
-            lastId = max(url.id, lastId)
-            return URL(string: self.serverURL(.dataFiles) + url.path)!
-          }
-        
-          self.downloadFilesForProcessing(urls) { result in
-            switch result {
-            case let .success(localURLS):
-              completion(.success((localURLS, lastId)))
-            case let .failure(error):
-              completion(.failure(error))
-            }
-          }
-        } else {
-            /// no keys to be processed
-            os_log("No key files returned from server, last file index: %d", log: OSLog.checkExposure, type: .info, lastId)
-            completion(.success(([], lastId)))
-        }
-    }
-    
-    private func findFilesToProcess(_ fileList: String) -> [CodableExposureFiles] {
-        /// fileList if of format
-        /*
-         v1/1597846020-1597846080-00001.zip
-         v1/1597847700-1597847760-00001.zip
-         v1/1597848660-1597848720-00001.zip
-        */
-        let listData = fileList.split(separator: "\n").map { String($0) }
-        
-        var filesToProcess: [CodableExposureFiles] = []
-        for key in listData {
-            let fileURL = URL(fileURLWithPath: key)
-            let fileName = fileURL.deletingPathExtension().lastPathComponent
-            let idVal = self.parseGoogleFileName(fileName)
-            os_log("Parsing google file entry item %@, %@, %d", log: OSLog.checkExposure, type: .debug, String(key), fileName, idVal)
-
-            if idVal > -1  {
-                let fileItem = CodableExposureFiles(id: idVal, path: String(key))
-                filesToProcess.append(fileItem)
-            }
-        }
-        if (self.configData.lastExposureIndex <= 0) {
-            return Array(filesToProcess.suffix(self.configData.fileLimit))
-        } else {
-            return Array(filesToProcess.prefix(self.configData.fileLimit))
-        }
-    }
-    
-    private func parseGoogleFileName(_ key: String) -> Int {
-        /// key format is 1598375820-1598375880-00001
-        /// start time - end time - ??
-        /// we look for any start times > than the last end time we stored
-        /// return the end time as the last id
-        let keyParts = key.split(separator: "-").map { String($0) }
-        let lastId = self.configData.lastExposureIndex ?? 0
-        
-        if (Int(keyParts[0]) ?? 0 >= lastId) {
-            return Int(keyParts[1]) ?? 0
-        } else {
-            return -1
-        }
-        
-    }
-    
     private func downloadFilesForProcessing(_ files: [URL], _ completion: @escaping (Result<[URL], Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
@@ -611,7 +469,7 @@ class ExposureCheck: AsyncOperation {
        }
     }
     
-    private func triggerUserNotification(_ exposures: ExposureProcessor.ExposureInfo, _ completion: @escaping  (Result<Bool, Error>) -> Void) {
+  private func triggerUserNotification(_ exposures: ExposureProcessor.ExposureInfo, _ completion: @escaping  (Result<Bool, Error>) -> Void) {
       let content = UNMutableNotificationContent()
       let calendar = Calendar.current
       let dateToday = calendar.startOfDay(for: Date())
@@ -639,9 +497,9 @@ class ExposureCheck: AsyncOperation {
         self.triggerCallBack(lastExposure!, payload, completion)
       }
       
-    }
+  }
   
-  private func triggerCallBack(_ lastExposure: Date, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
+    private func triggerCallBack(_ lastExposure: Date, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
     guard !self.isCancelled else {
       return self.cancelProcessing()
     }
@@ -665,7 +523,7 @@ class ExposureCheck: AsyncOperation {
         case .success:
           os_log("Request for callback sent", log: OSLog.checkExposure, type: .debug)
           Storage.shared.flagNotificationRaised(self.storageContext)
-          completion(.success(true))
+          self.saveMetric(event: "CALLBACK_REQUEST", completion: completion)
         case let .failure(error):
           os_log("Unable to send callback request, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
           completion(.failure(error))
@@ -673,7 +531,7 @@ class ExposureCheck: AsyncOperation {
     }
     
   }
-
+  
   private func saveMetric(event: String, completion: @escaping  (Result<Bool, Error>) -> Void) {
     self.saveMetric(event: event, payload: nil, completion: completion)
   }
@@ -682,24 +540,12 @@ class ExposureCheck: AsyncOperation {
     guard !self.isCancelled else {
       return self.cancelProcessing()
     }
-    guard self.configData != nil else {
-      // don't track daily trace if config not setup
-      return completion(.success(true))
-    }
-
+    
     if (!self.configData.analyticsOptin) {
       os_log("Metric opt out", log: OSLog.exposure, type: .error)
       return completion(.success(true))
     }
-    os_log("Sending metric, %@", log:OSLog.checkExposure, type: .info, event)
-    var params: Parameters = [:]
-    params["os"] = "ios"
-    params["event"] = event
-    params["version"] = Storage.shared.version()["display"]
-    if let packet = payload {
-        params["payload"] = packet
-    }
-    self.sessionManager.request(self.serverURL(.metrics), method: .post , parameters: params, encoding: JSONEncoding.default)
+    self.sessionManager.request(self.serverURL(.metrics), method: .post , parameters: ["os": "ios", "event": event, "version": self.configData.version, "payload": payload ?? []], encoding: JSONEncoding.default)
       .validate()
       .response() { response in
         switch response.result {
@@ -730,17 +576,14 @@ class RequestInterceptor: Alamofire.RequestInterceptor {
 
         var urlRequest = urlRequest
 
-        let nfServer = Storage.getDomain(self.config.serverURL)
-        if (urlRequest.url?.host == nfServer) {
-            /// Set the Authorization header value using the access token, only on nearform server requests
-            urlRequest.setValue("Bearer " + self.config.authToken, forHTTPHeaderField: "Authorization")
-        }
-        
+        /// Set the Authorization header value using the access token.
+        urlRequest.setValue("Bearer " + self.config.authToken, forHTTPHeaderField: "Authorization")
+      
         completion(.success(urlRequest))
     }
 
     func retry(_ request: Request, for session: Session, dueTo error: Error, completion: @escaping (RetryResult) -> Void) {
-        guard let response = request.task?.response as? HTTPURLResponse, response.statusCode == 401, request.retryCount == 0 else {
+        guard let response = request.task?.response as? HTTPURLResponse, response.statusCode == 401 else {
             /// The request did not fail due to a 401 Unauthorized response.
             /// Return the original error and don't retry the request.
             return completion(.doNotRetryWithError(error))

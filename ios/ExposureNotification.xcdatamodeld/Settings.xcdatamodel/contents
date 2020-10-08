@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="16119" systemVersion="19G2021" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="16119" systemVersion="19D76" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
     <entity name="Exposures" representedClassName="Exposures" syncable="YES" codeGenerationType="class">
         <attribute name="attenuations" optional="YES" attributeType="String"/>
         <attribute name="customAttenuationDurations" optional="YES" attributeType="String"/>
@@ -18,20 +18,17 @@
         <attribute name="datesLastRan" optional="YES" attributeType="String"/>
         <attribute name="errorDetails" optional="YES" attributeType="String"/>
         <attribute name="fileLimit" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="keyServerType" optional="YES" attributeType="String"/>
-        <attribute name="keyServerUrl" optional="YES" attributeType="String"/>
         <attribute name="lastIndex" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="lastRunDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="notificationDesc" optional="YES" attributeType="String"/>
         <attribute name="notificationRaised" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="notificationTitle" optional="YES" attributeType="String"/>
         <attribute name="serverURL" optional="YES" attributeType="String"/>
-        <attribute name="servicePaused" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="storeExposuresFor" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="version" optional="YES" attributeType="String"/>
     </entity>
     <elements>
         <element name="Exposures" positionX="-54" positionY="-9" width="128" height="178"/>
-        <element name="Settings" positionX="-63" positionY="-18" width="128" height="298"/>
+        <element name="Settings" positionX="-63" positionY="-18" width="128" height="253"/>
     </elements>
 </model>
