@@ -41,9 +41,11 @@ buildscript {
             google()
             jcenter()
 			mavenCentral()
+            maven {url 'https://developer.huawei.com/repo/'}
         }
         dependencies {
             classpath 'com.android.tools.build:gradle:3.4.1'
+            classpath 'com.huawei.agconnect:agcp:1.3.1.300'
             classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${project.ext.kotlinVersion}"
         }
     // }
@@ -83,10 +85,14 @@ repositories {
     google()
     jcenter()
 	mavenCentral()
+    maven {url 'https://developer.huawei.com/repo/'}
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+
+    //HMS
+    implementation 'com.huawei.hms:contactshield:5.0.3.300'
 
     //noinspection GradleDynamicVersion
     implementation 'com.facebook.react:react-native:+'  // From node_modules

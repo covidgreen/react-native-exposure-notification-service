@@ -32,6 +32,13 @@ import android.location.LocationManager
 import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.location.LocationManagerCompat
+import com.huawei.hms.api.HuaweiApiAvailability
+import com.huawei.hms.contactshield.PeriodicKey
+import com.huawei.hms.utils.HMSPackageManager
+import ie.gov.tracing.hms.ApiAvailabilityCheckUtils
+import ie.gov.tracing.hms.ApiAvailabilityCheckUtils.isGMS
+import ie.gov.tracing.hms.ApiAvailabilityCheckUtils.isHMS
+import ie.gov.tracing.hms.ContactShieldWrapper
 
 class Listener: ActivityEventListener {
     override fun onNewIntent(intent: Intent?) {}
@@ -75,12 +82,29 @@ class Listener: ActivityEventListener {
                 return
             }
 
-            if (requestCode == RequestCodes.PLAY_SERVICES_UPDATE) {
+            if (requestCode == RequestCodes.GMS_PLAY_SERVICES_UPDATE) {
                 if (resultCode == Activity.RESULT_OK) {
                     val gps = GoogleApiAvailability.getInstance()
                     val result = gps.isGooglePlayServicesAvailable(Tracing.context.applicationContext)
-                    Tracing.base.playServicesVersion = gps.getApkVersion(Tracing.context.applicationContext)
-                    Events.raiseEvent(Events.INFO,"triggerUpdate - version after activity: ${Tracing.base.playServicesVersion}")
+                    Tracing.base.gmsServicesVersion = gps.getApkVersion(Tracing.context.applicationContext)
+                    Events.raiseEvent(Events.INFO,"triggerUpdate - version after activity: ${Tracing.base.gmsServicesVersion}")
+
+                    if(result == ConnectionResult.SUCCESS) {
+                        Events.raiseEvent(Events.INFO,"triggerUpdate - update successful")
+                        Tracing.resolutionPromise?.resolve("success")
+                    } else {
+                        Events.raiseEvent(Events.ERROR,"triggerUpdate - update failed: $result")
+                        Tracing.resolutionPromise?.resolve("failed")
+                    }
+                } else {
+                    Events.raiseEvent(Events.INFO,"triggerUpdate - update cancelled")
+                    Tracing.resolutionPromise?.resolve("cancelled")
+                }
+            }else if(requestCode == RequestCodes.HMS_PLAY_SERVICES_UPDATE){
+                if (resultCode == Activity.RESULT_OK) {
+                    val result = HuaweiApiAvailability.getInstance().isHuaweiMobileServicesAvailable(Tracing.context.applicationContext);
+                    Tracing.base.hmsServicesVersion = HMSPackageManager.getInstance(Tracing.context.applicationContext).hmsVersionCode
+                    Events.raiseEvent(Events.INFO,"triggerUpdate - version after activity: ${Tracing.base.hmsServicesVersion}")
 
                     if(result == ConnectionResult.SUCCESS) {
                         Events.raiseEvent(Events.INFO,"triggerUpdate - update successful")
@@ -139,6 +163,7 @@ class Tracing {
         var exposureDisabledReason = "starting"
 
         private lateinit var exposureWrapper: ExposureNotificationClientWrapper
+        private lateinit var contactShieldWrapper: ContactShieldWrapper
 
         var resolutionPromise: Promise? = null
         var startPromise: Promise? = null
@@ -249,6 +274,7 @@ class Tracing {
                 reactContext = appContext
                 context = reactContext.applicationContext
                 exposureWrapper = ExposureNotificationClientWrapper.get(context)
+                contactShieldWrapper = ContactShieldWrapper.getInstance(context)
                 reactContext.addActivityEventListener(Listener())
                 currentContext = context // this is overridden depending on path into codebase
 
@@ -342,20 +368,37 @@ class Tracing {
         @JvmStatic
         fun exposureEnabled(promise: Promise) {
             try {
-                exposureWrapper.isEnabled
-                        .addOnSuccessListener { enabled: Boolean? ->
-                            if (enabled != null) {
-                                promise.resolve(enabled)
-                            } else {
-                                Events.raiseEvent(Events.INFO, "exposureEnabled: null")
+                if (isGMS(context)) {
+                    exposureWrapper.isEnabled
+                            .addOnSuccessListener { enabled: Boolean? ->
+                                if (enabled != null) {
+                                    promise.resolve(enabled)
+                                } else {
+                                    Events.raiseEvent(Events.INFO, "exposureEnabled: null")
+                                    promise.resolve(false)
+                                }
+                            }
+                            .addOnFailureListener { ex ->
+                                Events.raiseError("exposureEnabled - onFailure", ex)
+                                handleApiException(ex)
                                 promise.resolve(false)
                             }
-                        }
-                        .addOnFailureListener { ex ->
-                            Events.raiseError("exposureEnabled - onFailure", ex)
-                            handleApiException(ex)
-                            promise.resolve(false)
-                        }
+                } else if (isHMS(context)) {
+                    contactShieldWrapper.isEnabled
+                            .addOnSuccessListener { enabled: Boolean? ->
+                                if (enabled != null) {
+                                    promise.resolve(enabled)
+                                } else {
+                                    Events.raiseEvent(Events.INFO, "exposureEnabled: null")
+                                    promise.resolve(false)
+                                }
+                            }
+                            .addOnFailureListener { ex ->
+                                Events.raiseError("exposureEnabled - onFailure", ex)
+                                handleApiException(ex)
+                                promise.resolve(false)
+                            }
+                }
             } catch (ex: Exception) {
                 Events.raiseError("exposureEnabled - exception", ex)
                 promise.resolve(false)
@@ -420,6 +463,16 @@ class Tracing {
             return result
         }
 
+        private fun getExposureKeyAsMap(tek: PeriodicKey): WritableMap {
+            val result: WritableMap = Arguments.createMap()
+            result.putString("keyData", BaseEncoding.base64().encode(tek.content))
+            result.putInt("rollingPeriod", 144)
+            result.putInt("rollingStartNumber", tek.periodicKeyValidTime.toInt())
+            result.putInt("transmissionRiskLevel", tek.initialRiskLevel) // app should overwrite
+
+            return result
+        }
+
         // get the diagnosis keys for this user for the past 14 days (config)
         @JvmStatic
         fun getDiagnosisKeys(promise: Promise?) {
@@ -427,48 +480,94 @@ class Tracing {
                 if (promise != null) { // called from client
                     resolutionPromise = promise
                 }
-                exposureWrapper.temporaryExposureKeyHistory
-                        .addOnSuccessListener {
-                            if (it != null) {
-                                // convert the keys into a structure we can convert to json
-                                val result: WritableArray = Arguments.createArray()
+                if (isGMS(context.applicationContext)) {
+                    exposureWrapper.temporaryExposureKeyHistory
+                            .addOnSuccessListener {
+                                if (it != null) {
+                                    // convert the keys into a structure we can convert to json
+                                    val result: WritableArray = Arguments.createArray()
 
-                                for (temporaryExposureKey in it) {
-                                    result.pushMap(getExposureKeyAsMap(temporaryExposureKey))
+                                    for (temporaryExposureKey in it) {
+                                        result.pushMap(getExposureKeyAsMap(temporaryExposureKey))
+                                    }
+
+                                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success, #keys: ${it.size}")
+                                    resolutionPromise?.resolve(result)
+                                } else {
+                                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success - no keys")
+                                    resolutionPromise?.resolve(Arguments.createArray())
                                 }
-
-                                Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success, #keys: ${it.size}")
-                                resolutionPromise?.resolve(result)
-                            } else {
-                                Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success - no keys")
-                                resolutionPromise?.resolve(Arguments.createArray())
                             }
-                        }
-                        .addOnFailureListener { ex ->
-                            if (ex is ApiException && ex.statusCode == ExposureNotificationStatusCodes.RESOLUTION_REQUIRED) {
-                                Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure api exception: " +
-                                        ExposureNotificationStatusCodes.getStatusCodeString(ex.statusCode))
-                                if (promise != null) { // ask permission, if failed and no promise set as param
-                                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - ask user for permission")
-                                    try {
-                                        ex.status.startResolutionForResult(base.activity,
-                                                RequestCodes.REQUEST_CODE_GET_TEMP_EXPOSURE_KEY_HISTORY)
+                            .addOnFailureListener { ex ->
+                                if (ex is ApiException && ex.statusCode == ExposureNotificationStatusCodes.RESOLUTION_REQUIRED) {
+                                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure api exception: " +
+                                            ExposureNotificationStatusCodes.getStatusCodeString(ex.statusCode))
+                                    if (promise != null) { // ask permission, if failed and no promise set as param
+                                        Events.raiseEvent(Events.INFO, "getDiagnosisKeys - ask user for permission")
+                                        try {
+                                            ex.status.startResolutionForResult(base.activity,
+                                                    RequestCodes.REQUEST_CODE_GET_TEMP_EXPOSURE_KEY_HISTORY)
 
-                                        // we will need to resolve promise and attempt to get the keys again
-                                        // promise will be resolved if successful in success listener
-                                    } catch (ex: Exception) {
+                                            // we will need to resolve promise and attempt to get the keys again
+                                            // promise will be resolved if successful in success listener
+                                        } catch (ex: Exception) {
+                                            resolutionPromise?.resolve(Arguments.createArray())
+                                            Events.raiseError("getDiagnosisKeys - exposure api exception", ex)
+                                        }
+                                    } else {
                                         resolutionPromise?.resolve(Arguments.createArray())
-                                        Events.raiseError("getDiagnosisKeys - exposure api exception", ex)
+                                        Events.raiseError("getDiagnosisKeys - failed post-resolution, not trying again", ex)
                                     }
                                 } else {
                                     resolutionPromise?.resolve(Arguments.createArray())
-                                    Events.raiseError("getDiagnosisKeys - failed post-resolution, not trying again", ex)
+                                    Events.raiseError("getDiagnosisKeys - general exception", ex)
                                 }
-                            } else {
-                                resolutionPromise?.resolve(Arguments.createArray())
-                                Events.raiseError("getDiagnosisKeys - general exception", ex)
                             }
-                        }
+                }else if(isHMS(context.applicationContext)){
+                    contactShieldWrapper.temporaryExposureKeyHistory
+                            .addOnSuccessListener {
+                                if (it != null) {
+                                    // convert the keys into a structure we can convert to json
+                                    val result: WritableArray = Arguments.createArray()
+
+                                    for (temporaryExposureKey in it) {
+                                        result.pushMap(getExposureKeyAsMap(temporaryExposureKey))
+                                    }
+
+                                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success, #keys: ${it.size}")
+                                    resolutionPromise?.resolve(result)
+                                } else {
+                                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success - no keys")
+                                    resolutionPromise?.resolve(Arguments.createArray())
+                                }
+                            }
+                            .addOnFailureListener { ex ->
+                                if (ex is ApiException && ex.statusCode == ExposureNotificationStatusCodes.RESOLUTION_REQUIRED) {
+                                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure api exception: " +
+                                            ExposureNotificationStatusCodes.getStatusCodeString(ex.statusCode))
+                                    if (promise != null) { // ask permission, if failed and no promise set as param
+                                        Events.raiseEvent(Events.INFO, "getDiagnosisKeys - ask user for permission")
+                                        try {
+                                            ex.status.startResolutionForResult(base.activity,
+                                                    RequestCodes.REQUEST_CODE_GET_TEMP_EXPOSURE_KEY_HISTORY)
+
+                                            // we will need to resolve promise and attempt to get the keys again
+                                            // promise will be resolved if successful in success listener
+                                        } catch (ex: Exception) {
+                                            resolutionPromise?.resolve(Arguments.createArray())
+                                            Events.raiseError("getDiagnosisKeys - exposure api exception", ex)
+                                        }
+                                    } else {
+                                        resolutionPromise?.resolve(Arguments.createArray())
+                                        Events.raiseError("getDiagnosisKeys - failed post-resolution, not trying again", ex)
+                                    }
+                                } else {
+                                    resolutionPromise?.resolve(Arguments.createArray())
+                                    Events.raiseError("getDiagnosisKeys - general exception", ex)
+                                }
+                            }
+                }
+
             } catch (ex: Exception) {
                 Events.raiseError("getDiagnosisKeys", ex)
                 promise?.resolve(Arguments.createArray())
@@ -478,21 +577,40 @@ class Tracing {
         @JvmStatic
         fun isAuthorised(promise: Promise) {
             try {
-                exposureWrapper.isEnabled
-                        .addOnSuccessListener { enabled: Boolean? ->
-                            if (enabled == true) {
-                                Events.raiseEvent(Events.INFO,"isAuthorised: granted")
-                                promise.resolve("granted")
-                            } else {
-                                Events.raiseEvent(Events.INFO,"isAuthorised: denied")
+                if (isGMS(context)) {
+                    exposureWrapper.isEnabled
+                            .addOnSuccessListener { enabled: Boolean? ->
+                                if (enabled == true) {
+                                    Events.raiseEvent(Events.INFO,"isAuthorised: granted")
+                                    promise.resolve("granted")
+                                } else {
+                                    Events.raiseEvent(Events.INFO,"isAuthorised: denied")
+                                    promise.resolve("blocked")
+                                }
+                            }
+                            .addOnFailureListener { ex ->
+                                Events.raiseError("isAuthorised - onFailure", ex)
+                                handleApiException(ex)
                                 promise.resolve("blocked")
                             }
-                        }
-                        .addOnFailureListener { ex ->
-                            Events.raiseError("isAuthorised - onFailure", ex)
-                            handleApiException(ex)
-                            promise.resolve("blocked")
-                        }
+                }else if (isHMS(context)) {
+                    contactShieldWrapper.isEnabled
+                            .addOnSuccessListener { enabled: Boolean? ->
+                                if (enabled == true) {
+                                    Events.raiseEvent(Events.INFO,"isAuthorised: granted")
+                                    promise.resolve("granted")
+                                } else {
+                                    Events.raiseEvent(Events.INFO,"isAuthorised: denied")
+                                    promise.resolve("blocked")
+                                }
+                            }
+                            .addOnFailureListener { ex ->
+                                Events.raiseError("isAuthorised - onFailure", ex)
+                                handleApiException(ex)
+                                promise.resolve("blocked")
+                            }
+                }
+
             } catch (ex: Exception) {
                 Events.raiseError("isAuthorised - exception", ex)
                 promise.resolve("blocked")
@@ -518,13 +636,16 @@ class Tracing {
         fun isSupported(promise: Promise) = runBlocking<Unit> {
             launch {
                 try {
-                    val apiResult = ExposureNotificationHelper.checkAvailability()
-                    Events.raiseEvent(Events.INFO, "isSupported - checkAvailability: $apiResult")
-                    if (apiResult == ConnectionResult.SUCCESS) {
+                    val gmsApiResult = ExposureNotificationHelper.checkGmsAvailability()
+                    val hmsApiResult = ExposureNotificationHelper.checkHmsAvailability()
+                    Events.raiseEvent(Events.INFO, "isGmsSupported - checkGmsAvailability: $gmsApiResult\nisHmsSupported - checkHmsAvailability: $hmsApiResult")
+                    if (gmsApiResult == ConnectionResult.SUCCESS|| hmsApiResult == com.huawei.hms.api.ConnectionResult.SUCCESS) {
                         promise.resolve(true)
-                    } else if (apiResult == ConnectionResult.SERVICE_INVALID || apiResult == ConnectionResult.SERVICE_DISABLED || apiResult == ConnectionResult.SERVICE_MISSING) {
+                    } else if (gmsApiResult == ConnectionResult.SERVICE_INVALID || gmsApiResult == ConnectionResult.SERVICE_DISABLED || gmsApiResult == ConnectionResult.SERVICE_MISSING ||
+                            hmsApiResult == com.huawei.hms.api.ConnectionResult.SERVICE_INVALID ||  hmsApiResult == com.huawei.hms.api.ConnectionResult.SERVICE_DISABLED ||
+                            hmsApiResult == com.huawei.hms.api.ConnectionResult.SERVICE_MISSING ) {
                         promise.resolve(false)
-                        base.setApiError(apiResult)
+                        base.setApiError(gmsApiResult)
                     }
                 } catch (ex: Exception) {
                     Events.raiseError("isSupported - Exception", ex)
@@ -540,21 +661,36 @@ class Tracing {
                 try {
                     Events.raiseEvent(Events.INFO,"triggerUpdate - trigger update")
                     val gps = GoogleApiAvailability.getInstance()
-                    base.playServicesVersion = gps.getApkVersion(context.applicationContext)
-                    Events.raiseEvent(Events.INFO,"triggerUpdate - version: ${base.playServicesVersion}")
-                    val result = gps.isGooglePlayServicesAvailable(context.applicationContext)
-                    Events.raiseEvent(Events.INFO,"triggerUpdate - result: $result")
-                    if (result == ConnectionResult.SUCCESS) {
+                    base.gmsServicesVersion = gps.getApkVersion(context.applicationContext)
+                    Events.raiseEvent(Events.INFO,"triggerUpdate - version: ${base.gmsServicesVersion}")
+                    val gmsResult = gps.isGooglePlayServicesAvailable(context.applicationContext)
+                    Events.raiseEvent(Events.INFO,"triggerUpdate - result: $gmsResult")
+                    if (gmsResult == ConnectionResult.SUCCESS) {
                         promise.resolve("already_installed")
                     }
-                    if (result == ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED) { // requires update
+                    if (gmsResult == ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED) { // requires update
                         resolutionPromise = promise
                         gps.getErrorDialog(base.activity,
                                 ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED,
-                                RequestCodes.PLAY_SERVICES_UPDATE).show()
+                                RequestCodes.GMS_PLAY_SERVICES_UPDATE).show()
                     } else {
-                        promise.resolve("unknown result: $result")
+                        val hmsResult = HuaweiApiAvailability.getInstance().isHuaweiMobileServicesAvailable(context.applicationContext)
+                        base.hmsServicesVersion = HMSPackageManager.getInstance(context.applicationContext).hmsVersionCode
+                        Events.raiseEvent(Events.INFO,"triggerUpdate - version: ${base.hmsServicesVersion}")
+                        if (hmsResult == com.huawei.hms.api.ConnectionResult.SUCCESS) {
+                            promise.resolve("already_installed")
+                        }
+                        if (hmsResult == com.huawei.hms.api.ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED) { // requires update
+                            resolutionPromise = promise
+                            gps.getErrorDialog(base.activity,
+                                    com.huawei.hms.api.ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED,
+                                    RequestCodes.GMS_PLAY_SERVICES_UPDATE).show()
+                        }else{
+                            promise.resolve("unknown result: $gmsResult")
+                            promise.resolve("unknown result: $hmsResult")
+                        }
                     }
+
                 } catch (ex: Exception) {
                     Events.raiseError("triggerUpdate - exception", ex)
                     promise.resolve("error")
@@ -692,7 +828,8 @@ class Tracing {
         fun getLogData(promise: Promise) {
             val map = Arguments.createMap()
 
-            map.putInt("installedPlayServicesVersion", base.playServicesVersion)
+            map.putInt("installedPlayServicesVersion", base.gmsServicesVersion)
+            map.putInt("installedHmsServicesVersion", base.hmsServicesVersion)
             map.putBoolean("nearbyApiSupported", !base.nearbyNotSupported())
 
             map.putDouble("lastIndex", getLong("since", context).toDouble())

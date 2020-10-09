@@ -24,7 +24,10 @@
         </receiver>
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
-            android:foregroundServiceType="location" />        
+            android:foregroundServiceType="location" />
+        <service android:name=".hms.BackgroundContackShieldIntentService"
+            android:enabled="true"
+            android:exported="true"/>
     </application>
 
 </manifest>

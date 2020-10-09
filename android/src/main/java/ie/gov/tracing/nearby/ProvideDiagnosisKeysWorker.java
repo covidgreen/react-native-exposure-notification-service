@@ -39,11 +39,15 @@ import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import org.threeten.bp.Duration;
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+import static ie.gov.tracing.hms.ApiAvailabilityCheckUtils.isGMS;
+import static ie.gov.tracing.hms.ApiAvailabilityCheckUtils.isHMS;
 
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.TaskToFutureAdapter;
+import ie.gov.tracing.hms.ApiAvailabilityCheckUtils;
+import ie.gov.tracing.hms.ContactShieldWrapper;
 import ie.gov.tracing.network.DiagnosisKeyDownloader;
 import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.ExposureNotificationRepository;
@@ -155,7 +159,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       final String token = generateRandomToken();
       return FluentFuture.from(TaskToFutureAdapter
               .getFutureWithTimeout(
-                      ExposureNotificationClientWrapper.get(getApplicationContext()).isEnabled(),
+                      isGMS(Tracing.currentContext) ? ExposureNotificationClientWrapper.get(getApplicationContext()).isEnabled() : null,
+                      isHMS(Tracing.currentContext) ? ContactShieldWrapper.getInstance(getApplicationContext()).isEnabled() : null,
                       DEFAULT_API_TIMEOUT.toMillis(),
                       TimeUnit.MILLISECONDS,
                       AppExecutors.getScheduledExecutor()))
