@@ -5,9 +5,9 @@ import android.content.Context;
 
 import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.exposurenotification.ExposureConfiguration;
-//import com.google.android.gms.nearby.exposurenotification.ExposureInformation;
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
 import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
+import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
 import com.google.android.gms.tasks.Task;
 import com.google.gson.Gson;
@@ -91,6 +91,15 @@ public class ExposureNotificationClientWrapper {
             .provideDiagnosisKeys(files, exposureConfiguration, token);
   }
 
+
+  Task<Void> provideDiagnosisKeys(List<File> files) {
+
+    Events.raiseEvent(Events.INFO, "processing diagnosis keys with v1.6");
+
+    return exposureNotificationClient
+            .provideDiagnosisKeys(files);
+  }
+
   Task<ExposureSummary> getExposureSummary(String token) {
     return exposureNotificationClient.getExposureSummary(token);
   }
@@ -98,11 +107,9 @@ public class ExposureNotificationClientWrapper {
   public boolean deviceSupportsLocationlessScanning() {
     return exposureNotificationClient.deviceSupportsLocationlessScanning();
   }
-  
-  /*
-  Task<List<ExposureInformation>> getExposureInformation(String token) {
-    return exposureNotificationClient.getExposureInformation(token);
+
+  public Task<List<ExposureWindow>> getExposureWindows() {
+    return exposureNotificationClient.getExposureWindows(ExposureNotificationClient.TOKEN_A);
   }
-  */
 
 }
