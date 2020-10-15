@@ -632,16 +632,17 @@ class ExposureCheck: AsyncOperation {
       let payload:[String: Any] = [
         "matchedKeys": exposures.matchedKeyCount,
         "attenuations": exposures.customAttenuationDurations ?? exposures.attenuationDurations,
-        "maxRiskScore": exposures.maxRiskScore
+        "maxRiskScore": exposures.maxRiskScore,
+        "daysSinceExposure": exposures.daysSinceLastExposure
       ]
       self.saveMetric(event: "CONTACT_NOTIFICATION", payload: payload) { _ in
         let lastExposure = calendar.date(byAdding: .day, value: (0 - exposures.daysSinceLastExposure), to: dateToday)
-        self.triggerCallBack(lastExposure!, payload, completion)
+        self.triggerCallBack(lastExposure!, exposures.daysSinceLastExposure, payload, completion)
       }
       
     }
   
-  private func triggerCallBack(_ lastExposure: Date, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
+  private func triggerCallBack(_ lastExposure: Date, _ daysSinceExposure: Int, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
     guard !self.isCancelled else {
       return self.cancelProcessing()
     }
@@ -650,21 +651,13 @@ class ExposureCheck: AsyncOperation {
       os_log("No callback number configured", log: OSLog.checkExposure, type: .info)
       return completion(.success(true))
     }
-   
-    let notificationRaised = self.configData.notificationRaised
-    
-    guard !(notificationRaised ?? false) else {
-      os_log("Callback number already sent to server", log: OSLog.checkExposure, type: .info)
-      return completion(.success(true))
-    }
-    
-    self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "payload": payload], encoding: JSONEncoding.default)
+           
+    self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload], encoding: JSONEncoding.default)
       .validate()
       .response() { response in
         switch response.result {
         case .success:
           os_log("Request for callback sent", log: OSLog.checkExposure, type: .debug)
-          Storage.shared.flagNotificationRaised(self.storageContext)
           completion(.success(true))
         case let .failure(error):
           os_log("Unable to send callback request, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)

@@ -19,7 +19,6 @@ public class Storage {
         var fileLimit: Int
         var datesLastRan: String!
         var lastExposureIndex: Int!
-        var notificationRaised: Bool!
         var paused: Bool!
         var callbackNumber: String!
         var analyticsOptin: Bool!
@@ -90,7 +89,6 @@ public class Storage {
               fileLimit: data[0].value(forKey: "fileLimit") as! Int,
               datesLastRan: data[0].value(forKey: "datesLastRan") as? String ?? "",
               lastExposureIndex: data[0].value(forKey: "lastIndex") as? Int,
-              notificationRaised: data[0].value(forKey: "notificationRaised") as? Bool,
               paused: data[0].value(forKey: "servicePaused") as? Bool ?? false,
               callbackNumber: callbackNum,
               analyticsOptin: data[0].value(forKey: "analyticsOptin") as? Bool,
@@ -163,30 +161,6 @@ public class Storage {
         os_log("Could not update daily trace settings. %@", log: OSLog.storage, type: .error, error.localizedDescription)
       }
       os_log("Daily Trace settings stored", log: OSLog.storage, type: .debug)
-    }
-
-    public func flagNotificationRaised(_ context: NSManagedObjectContext) {
-      let fetchRequest =
-      NSFetchRequest<NSManagedObject>(entityName: "Settings")
-
-      do {
-          let settingsResult = try context.fetch(fetchRequest)
-
-          if settingsResult.count > 0 {
-            let managedObject = settingsResult[0]
-
-            managedObject.setValue(true, forKey: "notificationRaised")
-            
-            try context.save()
-          } else {
-              os_log("No settings have been stored, can't flag as notified", log: OSLog.storage, type: .debug)
-          }
-          
-      } catch {
-        os_log("Could not flag as notified. %@", log: OSLog.storage, type: .error, error.localizedDescription)
-      }
-      os_log("Flagged that user has been notified", log: OSLog.storage, type: .debug)
-
     }
 
     public func flagPauseStatus(_ context: NSManagedObjectContext, _ paused: Bool) {

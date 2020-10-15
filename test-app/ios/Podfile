@@ -3,6 +3,27 @@ platform :ios, '10.0'
 require_relative '../node_modules/react-native-unimodules/cocoapods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings.delete 'IPHONEOS_DEPLOYMENT_TARGET'
+    end
+  end
+  #Workaround for Xcode 12 and Auto-Linking
+  installer.pods_project.targets.each do |target|
+    if ['EXUpdates', 'RNCAsyncStorage', 'RNGestureHandler', 'RNPermissions', 'RNReanimated', 'RNScreens', 'RNShare', 'react-native-netinfo', 'react-native-safe-area-context', 'react-native-webview', 'RNCMaskedView', 'RNIOS11DeviceCheck', 'RNSVG', 'react-native-exposure-notification-service', 'RNCPushNotificationIOS'].include?(target.name) #list all affected target in the array
+      target.build_phases.each do |build_phases|
+        if build_phases.display_name == 'Frameworks'
+          file_ref = installer.pods_project.new(Xcodeproj::Project::Object::PBXFileReference)
+          file_ref.path = 'React.framework'
+          file_ref.source_tree = 'BUILT_PRODUCTS_DIR'
+          build_phases.add_file_reference(file_ref)
+        end
+      end
+    end
+  end
+end
+
 target 'testapp' do
   rnPrefix = "../node_modules/react-native"
   pod 'react-native-exposure-notification-service', :path => "../.."
@@ -29,7 +50,7 @@ target 'testapp' do
   pod 'React-jsi', :path => "#{rnPrefix}/ReactCommon/jsi"
   pod 'React-jsiexecutor', :path => "#{rnPrefix}/ReactCommon/jsiexecutor"
   pod 'React-jsinspector', :path => "#{rnPrefix}/ReactCommon/jsinspector"
-  pod 'ReactCommon/callinvoker', :path => "#{rnPrefix}/ReactCommon"
+  pod 'React-callinvoker', :path => '../node_modules/react-native/ReactCommon/callinvoker'
   pod 'ReactCommon/turbomodule/core', :path => "#{rnPrefix}/ReactCommon"
   pod 'Yoga', :path => "#{rnPrefix}/ReactCommon/yoga"
   pod 'DoubleConversion', :podspec => "#{rnPrefix}/third-party-podspecs/DoubleConversion.podspec"

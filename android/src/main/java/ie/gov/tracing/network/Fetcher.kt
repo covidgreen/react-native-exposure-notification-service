@@ -20,7 +20,7 @@ import java.util.*
 data class Token(val token: String)
 
 @Keep
-data class Callback(val mobile: String, val closeContactDate: Long, val payload: Map<String, Any>)
+data class Callback(val mobile: String, val closeContactDate: Long, val  daysSinceExposure: long, val payload: Map<String, Any>)
 
 @Keep
 data class Metric(val os: String, val event: String, val version: String, val payload: Map<String, Any>?)
@@ -213,14 +213,7 @@ class Fetcher {
         @JvmStatic
         fun triggerCallback(exposureEntity: ExposureEntity, context: Context, payload: Map<String, Any>) {
             try {
-                val notificationSent = SharedPrefs.getLong("notificationSent", context)
                 var callbackNum = SharedPrefs.getString("callbackNumber", context)
-
-                if (notificationSent > 0) {
-                    Events.raiseEvent(Events.INFO, "triggerCallback - notification " +
-                            "already sent: " + notificationSent)
-                    return
-                }
 
                 if (callbackNum.isEmpty()) {
 
@@ -259,16 +252,14 @@ class Fetcher {
                 val daysSinceExposure = calendar.time.time
 
                 Events.raiseEvent(Events.INFO, "triggerCallback - sending: ${daysSinceExposure} ${Date(daysSinceExposure)}")
-                val callbackParams = Callback(callbackNum, daysSinceExposure, payload)
+                val callbackParams = Callback(callbackNum, daysSinceExposure, exposureEntity.daysSinceLastExposure(), payload)
                 val success = post("/callback", Gson().toJson(callbackParams), context)
 
                 if (!success) {
                     Events.raiseEvent(Events.ERROR, "triggerCallback - failed")
                     return
                 }
-
                 Events.raiseEvent(Events.INFO, "triggerCallback - success")
-                SharedPrefs.setLong("notificationSent", System.currentTimeMillis(), context)
 
             } catch(ex: Exception) {
                 Events.raiseError("triggerCallback - error", ex)
