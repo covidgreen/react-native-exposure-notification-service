@@ -573,6 +573,12 @@ Returns the version number for the app
 
 Returns the bundle identifier / package name for the app
 
+##### `getConfigData()`
+
+`() => Promise<{[key: string]: any}>`
+
+Returns the config being used by the module
+
 ##### `setExposureState()`
 
 `(setStateAction: SetStateAction<State>) => void`

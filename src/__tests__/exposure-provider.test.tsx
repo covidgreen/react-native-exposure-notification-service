@@ -33,7 +33,8 @@ import {
   ExposureProviderProps,
   useExposure,
   getBundleId,
-  getVersion
+  getVersion,
+  getConfigData
 } from '../exposure-provider';
 
 import ExposureNotificationModule, {
@@ -83,6 +84,7 @@ jest.mock('../exposure-notification-module', () => ({
   getLogData: jest.fn().mockResolvedValue({}),
   bundleId: jest.fn().mockResolvedValue('testbundle'),
   version: jest.fn().mockResolvedValue({version: '123', build: '5'}),
+  getConfigData: jest.fn().mockResolvedValue({lastRan: '123'}),
   triggerUpdate: jest.fn().mockResolvedValue(true),
   status: jest.fn().mockResolvedValue({
     state: 'active'
@@ -676,6 +678,15 @@ describe('useExposure', () => {
       const val = await getVersion();
       expect(ExposureNotificationModule.version).toHaveBeenCalledTimes(1);
       expect(val).toEqual({build: '5', version: '123'});
+    });
+  });
+
+  describe('getConfigData()', () => {
+    it('gets the config used by the module', async () => {
+      mocked(ExposureNotificationModule.getConfigData).mockClear();
+      const val = await getConfigData();
+      expect(ExposureNotificationModule.getConfigData).toHaveBeenCalledTimes(1);
+      expect(val).toEqual({lastRan: '123'});
     });
   });
 
