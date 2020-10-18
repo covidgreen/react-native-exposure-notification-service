@@ -20,7 +20,7 @@ import java.util.*
 data class Token(val token: String)
 
 @Keep
-data class Callback(val mobile: String, val closeContactDate: Long, val  daysSinceExposure: long, val payload: Map<String, Any>)
+data class Callback(val mobile: String, val closeContactDate: Long, val  daysSinceExposure: Int, val payload: Map<String, Any>)
 
 @Keep
 data class Metric(val os: String, val event: String, val version: String, val payload: Map<String, Any>?)

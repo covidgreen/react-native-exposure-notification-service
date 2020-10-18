@@ -27,6 +27,7 @@ import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.io.File;
 import java.security.SecureRandom;
@@ -125,28 +126,37 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   public ListenableFuture<Result> startWork() {
       Tracing.currentContext = getApplicationContext();
       Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
+      SharedPrefs.remove("lastApiError", Tracing.currentContext);
+      SharedPrefs.remove("lastError", Tracing.currentContext);
 
       setForegroundAsync(createForegroundInfo());
 
+      long lastRun = SharedPrefs.getLong("lastRunDate", Tracing.currentContext);
+      long checkFrequency = SharedPrefs.getLong("exposureCheckFrequency", Tracing.context);
+      if (checkFrequency == 0) {
+        checkFrequency = 120;
+      }
+      if ((lastRun + (checkFrequency * 60)) < (System.currentTimeMillis() / 1000)) {
+        String ran = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastRun);
+        SharedPrefs.setString("lastError", String.format("Check was run at %s, interval is %s, its too soon to check again", ran, checkFrequency), Tracing.currentContext);
+        return Futures.immediateFailedFuture(new TooSoonToRun());
+      }
 
       // try save daily metric, does not affect success
       saveDailyMetric();
-      
-      updateLastRun();
-
-      SharedPrefs.remove("lastApiError", Tracing.currentContext);
-      SharedPrefs.remove("lastError", Tracing.currentContext);
 
       // validate config set before running
       final String auth = SharedPrefs.getString("authToken", this.getApplicationContext());
       if (auth.isEmpty()) {
         // config not yet populated so don't run
+        SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", Tracing.currentContext);
         return Futures.immediateFailedFuture(new ConfigNotSetException());
       }
 
       final Boolean paused = SharedPrefs.getBoolean("servicePaused", this.getApplicationContext());
       if (paused) {
         // ENS is paused
+        SharedPrefs.setString("lastError", "ENS is paused", Tracing.currentContext);
         return Futures.immediateFailedFuture(new ENSPaused());
       }
 
@@ -165,6 +175,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                   return diagnosisKeys.download();
                 } else {
                   // Stop here because things aren't enabled. Will still return successful though.
+                  SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
                   return Futures.immediateFailedFuture(new NotEnabledException());
                 }
               },
@@ -176,7 +187,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
               .transform(done -> processSuccess(), // all done, do tidy ups here
                       AppExecutors.getLightweightExecutor())
               .catching(NotEnabledException.class,
-                      ex -> Result.success(), // not enabled, just return success
+                      ex -> {
+                        SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
+                        Result.success(); // not enabled, just return success
+                      },
                       AppExecutors.getBackgroundExecutor())
               .catching(Exception.class, this::processFailure,
                       AppExecutors.getBackgroundExecutor());

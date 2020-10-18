@@ -4,7 +4,8 @@ export {
   ExposureContextValue,
   useExposure,
   getBundleId,
-  getVersion
+  getVersion,
+  getConfigData
 } from './exposure-provider';
 
 export {

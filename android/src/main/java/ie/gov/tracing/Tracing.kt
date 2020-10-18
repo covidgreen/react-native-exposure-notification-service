@@ -703,6 +703,20 @@ class Tracing {
             promise.resolve(map)
         }
 
+        @JvmStatic
+        fun getConfigData(promise: Promise) {
+            val map = Arguments.createMap()
+
+            map.putString("token", SharedPrefs.getString("authToken", context)
+            map.putString("refreshToken", SharedPrefs.getString("refreshToken", context)
+            map.putString("keyServerType", SharedPrefs.getString("keyServerType", context)
+            map.putString("keyServerUrl", SharedPrefs.getString("keyServerUrl", context)
+            map.putString("serverUrl", SharedPrefs.getString("serverUrl", context)
+            map.putBoolean("analyticsOptin", SharedPrefs.getBoolean("analyticsOptin", context)
+            
+            promise.resolve(map)
+        }
+
         fun handleApiException(ex: Exception) {
             if (ex is ApiException) {
                 Events.raiseEvent(Events.ERROR, "handle api exception: ${ExposureNotificationStatusCodes.getStatusCodeString(ex.statusCode)}")

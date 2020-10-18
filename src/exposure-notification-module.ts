@@ -55,7 +55,8 @@ export enum StatusType {
   exposure = 'exposure',
   resolution = 'resolution',
   paused = 'paused',
-  starting = 'starting'
+  starting = 'starting',
+  stopped = 'stopped'
 }
 
 export interface Status {
@@ -97,6 +98,8 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
   status(): Promise<Status>;
 
   getLogData(): Promise<any>;
+
+  getConfigData(): Promise<any>;
 
   version(): Promise<Version>;
 

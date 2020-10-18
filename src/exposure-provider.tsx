@@ -135,6 +135,15 @@ export const getBundleId = async () => {
   }
 };
 
+export const getConfigData = async () => {
+  try {
+    const result = await ExposureNotification.getConfigData();
+    return result;
+  } catch (e) {
+    console.log('getConfigData error', e);
+  }
+};
+
 export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   children,
   isReady = false,
@@ -192,7 +201,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         const latestStatus = await ExposureNotification.status();
 
         if (
-          !(latestStatus && latestStatus.type?.indexOf(StatusType.paused) > -1)
+          !(latestStatus && latestStatus.type?.indexOf(StatusType.paused) > -1 && latestStatus.type?.indexOf(StatusType.stopped) > -1)
         ) {
           start();
         }
@@ -245,6 +254,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const start = async () => {
     try {
+      configure();
       const result = await ExposureNotification.start();
       await validateStatus();
       await getCloseContacts();

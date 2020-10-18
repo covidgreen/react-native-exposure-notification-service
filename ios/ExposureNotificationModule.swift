@@ -172,6 +172,16 @@ public class ExposureNotificationModule: RCTEventEmitter {
       }
     }
 
+    @objc public func getConfigData(_ resolve: @escaping RCTPromiseResolveBlock,
+                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
+        if #available(iOS 13.5, *) {
+            ExposureProcessor.shared.getConfigData(resolve, rejecter: reject)
+        } else {
+            resolve([])
+        }
+        
+    }
+    
     @objc public func triggerUpdate(_ resolve: @escaping RCTPromiseResolveBlock,
                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
         resolve(false)
@@ -262,18 +272,22 @@ public class ExposureNotificationModule: RCTEventEmitter {
               status["type"] = ["bluetooth"]
           case .restricted:
               status["state"] = "restricted"
-        case .paused:
+          case .paused:
               status["state"] = "disabled"
               status["type"] = ["paused"]
-        case .unauthorized:
+          case .unauthorized:
               status["state"] = "unavailable"
               status["type"] = ["unauthorized"]
-        @unknown default:
+          @unknown default:
               status["state"] = "unavailable"
         }
         if ExposureManager.shared.isPaused() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
            status["state"] = "disabled"
            status["type"] = ["paused"]
+        }
+        if ExposureManager.shared.isStopped() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
+           status["state"] = "disabled"
+           status["type"] = ["stopped"]
         }
         os_log("Status of exposure service has changed %@", log: OSLog.exposure, type: .debug, status)
         sendEvent(withName: "exposureEvent", body: ["onStatusChanged": status])

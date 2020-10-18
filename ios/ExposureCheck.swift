@@ -100,12 +100,17 @@ class ExposureCheck: AsyncOperation {
     }
        
     override func main() {
-      self.configData = Storage.shared.readSettings(self.storageContext)
+       self.configData = Storage.shared.readSettings(self.storageContext)
        guard self.configData != nil else {
-          self.finishNoProcessing("No config set so can't proceeed with checking exposures", false)
+          self.finishNoProcessing("No config set so can't proceed with checking exposures", false)
           return
        }
-      
+ 
+        guard self.configData.refreshToken != "missing" else {
+          self.finishNoProcessing("No refresh token set so can't proceed", false)
+          return
+       }
+        
        let serverDomain: String = Storage.getDomain(self.configData.serverURL)
        let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
        var manager: ServerTrustManager
@@ -762,7 +767,7 @@ class RequestInterceptor: Alamofire.RequestInterceptor {
         switch response.result {
          case .success:
              self.config.authToken = response.value!.token
-             Storage.shared.updateAppSettings(self.config)
+             Storage.shared.updateAuthToken(self.config.authToken)
              completion(.success(true))
          case let .failure(error):
              completion(.failure(error))
