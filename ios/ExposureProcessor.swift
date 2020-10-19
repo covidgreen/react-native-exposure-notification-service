@@ -238,7 +238,8 @@ public class ExposureProcessor {
       data["fileLimit"] = config.fileLimit
       data["keychainGetError"] = config.lastKeyChainGetError
       data["keychainSetError"] = config.lastKeyChainSetError
-      
+      data["lastExposureIndex"] = config.lastExposureIndex
+        
       let formatter = DateFormatter()
       formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
       

@@ -46,7 +46,7 @@ class ExposureManager {
   public func isStopped() -> Bool {
      let context = Storage.PersistentContainer.shared.newBackgroundContext()
      guard let config = Storage.shared.readSettings(context) else {
-       return false
+       return true
      }
       
      return config.stopped

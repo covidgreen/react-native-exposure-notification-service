@@ -378,9 +378,9 @@ class Tracing {
         }
 
         @JvmStatic
-        fun checkExposure(readExposureDetails: Boolean = false) {
+        fun checkExposure(readExposureDetails: Boolean = false, skipTimeCheck: Boolean = false) {
             extraDetails = readExposureDetails
-            ProvideDiagnosisKeysWorker.startOneTimeWorkRequest()
+            ProvideDiagnosisKeysWorker.startOneTimeWorkRequest(skipTimeCheck)
         }
 
         @JvmStatic
@@ -707,12 +707,12 @@ class Tracing {
         fun getConfigData(promise: Promise) {
             val map = Arguments.createMap()
 
-            map.putString("token", SharedPrefs.getString("authToken", context)
-            map.putString("refreshToken", SharedPrefs.getString("refreshToken", context)
-            map.putString("keyServerType", SharedPrefs.getString("keyServerType", context)
-            map.putString("keyServerUrl", SharedPrefs.getString("keyServerUrl", context)
-            map.putString("serverUrl", SharedPrefs.getString("serverUrl", context)
-            map.putBoolean("analyticsOptin", SharedPrefs.getBoolean("analyticsOptin", context)
+            map.putString("token", SharedPrefs.getString("authToken", context))
+            map.putString("refreshToken", SharedPrefs.getString("refreshToken", context))
+            map.putString("keyServerType", SharedPrefs.getString("keyServerType", context))
+            map.putString("keyServerUrl", SharedPrefs.getString("keyServerUrl", context))
+            map.putString("serverUrl", SharedPrefs.getString("serverUrl", context))
+            map.putBoolean("analyticsOptin", SharedPrefs.getBoolean("analyticsOptin", context))
             
             promise.resolve(map)
         }

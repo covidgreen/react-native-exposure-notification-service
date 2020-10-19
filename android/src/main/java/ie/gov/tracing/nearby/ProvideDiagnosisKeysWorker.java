@@ -128,6 +128,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
       SharedPrefs.remove("lastApiError", Tracing.currentContext);
       SharedPrefs.remove("lastError", Tracing.currentContext);
+      final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);
 
       setForegroundAsync(createForegroundInfo());
 
@@ -189,7 +190,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
               .catching(NotEnabledException.class,
                       ex -> {
                         SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
-                        Result.success(); // not enabled, just return success
+                        return Result.success(); // not enabled, just return success
                       },
                       AppExecutors.getBackgroundExecutor())
               .catching(Exception.class, this::processFailure,
@@ -334,13 +335,16 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   }
 
 
-  public static void startOneTimeWorkRequest() {
+  public static void startOneTimeWorkRequest(Boolean skipTimeCheck) {
     Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startOneTimeWorker");
     WorkManager workManager = WorkManager.getInstance(Tracing.context);
     OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(ProvideDiagnosisKeysWorker.class)
             .setConstraints(
                     new Constraints.Builder()
                             .setRequiredNetworkType(NetworkType.CONNECTED)
+                            .build())
+            .setInputData(
+                    new Data.Builder().putBoolean("skipTimeCheck", skipTimeCheck)
                             .build())
             .build();
     workManager.enqueueUniqueWork("OneTimeWorker", ExistingWorkPolicy.REPLACE, workRequest);

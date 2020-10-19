@@ -40,10 +40,15 @@ public class ExposureNotificationModule: RCTEventEmitter {
       }
 
       guard let serverURL = configDict["serverURL"] as? String, let refresh = configDict["refreshToken"] as? String, let token = configDict["authToken"] as? String else {
-          os_log("Error configuring module, refresh token or auth missing", log: OSLog.setup, type: .error)
+          os_log("Error configuring module, server url, refresh token or auth missing is missing", log: OSLog.setup, type: .error)
           return resolve(false)
       }
       
+      guard !serverURL.isEmpty, !refresh.isEmpty, !token.isEmpty else {
+          os_log("Error configuring module, server url, refresh token or auth token is empty", log: OSLog.setup, type: .error)
+          return resolve(false)
+      }
+        
       let configData = Storage.Config(
         refreshToken: refresh,
         serverURL: serverURL,
