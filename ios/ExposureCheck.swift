@@ -106,11 +106,6 @@ class ExposureCheck: AsyncOperation {
           return
        }
  
-        guard self.configData.refreshToken != "missing" else {
-          self.finishNoProcessing("No refresh token set so can't proceed", false)
-          return
-       }
-        
        let serverDomain: String = Storage.getDomain(self.configData.serverURL)
        let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
        var manager: ServerTrustManager
@@ -123,6 +118,11 @@ class ExposureCheck: AsyncOperation {
         
        os_log("Running with params %@, %@, %@", log: OSLog.checkExposure, type: .debug, self.configData.serverURL, self.configData.authToken, self.configData.refreshToken)
        
+       guard self.configData.refreshToken != "missing" else {
+          self.finishNoProcessing("No refresh token set so can't proceed", false)
+          return
+       }
+        
        guard (self.configData.lastRunDate!.addingTimeInterval(TimeInterval(self.configData.checkExposureInterval * 60)) < Date() || self.skipTimeCheck) else {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -681,10 +681,15 @@ class ExposureCheck: AsyncOperation {
       return self.cancelProcessing()
     }
     guard self.configData != nil else {
-      // don't track daily trace if config not setup
+      // don'trun if config not setup
       return completion(.success(true))
     }
-
+    
+    guard self.sessionManager != nil else {
+      // don't run if session manager not setup
+      return completion(.success(true))
+    }
+    
     if (!self.configData.analyticsOptin) {
       os_log("Metric opt out", log: OSLog.exposure, type: .error)
       return completion(.success(true))
