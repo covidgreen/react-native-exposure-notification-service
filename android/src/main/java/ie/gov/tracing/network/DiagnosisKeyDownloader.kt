@@ -58,11 +58,11 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
         // 2. download the files to process
         // 3. increment sync to largest processed index
         // 4. return the list of files to pass to the submitter
-        var url = "/exposures/?since=$since&limit=$fileLimit"
+        var endpoint = "/exposures/?since=$since&limit=$fileLimit"
         if (keyServerType == "google") {
-            url = "/v1/index.txt"
+            endpoint = "/v1/index.txt"
         } 
-        val data = Fetcher.fetch(url, false, true, context)
+        val data = Fetcher.fetchKeyFile(endpoint, context)
 
         val files = mutableListOf<File>()
         if(data != null) {
