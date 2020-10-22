@@ -254,7 +254,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const start = async () => {
     try {
-      configure();
       const result = await ExposureNotification.start();
       await validateStatus();
       await getCloseContacts();
