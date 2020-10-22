@@ -378,9 +378,9 @@ class Tracing {
         }
 
         @JvmStatic
-        fun checkExposure(readExposureDetails: Boolean = false) {
+        fun checkExposure(readExposureDetails: Boolean = false, skipTimeCheck: Boolean = false) {
             extraDetails = readExposureDetails
-            ProvideDiagnosisKeysWorker.startOneTimeWorkRequest()
+            ProvideDiagnosisKeysWorker.startOneTimeWorkRequest(skipTimeCheck)
         }
 
         @JvmStatic
@@ -391,11 +391,15 @@ class Tracing {
         }
 
         @JvmStatic
-        fun version(): WritableMap {
+        fun version(runningContext: Context?): WritableMap {
             var versionName: String
             var versionCode: String
+            var currentContext = context
+            if (runningContext != null) {
+                currentContext = runningContext
+            }
             try {
-                val pinfo: PackageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0)
+                val pinfo: PackageInfo = currentContext.getPackageManager().getPackageInfo(currentContext.getPackageName(), 0)
                 versionName = pinfo.versionName
                 versionCode = PackageInfoCompat.getLongVersionCode(pinfo).toString()           
             } catch(e: Exception) {
@@ -700,6 +704,20 @@ class Tracing {
             map.putString("lastError", SharedPrefs.getString("lastError", context))
             map.putString("lastApiError", SharedPrefs.getString("lastApiError", context))
 
+            promise.resolve(map)
+        }
+
+        @JvmStatic
+        fun getConfigData(promise: Promise) {
+            val map = Arguments.createMap()
+
+            map.putString("token", SharedPrefs.getString("authToken", context))
+            map.putString("refreshToken", SharedPrefs.getString("refreshToken", context))
+            map.putString("keyServerType", SharedPrefs.getString("keyServerType", context))
+            map.putString("keyServerUrl", SharedPrefs.getString("keyServerUrl", context))
+            map.putString("serverUrl", SharedPrefs.getString("serverUrl", context))
+            map.putBoolean("analyticsOptin", SharedPrefs.getBoolean("analyticsOptin", context))
+            
             promise.resolve(map)
         }
 

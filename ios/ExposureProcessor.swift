@@ -118,6 +118,7 @@ public class ExposureProcessor {
         }
         let context = Storage.PersistentContainer.shared.newBackgroundContext()
         Storage.shared.flagPauseStatus(context, false)
+        Storage.shared.flagStopped(context, false)
         ExposureManager.shared.manager.setExposureNotificationEnabled(true) { error in
             if let error = error as? ENError {
                 os_log("Error starting notification services, %@", log: OSLog.exposure, type: .error, error.localizedDescription)
@@ -161,6 +162,7 @@ public class ExposureProcessor {
         }
         let context = Storage.PersistentContainer.shared.newBackgroundContext()
         Storage.shared.flagPauseStatus(context, false)
+        Storage.shared.flagStopped(context, true)
         ExposureManager.shared.manager.setExposureNotificationEnabled(false) { error in
             if let error = error as? ENError {
               os_log("Error stopping notification services, %@", log: OSLog.setup, type: .error, error.localizedDescription)
@@ -220,6 +222,41 @@ public class ExposureProcessor {
       
     }
   
+    public func getConfigData(_ resolve: @escaping RCTPromiseResolveBlock,
+                           rejecter reject: @escaping RCTPromiseRejectBlock) {
+      let context = Storage.PersistentContainer.shared.newBackgroundContext()
+      guard let config = Storage.shared.readSettings(context) else {
+        return resolve([])
+      }
+      var data:[String: Any] = [:]
+      data["token"] = config.authToken
+      data["refreshToken"] = config.refreshToken
+      data["serverURL"] = config.serverURL
+      data["keyServerURL"] = config.keyServerUrl
+      data["serverType"] = config.keyServerType.rawValue
+      data["analyticsOptin"] = config.analyticsOptin
+      data["fileLimit"] = config.fileLimit
+      data["keychainGetError"] = config.lastKeyChainGetError
+      data["keychainSetError"] = config.lastKeyChainSetError
+      data["lastExposureIndex"] = config.lastExposureIndex
+        
+      let formatter = DateFormatter()
+      formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+      
+      if let when = config.lastUpdated {
+        data["lastUpdated"] = formatter.string(from: when)
+      } else {
+        data["lastUpdated"] = "Not updated"
+      }
+      if let ran = config.lastRunDate {
+        data["lastRunDate"] = formatter.string(from: ran)
+      } else {
+        data["lastRunDate"] = "Not run"
+      }
+      resolve(data)
+      
+    }
+
     public func getCloseContacts(_ resolve: @escaping RCTPromiseResolveBlock,
                                   rejecter reject: @escaping RCTPromiseRejectBlock) {
        

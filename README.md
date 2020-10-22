@@ -330,7 +330,7 @@ function Root() {
   return (
     <ExposureProvider
       traceConfiguration={{
-        exposureCheckInterval: 120,
+        exposureCheckInterval: 180,
         storeExposuresFor: 14,
         fileLimit: 1,
         fileLimitiOS: 2
@@ -572,6 +572,12 @@ Returns the version number for the app
 `() => Promise<string>`
 
 Returns the bundle identifier / package name for the app
+
+##### `getConfigData()`
+
+`() => Promise<{[key: string]: any}>`
+
+Returns the config being used by the module
 
 ##### `setExposureState()`
 
