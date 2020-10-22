@@ -117,18 +117,13 @@ class ExposureCheck: AsyncOperation {
        self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)), serverTrustManager: manager)
         
        os_log("Running with params %@, %@, %@", log: OSLog.checkExposure, type: .debug, self.configData.serverURL, self.configData.authToken, self.configData.refreshToken)
-       
-       guard self.configData.refreshToken != "missing" else {
-          self.finishNoProcessing("No refresh token set so can't proceed", false)
-          return
-       }
-        
-       guard (self.configData.lastRunDate!.addingTimeInterval(TimeInterval(self.configData.checkExposureInterval * 60)) < Date() || self.skipTimeCheck) else {
+               
+       /*guard (self.configData.lastRunDate!.addingTimeInterval(TimeInterval(self.configData.checkExposureInterval * 60)) < Date() || self.skipTimeCheck) else {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
             self.finishNoProcessing("Check was run at \(formatter.string(from: self.configData.lastRunDate!)), interval is \(self.configData.checkExposureInterval), its too soon to check again", false)
             return
-       }
+       }*/
 
        guard ENManager.authorizationStatus == .authorized else {
             self.finishNoProcessing("Not authorised so can't run exposure checks")

@@ -151,15 +151,15 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       saveDailyMetric();
 
       // validate config set before running
-      final String auth = SharedPrefs.getString("serverUrl", Tracing.currentContext;
-      if (auth.isEmpty()) {
+      final String server = SharedPrefs.getString("serverUrl", Tracing.currentContext);
+      if (server.isEmpty()) {
         // config not yet populated so don't run
         SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", Tracing.currentContext);
         Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
         return Futures.immediateFailedFuture(new ConfigNotSetException());
       }
 
-      final Boolean paused = SharedPrefs.getBoolean("servicePaused", Tracing.currentContext;
+      final Boolean paused = SharedPrefs.getBoolean("servicePaused", Tracing.currentContext);
       if (paused) {
         // ENS is paused
         SharedPrefs.setString("lastError", "ENS is paused", Tracing.currentContext);

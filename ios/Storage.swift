@@ -76,18 +76,18 @@ public class Storage {
             }
             var authToken = keychain.get("nm:authToken") ?? "missing"
             let lastKeyChainError = keychain.lastResultCode
-            if authToken == "missing" {
-                authToken = keychain.get("token") ?? "missing"
+            if authToken == "" {
+                authToken = keychain.get("token") ?? ""
             }
-            if authToken == "missing" {
-                authToken = data[0].value(forKey: "authToken") as? String ?? "missing"
+            if authToken == "" {
+                authToken = data[0].value(forKey: "authToken") as? String ?? ""
             }
-            var refreshToken = keychain.get("nm:refreshToken") ?? "missing"
-            if refreshToken == "missing" {
-                refreshToken = keychain.get("refreshToken") ?? "missing"
+            var refreshToken = keychain.get("nm:refreshToken") ?? ""
+            if refreshToken == "" {
+                refreshToken = keychain.get("refreshToken") ?? ""
             }
-            if refreshToken == "missing" {
-                refreshToken = data[0].value(forKey: "refreshToken") as? String ?? "missing"
+            if refreshToken == "" {
+                refreshToken = data[0].value(forKey: "refreshToken") as? String ?? ""
             }
             let defaultDate = Date().addingTimeInterval(-1*24*60*60)
             
