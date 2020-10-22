@@ -391,11 +391,15 @@ class Tracing {
         }
 
         @JvmStatic
-        fun version(): WritableMap {
+        fun version(runningContext: Context?): WritableMap {
             var versionName: String
             var versionCode: String
+            var currentContext = context
+            if (runningContext != null) {
+                currentContext = runningContext
+            }
             try {
-                val pinfo: PackageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0)
+                val pinfo: PackageInfo = currentContext.getPackageManager().getPackageInfo(currentContext.getPackageName(), 0)
                 versionName = pinfo.versionName
                 versionCode = PackageInfoCompat.getLongVersionCode(pinfo).toString()           
             } catch(e: Exception) {

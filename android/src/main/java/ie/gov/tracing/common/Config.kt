@@ -27,8 +27,12 @@ class Config {
                 SharedPrefs.setString("notificationTitle", params.getString("notificationTitle")!!, Tracing.context)
                 SharedPrefs.setString("notificationDesc", params.getString("notificationDesc")!!, Tracing.context)
                 // this is sensitive user data, our shared prefs class is uses EncryptedSharedPreferences and MasterKeys
-                SharedPrefs.setString("refreshToken", params.getString("refreshToken")!!, Tracing.context)
-                SharedPrefs.setString("authToken", params.getString("authToken")!!, Tracing.context)
+                if (!params.getString("refreshToken").isNullOrEmpty()) {
+                    SharedPrefs.setString("refreshToken", params.getString("refreshToken")!!, Tracing.context)
+                }
+                if (!params.getString("authToken").isNullOrEmpty()) {
+                    SharedPrefs.setString("authToken", params.getString("authToken")!!, Tracing.context)
+                }
                 SharedPrefs.setString("callbackNumber", params.getString("callbackNumber")!!, Tracing.context)
             } catch(ex: Exception) {
                 Events.raiseError("Error setting configuration: ", ex)

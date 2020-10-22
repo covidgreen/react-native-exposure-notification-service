@@ -330,7 +330,7 @@ function Root() {
   return (
     <ExposureProvider
       traceConfiguration={{
-        exposureCheckInterval: 120,
+        exposureCheckInterval: 180,
         storeExposuresFor: 14,
         fileLimit: 1,
         fileLimitiOS: 2

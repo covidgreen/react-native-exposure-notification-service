@@ -15,6 +15,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.SecureRandom
 import java.util.*
+import io.reactivex.Single
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.schedulers.Schedulers
 
 @Keep
 data class Token(val token: String)
@@ -57,7 +60,7 @@ class Fetcher {
                 if (keyServerType.isEmpty()) {
                     keyServerType = "nearform"
                 }
-                val authToken = SharedPrefs.getString("authToken", context)
+                val authToken = getAuthToken(context)
                 var fileUrl = "${keyServerUrl}/data/$filename"
                 if (keyServerType == "google") {
                     fileUrl = "${keyServerUrl}/$filename"
@@ -89,10 +92,37 @@ class Fetcher {
             }
         }
 
+        private fun getRefreshToken(context: Context): String {
+            var token = SharedPrefs.getString("refreshToken", context)
+            if (token.isEmpty()) {
+                try {
+                    val store = ExpoSecureStoreInterop(context)
+                    token = store.getItemImpl("refreshToken")
+                } catch (exExpo: Exception) {
+                    Events.raiseError("ExpoSecureStoreInterop  refreshToken", exExpo)
+                }
+            }
+            return token
+        }
+
+        private fun getAuthToken(context: Context): String {
+            var token = SharedPrefs.getString("authToken", context)
+            if (token.isEmpty()) {
+                try {
+                    val store = ExpoSecureStoreInterop(context)
+                    token = store.getItemImpl("token")
+                } catch (exExpo: Exception) {
+                    Events.raiseError("ExpoSecureStoreInterop  refreshToken", exExpo)
+                }
+            }
+            return token
+        }
+
+
         private fun getNewAuthToken(context: Context): String? {
             try {
                 val serverUrl = SharedPrefs.getString("serverUrl", context)
-                val refreshToken = SharedPrefs.getString("refreshToken", context)
+                val refreshToken = getRefreshToken(context)
 
                 val url = URL("${serverUrl}/refresh")
                 val urlConnection = url.openConnection() as HttpURLConnection
@@ -117,7 +147,7 @@ class Fetcher {
         private fun post(endpoint: String, body: String, context: Context): Boolean {
             try {
                 val serverUrl = SharedPrefs.getString("serverUrl", context)
-                val authToken = SharedPrefs.getString("authToken", context)
+                val authToken = getAuthToken(context)
                 Events.raiseEvent(Events.INFO, "post - sending data to: " +
                         "${serverUrl}$endpoint, body: $body")
 
@@ -161,7 +191,7 @@ class Fetcher {
                 if (keyServerType.isEmpty()) {
                     keyServerType = "nearform"
                 }
-                val authToken = SharedPrefs.getString("authToken", context)
+                val authToken = getAuthToken(context)
 
                 Events.raiseEvent(Events.INFO, "fetch - fetching from: ${serverUrl}$endpoint")
                 val url = URL("${serverUrl}$endpoint")
@@ -209,6 +239,7 @@ class Fetcher {
                 return null
             }
         }
+
 
         @JvmStatic
         fun triggerCallback(exposureEntity: ExposureEntity, context: Context, payload: Map<String, Any>) {
@@ -270,25 +301,28 @@ class Fetcher {
         fun saveMetric(event: String, context: Context, payload: Map<String, Any>? = null) {
             try {
                 val analytics = SharedPrefs.getBoolean("analyticsOptin", context)
-                val version = Tracing.version().getString("display").toString()
+                val version = Tracing.version(context).getString("display").toString()
 
-                if(!analytics) {
+                if (!analytics) {
                     Events.raiseEvent(Events.INFO, "saveMetric - not saving, no opt in")
                     return
                 }
 
                 val metric = Metric("android", event, version, payload)
 
-                val success = post("/metrics", Gson().toJson(metric), context)
-
-                if (!success) {
-                    Events.raiseEvent(Events.ERROR, "saveMetric - failed: $event")
-                    return
+                Single.fromCallable {
+                    return@fromCallable Fetcher.post("/metrics", Gson().toJson(metric), context)
                 }
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe({ success ->
+                            Events.raiseEvent(if (success) Events.INFO else Events.ERROR, "saveMetric - ${if (success) "success" else "failed"}")
+                        }, {
+                            Events.raiseError("saveMetric - error - background", java.lang.Exception(it))
+                        })
 
-                Events.raiseEvent(Events.INFO, "saveMetric - success, $event, $version")
-            } catch(ex: Exception) {
-                Events.raiseError("triggerCallback - error", ex)
+            } catch (ex: Exception) {
+                Events.raiseError("saveMetric - error", ex)
             }
         }
     }

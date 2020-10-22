@@ -10,6 +10,7 @@ import android.os.Build;
 import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+import androidx.work.Data;
 import androidx.core.app.NotificationCompat;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
@@ -88,7 +89,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private void deleteOldData() {
     try {
       long DAY_IN_MS = 1000 * 60 * 60 * 24;
-      long storeExposuresFor = SharedPrefs.getLong("storeExposuresFor", this.getApplicationContext());
+      long storeExposuresFor = SharedPrefs.getLong("storeExposuresFor", Tracing.currentContext);
       long daysBeforeNowInMs = System.currentTimeMillis() - storeExposuresFor * DAY_IN_MS;
       Events.raiseEvent(Events.INFO, "deleteOldData - delete exposures/tokens before: " +
               new Date(daysBeforeNowInMs));
@@ -116,6 +117,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       }
 
       SharedPrefs.setString("lastRun", newLastRun, Tracing.currentContext);
+      SharedPrefs.setLong("lastRunDate", System.currentTimeMillis(), Tracing.currentContext);
     } catch(Exception ex) {
       Events.raiseError("lastRun",  ex);
     }
@@ -132,32 +134,36 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
       setForegroundAsync(createForegroundInfo());
 
-      long lastRun = SharedPrefs.getLong("lastRunDate", Tracing.currentContext);
+      /*long lastRun = SharedPrefs.getLong("lastRunDate", Tracing.currentContext);
       long checkFrequency = SharedPrefs.getLong("exposureCheckFrequency", Tracing.context);
       if (checkFrequency == 0) {
-        checkFrequency = 120;
+        checkFrequency = 180;
       }
-      if ((lastRun + (checkFrequency * 60)) < (System.currentTimeMillis() / 1000)) {
+      if (!skipTimeCheck && (lastRun + (checkFrequency * 60)) < (System.currentTimeMillis() / 1000)) {
         String ran = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastRun);
         SharedPrefs.setString("lastError", String.format("Check was run at %s, interval is %s, its too soon to check again", ran, checkFrequency), Tracing.currentContext);
         return Futures.immediateFailedFuture(new TooSoonToRun());
       }
+      */
 
+      updateLastRun();
       // try save daily metric, does not affect success
       saveDailyMetric();
 
       // validate config set before running
-      final String auth = SharedPrefs.getString("authToken", this.getApplicationContext());
+      final String auth = SharedPrefs.getString("serverUrl", Tracing.currentContext;
       if (auth.isEmpty()) {
         // config not yet populated so don't run
         SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", Tracing.currentContext);
+        Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
         return Futures.immediateFailedFuture(new ConfigNotSetException());
       }
 
-      final Boolean paused = SharedPrefs.getBoolean("servicePaused", this.getApplicationContext());
+      final Boolean paused = SharedPrefs.getBoolean("servicePaused", Tracing.currentContext;
       if (paused) {
         // ENS is paused
         SharedPrefs.setString("lastError", "ENS is paused", Tracing.currentContext);
+        Events.raiseEvent(Events.INFO, "ENS Paused");
         return Futures.immediateFailedFuture(new ENSPaused());
       }
 
@@ -166,7 +172,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       final String token = generateRandomToken();
       return FluentFuture.from(TaskToFutureAdapter
               .getFutureWithTimeout(
-                      ExposureNotificationClientWrapper.get(getApplicationContext()).isEnabled(),
+                      ExposureNotificationClientWrapper.get(Tracing.currentContext).isEnabled(),
                       DEFAULT_API_TIMEOUT.toMillis(),
                       TimeUnit.MILLISECONDS,
                       AppExecutors.getScheduledExecutor()))
@@ -177,6 +183,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                 } else {
                   // Stop here because things aren't enabled. Will still return successful though.
                   SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
+                  Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
                   return Futures.immediateFailedFuture(new NotEnabledException());
                 }
               },
@@ -190,6 +197,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
               .catching(NotEnabledException.class,
                       ex -> {
                         SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
+                        Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
                         return Result.success(); // not enabled, just return success
                       },
                       AppExecutors.getBackgroundExecutor())
@@ -258,7 +266,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
   private void saveDailyMetric() {
     try {
-      long dailyActiveTrace = SharedPrefs.getLong("dailyActiveTrace", this.getApplicationContext());
+      long dailyActiveTrace = SharedPrefs.getLong("dailyActiveTrace", Tracing.currentContext);
 
       Events.raiseEvent(Events.INFO, "saveDailyMetric - last DAILY_ACTIVE_TRACE: " + dailyActiveTrace);
 
@@ -276,8 +284,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       }
 
       Events.raiseEvent(Events.INFO, "saveDailyMetric - saving DAILY_ACTIVE_TRACE metric");
-      Fetcher.saveMetric("DAILY_ACTIVE_TRACE", this.getApplicationContext(), null);
-      SharedPrefs.setLong("dailyActiveTrace", System.currentTimeMillis(), this.getApplicationContext());
+      Fetcher.saveMetric("DAILY_ACTIVE_TRACE", Tracing.currentContext, null);
+      SharedPrefs.setLong("dailyActiveTrace", System.currentTimeMillis(), Tracing.currentContext);
 
     } catch(Exception ex) {
       Events.raiseError("saveDailyMetric - error", ex);
@@ -314,7 +322,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   public static void startScheduler() {
     long checkFrequency = SharedPrefs.getLong("exposureCheckFrequency", Tracing.context);
     if (checkFrequency <= 0) {
-      checkFrequency = 120;
+      checkFrequency = 180;
     }
     Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startScheduler: run every " +
             checkFrequency + " minutes");
@@ -358,4 +366,5 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private static class NotEnabledException extends Exception {}
   private static class ConfigNotSetException extends Exception {}
   private static class ENSPaused extends Exception {}
+  private static class TooSoonToRun extends Exception {}
 }

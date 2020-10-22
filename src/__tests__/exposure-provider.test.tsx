@@ -100,7 +100,7 @@ const mockConfig = {
   authToken: 'testAuthToken',
   refreshToken: 'testRefreshToken',
   traceConfiguration: {
-    exposureCheckInterval: 120,
+    exposureCheckInterval: 180,
     storeExposuresFor: 14,
     fileLimit: 1,
     fileLimitiOS: 3

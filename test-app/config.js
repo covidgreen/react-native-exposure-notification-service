@@ -1,5 +1,5 @@
 export default {
-    "exposureCheckFrequency": 120,
+    "exposureCheckFrequency": 180,
     "serverURL": "your-server-url",
     "authToken": "your-auth-token",
     "refreshToken": "your-refresh-token",

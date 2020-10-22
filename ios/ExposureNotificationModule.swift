@@ -54,7 +54,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
         serverURL: serverURL,
         keyServerUrl: configDict["keyServerUrl"] as? String ?? serverURL,
         keyServerType: Storage.KeyServerType (rawValue: configDict["keyServerType"] as! String) ?? Storage.KeyServerType.NearForm,
-        checkExposureInterval: configDict["exposureCheckFrequency"] as? Int ?? 120,
+        checkExposureInterval: configDict["exposureCheckFrequency"] as? Int ?? 180,
         storeExposuresFor: configDict["storeExposuresFor"] as? Int ?? 14,
         notificationTitle: configDict["notificationTitle"] as? String ?? "Close Contact Warning",
         notificationDesc: configDict["notificationDesc"] as? String ?? "The COVID Tracker App has detected that you may have been exposed to someone who has tested positive for COVID-19.",
