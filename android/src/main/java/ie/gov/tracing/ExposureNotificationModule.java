@@ -116,7 +116,7 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void checkExposure(Boolean readExposureDetails, Boolean skipTimeCheck) {
         if(nearbyNotSupported()) return;
-        Tracing.checkExposure(readExposureDetails);
+        Tracing.checkExposure(readExposureDetails, skipTimeCheck);
     }
 
     @ReactMethod
@@ -186,6 +186,11 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void getConfigData(Promise promise) {
+        Tracing.getConfigData(promise);
+    }
+
+    @ReactMethod
     public void status(Promise promise) {
         if(nearbyNotSupported()) {
             Tracing.setExposureStatus("unavailable", "apiError: " + apiError);
@@ -205,7 +210,7 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void version(Promise promise) {
-        WritableMap version = Tracing.version();
+        WritableMap version = Tracing.version(Tracing.reactContext.getApplicationContext());
         promise.resolve(version);
     }
 

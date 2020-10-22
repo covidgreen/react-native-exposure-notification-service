@@ -19,7 +19,7 @@ class ExposureManager {
             // in Settings.
             if ENManager.authorizationStatus == .authorized && !self.manager.exposureNotificationEnabled {
 
-                if !ExposureManager.shared.isPaused() {
+                if !ExposureManager.shared.isPaused() && !ExposureManager.shared.isStopped() {
                     self.manager.setExposureNotificationEnabled(true) { error in
                         // No error handling for attempts to enable on launch
                       if let error = error as? ENError {
@@ -42,7 +42,16 @@ class ExposureManager {
     
      return config.paused
   }
-  
+
+  public func isStopped() -> Bool {
+     let context = Storage.PersistentContainer.shared.newBackgroundContext()
+     guard let config = Storage.shared.readSettings(context) else {
+       return true
+     }
+      
+     return config.stopped
+  }
+    
   deinit {
     manager.invalidate()
   }

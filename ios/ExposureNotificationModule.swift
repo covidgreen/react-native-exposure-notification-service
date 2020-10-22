@@ -40,16 +40,21 @@ public class ExposureNotificationModule: RCTEventEmitter {
       }
 
       guard let serverURL = configDict["serverURL"] as? String, let refresh = configDict["refreshToken"] as? String, let token = configDict["authToken"] as? String else {
-          os_log("Error configuring module, refresh token or auth missing", log: OSLog.setup, type: .error)
+          os_log("Error configuring module, server url, refresh token or auth missing is missing", log: OSLog.setup, type: .error)
           return resolve(false)
       }
       
+      guard !serverURL.isEmpty, !refresh.isEmpty, !token.isEmpty else {
+          os_log("Error configuring module, server url, refresh token or auth token is empty", log: OSLog.setup, type: .error)
+          return resolve(false)
+      }
+        
       let configData = Storage.Config(
         refreshToken: refresh,
         serverURL: serverURL,
         keyServerUrl: configDict["keyServerUrl"] as? String ?? serverURL,
         keyServerType: Storage.KeyServerType (rawValue: configDict["keyServerType"] as! String) ?? Storage.KeyServerType.NearForm,
-        checkExposureInterval: configDict["exposureCheckFrequency"] as? Int ?? 120,
+        checkExposureInterval: configDict["exposureCheckFrequency"] as? Int ?? 180,
         storeExposuresFor: configDict["storeExposuresFor"] as? Int ?? 14,
         notificationTitle: configDict["notificationTitle"] as? String ?? "Close Contact Warning",
         notificationDesc: configDict["notificationDesc"] as? String ?? "The COVID Tracker App has detected that you may have been exposed to someone who has tested positive for COVID-19.",
@@ -172,6 +177,16 @@ public class ExposureNotificationModule: RCTEventEmitter {
       }
     }
 
+    @objc public func getConfigData(_ resolve: @escaping RCTPromiseResolveBlock,
+                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
+        if #available(iOS 13.5, *) {
+            ExposureProcessor.shared.getConfigData(resolve, rejecter: reject)
+        } else {
+            resolve([])
+        }
+        
+    }
+    
     @objc public func triggerUpdate(_ resolve: @escaping RCTPromiseResolveBlock,
                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
         resolve(false)
@@ -262,18 +277,22 @@ public class ExposureNotificationModule: RCTEventEmitter {
               status["type"] = ["bluetooth"]
           case .restricted:
               status["state"] = "restricted"
-        case .paused:
+          case .paused:
               status["state"] = "disabled"
               status["type"] = ["paused"]
-        case .unauthorized:
+          case .unauthorized:
               status["state"] = "unavailable"
               status["type"] = ["unauthorized"]
-        @unknown default:
+          @unknown default:
               status["state"] = "unavailable"
         }
         if ExposureManager.shared.isPaused() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
            status["state"] = "disabled"
            status["type"] = ["paused"]
+        }
+        if ExposureManager.shared.isStopped() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
+           status["state"] = "disabled"
+           status["type"] = ["stopped"]
         }
         os_log("Status of exposure service has changed %@", log: OSLog.exposure, type: .debug, status)
         sendEvent(withName: "exposureEvent", body: ["onStatusChanged": status])

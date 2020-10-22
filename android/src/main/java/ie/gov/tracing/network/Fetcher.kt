@@ -36,7 +36,7 @@ import javax.net.ssl.X509TrustManager
 data class Token(val token: String)
 
 @Keep
-data class Callback(val mobile: String, val closeContactDate: Long, val payload: Map<String, Any>)
+data class Callback(val mobile: String, val closeContactDate: Long, val  daysSinceExposure: Int, val payload: Map<String, Any>)
 
 @Keep
 data class Metric(val os: String, val event: String, val version: String, val payload: Map<String, Any>?)
@@ -204,7 +204,6 @@ class Fetcher {
                 if (keyServerType.isEmpty()) {
                     keyServerType = "nearform"
                 }
-
                 var fileUrl = "${keyServerUrl}/data/$filename"
                 if (keyServerType == "google") {
                     fileUrl = "${keyServerUrl}/$filename"
@@ -248,16 +247,42 @@ class Fetcher {
 
         }
 
+        private fun getRefreshToken(context: Context): String {
+            var token = SharedPrefs.getString("refreshToken", context)
+            if (token.isEmpty()) {
+                try {
+                    val store = ExpoSecureStoreInterop(context)
+                    token = store.getItemImpl("refreshToken")
+                } catch (exExpo: Exception) {
+                    Events.raiseError("ExpoSecureStoreInterop  refreshToken", exExpo)
+                }
+            }
+            return token
+        }
+
+        private fun getAuthToken(context: Context): String {
+            var token = SharedPrefs.getString("authToken", context)
+            if (token.isEmpty()) {
+                try {
+                    val store = ExpoSecureStoreInterop(context)
+                    token = store.getItemImpl("token")
+                } catch (exExpo: Exception) {
+                    Events.raiseError("ExpoSecureStoreInterop  refreshToken", exExpo)
+                }
+            }
+            return token
+        }
+
         @JvmStatic
         fun getToken(originalRequest: Request, context: Context): String {
             var token = ""
             if (originalRequest.url.toString().endsWith(REFRESH)) {
 
-                token = SharedPrefs.getString("refreshToken", context)
+                token = getRefreshToken(context)
                 // Events.raiseEvent(Events.INFO, "getToken - Is Refresh: $token")
             } else {
                 // Events.raiseEvent(Events.INFO, "getToken - Not Refresh: $token")
-                token = SharedPrefs.getString("authToken", context)
+                token = getAuthToken(context)
 
             }
             return token
@@ -267,7 +292,6 @@ class Fetcher {
         fun post(endpoint: String, body: String, context: Context): Boolean {
 
             try {
-
                 var pin = true
                 var authenticate = true
                 val url = getURL(endpoint, context)
@@ -365,17 +389,11 @@ class Fetcher {
             return null
         }
 
+
         @JvmStatic
         fun triggerCallback(exposureEntity: ExposureEntity, context: Context, payload: Map<String, Any>) {
             try {
-                val notificationSent = SharedPrefs.getLong("notificationSent", context)
                 var callbackNum = SharedPrefs.getString("callbackNumber", context)
-
-                if (notificationSent > 0) {
-                    Events.raiseEvent(Events.INFO, "triggerCallback - notification " +
-                            "already sent: " + notificationSent)
-                    return
-                }
 
                 if (callbackNum.isEmpty()) {
 
@@ -411,18 +429,15 @@ class Fetcher {
                 calendar.set(Calendar.MILLISECOND, 0)
                 val daysSinceExposure = calendar.time.time
 
-
-                Events.raiseEvent(Events.INFO, "triggerCallback - sending: ${Date(daysSinceExposure)}")
-                val callbackParams = Callback(callbackNum, daysSinceExposure, payload)
-                val success = Fetcher.post("/callback", Gson().toJson(callbackParams), context)
+                Events.raiseEvent(Events.INFO, "triggerCallback - sending: ${daysSinceExposure} ${Date(daysSinceExposure)}")
+                val callbackParams = Callback(callbackNum, daysSinceExposure, exposureEntity.daysSinceLastExposure(), payload)
+                val success = post("/callback", Gson().toJson(callbackParams), context)
 
                 if (!success) {
                     Events.raiseEvent(Events.ERROR, "triggerCallback - failed")
                     return
                 }
-
                 Events.raiseEvent(Events.INFO, "triggerCallback - success")
-                SharedPrefs.setLong("notificationSent", System.currentTimeMillis(), context)
 
                 saveMetric("CALLBACK_REQUEST", context)
             } catch (ex: Exception) {
@@ -435,7 +450,7 @@ class Fetcher {
         fun saveMetric(event: String, context: Context, payload: Map<String, Any>? = null) {
             try {
                 val analytics = SharedPrefs.getBoolean("analyticsOptin", context)
-                val version = SharedPrefs.getString("version", context)
+                val version = Tracing.version(context).getString("display").toString()
 
                 if (!analytics) {
                     Events.raiseEvent(Events.INFO, "saveMetric - not saving, no opt in")
