@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.annotation.Keep
 import com.google.common.io.BaseEncoding
 import com.google.gson.Gson
+import ie.gov.tracing.Tracing
 import ie.gov.tracing.BuildConfig
 import ie.gov.tracing.common.Events
 import ie.gov.tracing.storage.ExpoSecureStoreInterop
