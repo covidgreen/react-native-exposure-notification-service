@@ -147,10 +147,18 @@ class Tracing {
 
         @JvmStatic
         fun setExposureStatus(status: String, reason: String = "") {
-            exposureStatus = status
-            exposureDisabledReason = reason
-
-            Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+            var changed = false
+            if (exposureStatus != status) {
+                exposureStatus = status
+                changed = true
+            }
+            if (exposureDisabledReason != reason) {
+                exposureDisabledReason = reason
+                changed = true
+            }
+            if (changed) {
+                Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+            }
         }
 
         private val authorisationCallback: Callback = object : Callback {
@@ -667,7 +675,7 @@ class Tracing {
             }
             try {
                 // check bluetooth
-                val bluetoothAdapter: BluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter();
                 if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
                     exposureDisabledReason = "bluetooth";
@@ -724,7 +732,7 @@ class Tracing {
         fun handleApiException(ex: Exception) {
             if (ex is ApiException) {
                 Events.raiseEvent(Events.ERROR, "handle api exception: ${ExposureNotificationStatusCodes.getStatusCodeString(ex.statusCode)}")
-                exposureDisabledReason = ""
+                
                 when (ex.statusCode) {
                     ExposureNotificationStatusCodes.RESOLUTION_REQUIRED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "resolution")
                     ExposureNotificationStatusCodes.SIGN_IN_REQUIRED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "signin_required")
