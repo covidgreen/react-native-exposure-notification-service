@@ -22,7 +22,7 @@ class Events {
         const val ON_STATUS_CHANGED = "onStatusChanged" // tracing api status
         const val ON_EXPOSURE = "exposure"
 
-        private const val TAG = "RNExposureNotificationService"
+        private const val TAG = "RN_ENService"
 
         private fun raiseEvent(map: ReadableMap) {
             Tracing.reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)?.emit("exposureEvent", map)
