@@ -201,7 +201,11 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         const latestStatus = await ExposureNotification.status();
 
         if (
-          !(latestStatus && (latestStatus.type?.indexOf(StatusType.paused) > -1 || latestStatus.type?.indexOf(StatusType.stopped) > -1))
+          !(
+            latestStatus &&
+            (latestStatus.type?.indexOf(StatusType.paused) > -1 ||
+              latestStatus.type?.indexOf(StatusType.stopped) > -1)
+          )
         ) {
           start();
         }
