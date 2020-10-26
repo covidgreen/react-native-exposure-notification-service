@@ -7,7 +7,6 @@ import androidx.annotation.Keep
 import com.google.common.io.BaseEncoding
 import com.google.gson.Gson
 import ie.gov.tracing.Tracing
-import ie.gov.tracing.BuildConfig
 import ie.gov.tracing.common.Events
 import ie.gov.tracing.storage.ExpoSecureStoreInterop
 import ie.gov.tracing.storage.ExposureEntity
@@ -155,7 +154,15 @@ class Fetcher {
             val builder = OkHttpClient.Builder()
             var usePinning = pin;
 
-            if (BuildConfig.DEBUG) {
+            val disableSSLPinning = SharedPrefs.getBoolean("disableSSLPinning",context);
+
+            if(disableSSLPinning){
+                usePinning = false;
+            }
+
+            val enableOKHTTPLogging = SharedPrefs.getBoolean("enableOKHTTPLogging",context);
+
+            if (enableOKHTTPLogging) {
 
                 builder.addNetworkInterceptor { chain ->
                     chain.proceed(
@@ -165,8 +172,6 @@ class Fetcher {
                                     .build()
                     )
                 }
-
-                usePinning = false
 
                 val logging = HttpLoggingInterceptor()
                 logging.apply { logging.level = HttpLoggingInterceptor.Level.BODY }
