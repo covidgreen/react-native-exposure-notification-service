@@ -3,6 +3,7 @@ package ie.gov.tracing.common
 import com.facebook.react.bridge.ReadableMap
 import ie.gov.tracing.Tracing
 import ie.gov.tracing.storage.SharedPrefs
+import java.text.SimpleDateFormat
 
 class Config {
     companion object {
@@ -34,6 +35,10 @@ class Config {
                     SharedPrefs.setString("authToken", params.getString("authToken")!!, Tracing.context)
                 }
                 SharedPrefs.setString("callbackNumber", params.getString("callbackNumber")!!, Tracing.context)
+                SharedPrefs.setString("callbackNumber", params.getString("callbackNumber")!!, Tracing.context)
+                val ran = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis())
+                SharedPrefs.setString("lastUpdated", ran, Tracing.context)
+
             } catch(ex: Exception) {
                 Events.raiseError("Error setting configuration: ", ex)
             }
