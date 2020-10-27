@@ -725,6 +725,9 @@ class Tracing {
             map.putString("keyServerUrl", SharedPrefs.getString("keyServerUrl", context))
             map.putString("serverUrl", SharedPrefs.getString("serverUrl", context))
             map.putBoolean("analyticsOptin", SharedPrefs.getBoolean("analyticsOptin", context))
+            map.putInt("lastExposureIndex", SharedPrefs.getLong("since", context).toInt())
+            map.putInt("fileLimit", SharedPrefs.getLong("fileLimit", context).toInt())
+            map.putString("lastUpdated", SharedPrefs.getString("lastUpdated", context))
             
             promise.resolve(map)
         }

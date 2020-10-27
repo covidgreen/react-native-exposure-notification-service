@@ -329,7 +329,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     WorkManager workManager = WorkManager.getInstance(Tracing.context);
     PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
             ProvideDiagnosisKeysWorker.class, checkFrequency, TimeUnit.MINUTES)
-            //.setInitialDelay(30, TimeUnit.SECONDS) // could offset this, but idle may be good enough
+            .setInitialDelay(30, TimeUnit.SECONDS) // could offset this, but idle may be good enough
             .addTag(WORKER_NAME)
             .setConstraints(
                     new Constraints.Builder()
