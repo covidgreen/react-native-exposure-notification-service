@@ -46,6 +46,7 @@ class ExposureCheck: AsyncOperation {
         let daysSinceLastExposureThreshold: Int
         let minimumRiskScoreFullRange: Double
         let infectiousnessForDaysSinceOnsetOfSymptoms: [Int]
+        let attenuationDurationThresholds: [Int]
     }
 
     private struct Thresholds {
@@ -218,9 +219,9 @@ class ExposureCheck: AsyncOperation {
                ExposureManager.shared.manager.detectExposures(configuration: configuration, diagnosisKeyURLs: files) { summary, error in
                    self.deleteLocalFiles(files)
                    if let error = error {
-                    return self.finishProcessing(.failure(self.wrapError("Failure in detectExposures", error)))
+                      return self.finishProcessing(.failure(self.wrapError("Failure in detectExposures", error)))
                    }
-                
+                    
                    guard let summaryData = summary else {
                       os_log("No summary data returned", log: OSLog.checkExposure, type: .debug)
                       return self.finishProcessing(.success((nil, lastIndex, thresholds)))
@@ -249,17 +250,18 @@ class ExposureCheck: AsyncOperation {
                            }
                      
                            let data1: [String] = windows.map { window in
-                               os_log("Some settings value, confidence: %d, date: %d, reportType: %d, infectiousness: %d", log: OSLog.checkExposure, type: .debug, window.calibrationConfidence as! CVarArg, window.date as CVarArg, window.diagnosisReportType as! CVarArg, window.infectiousness as! CVarArg)
+                            os_log("Some settings value, confidence: %d, date: %d, reportType: %d, infectiousness: %d", log: OSLog.checkExposure, type: .debug, window.calibrationConfidence.rawValue, window.date as CVarArg, window.diagnosisReportType.rawValue, window.infectiousness.rawValue)
                                window.scanInstances.map { scan in
-                                   os_log("Some scan data, minAttenuation: %d, secondsSinceLastScan: %d, typicalAttenuation: %d", log: OSLog.checkExposure, type: .debug, scan.minimumAttenuation as CVarArg, scan.secondsSinceLastScan, scan.typicalAttenuation)
+                                os_log("Some scan data, minAttenuation: %d, secondsSinceLastScan: %d, typicalAttenuation: %d", log: OSLog.checkExposure, type: .debug, scan.minimumAttenuation, scan.secondsSinceLastScan, scan.typicalAttenuation)
                              
                                }
                                return "test"
                            }
+                           return self.finishProcessing(.success((info, lastIndex, thresholds)))
                        }
+                   } else {
+                        return self.finishProcessing(.success((info, lastIndex, thresholds)))
                    }
-                
-                    return self.finishProcessing(.success((info, lastIndex, thresholds)))
                 }
             
             case let .failure(error):
@@ -625,16 +627,17 @@ class ExposureCheck: AsyncOperation {
                     exposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight = codableExposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight
                     exposureConfiguration.reportTypeSelfReportedWeight = codableExposureConfiguration.reportTypeSelfReportedWeight
                     exposureConfiguration.reportTypeRecursiveWeight = codableExposureConfiguration.reportTypeRecursiveWeight
-                    
-                    exposureConfiguration.attenuationDurationThresholds = codableExposureConfiguration.durationAtAttenuationThresholds as [NSNumber]
 
                     exposureConfiguration.daysSinceLastExposureThreshold = codableExposureConfiguration.daysSinceLastExposureThreshold
 
                     exposureConfiguration.minimumRiskScoreFullRange = codableExposureConfiguration.minimumRiskScoreFullRange
-                    
-                    exposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms = self.convertToMap(codableExposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms)
 
+                    exposureConfiguration.attenuationDurationThresholds = codableExposureConfiguration.attenuationDurationThresholds as [NSNumber]
+
+                    exposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms = self.convertToMap(codableExposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms)
+                    
                     exposureConfiguration.reportTypeNoneMap = ENDiagnosisReportType(rawValue:  codableExposureConfiguration.reportTypeNoneMap)!
+ 
                 }
                 
                 completion(.success((exposureConfiguration, thresholds)))
@@ -650,12 +653,21 @@ class ExposureCheck: AsyncOperation {
        }
     }
     
+    @available(iOS 13.7, *)
     private func convertToMap(_ daysSinceOnsetToInfectiousness: [Int]) -> [NSNumber : NSNumber] {
-        return zip(-14...14, daysSinceOnsetToInfectiousness)
-            .reduce(into: [:]) { (dict, tuple) in
-                let (index, infectiousness) = tuple
-                dict[NSNumber(value: index)] = NSNumber(value: infectiousness)
+        var map: [Int: Int] = [:]
+        var counter = 0
+        
+        for index in -14...14 {
+            if counter < daysSinceOnsetToInfectiousness.count {
+                map[index] = daysSinceOnsetToInfectiousness[counter]
+            } else {
+                map[index] = Int(ENInfectiousness.none.rawValue)
             }
+            counter += 1
+        }
+        
+        return map as [NSNumber : NSNumber]
     }
 
     private func triggerUserNotification(_ exposures: ExposureProcessor.ExposureInfo, _ completion: @escaping  (Result<Bool, Error>) -> Void) {

@@ -74,7 +74,7 @@ public class Storage {
             if callbackNum.isEmpty {
                 callbackNum = "\(callBack.code)\(callBack.number)"
             }
-            var authToken = keychain.get("nm:authToken") ?? "missing"
+            var authToken = keychain.get("nm:authToken") ?? ""
             let lastKeyChainError = keychain.lastResultCode
             if authToken.isEmpty {
                 authToken = keychain.get("token") ?? ""
