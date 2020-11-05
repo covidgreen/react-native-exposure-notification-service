@@ -31,6 +31,7 @@ class ExposureCheck: AsyncOperation {
         let transmissionRiskWeight: Double
         let durationAtAttenuationThresholds: [Int]
         let thresholdWeightings: [Double]
+        let thresholdWeightingsv2: [Double]
         let timeThreshold: Int
         let immediateDurationWeight: Double
         let nearDurationWeight: Double
@@ -47,11 +48,6 @@ class ExposureCheck: AsyncOperation {
         let minimumRiskScoreFullRange: Double
         let infectiousnessForDaysSinceOnsetOfSymptoms: [Int]
         let attenuationDurationThresholds: [Int]
-    }
-
-    private struct Thresholds {
-      let thresholdWeightings: [Double]
-      let timeThreshold: Int
     }
   
     private struct CodableExposureFiles: Codable {
@@ -183,10 +179,8 @@ class ExposureCheck: AsyncOperation {
         info.riskScoreSumFullRange = 10
         info.customAttenuationDurations = [30, 30, 30]
                 
-        let thresholds = Thresholds(thresholdWeightings: [1,1,0], timeThreshold: 15)
-
         let lastId = self.configData.lastExposureIndex!
-        return self.finishProcessing(.success((info, lastId, thresholds)))
+        return self.finishProcessing(.success((info, lastId)))
     }
 
     private func getDomain(_ url: String) -> String {
@@ -216,6 +210,7 @@ class ExposureCheck: AsyncOperation {
         switch result {
            case let .success((configuration, thresholds)):
                os_log("We have files and config, %d, %@", log: OSLog.checkExposure, type: .debug, files.count, files[0].absoluteString)
+            
                ExposureManager.shared.manager.detectExposures(configuration: configuration, diagnosisKeyURLs: files) { summary, error in
                    self.deleteLocalFiles(files)
                    if let error = error {
@@ -224,44 +219,17 @@ class ExposureCheck: AsyncOperation {
                     
                    guard let summaryData = summary else {
                       os_log("No summary data returned", log: OSLog.checkExposure, type: .debug)
-                      return self.finishProcessing(.success((nil, lastIndex, thresholds)))
+                      return self.finishProcessing(.success((nil, lastIndex)))
                    }
                 
-                   var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: summaryData.daysSinceLastExposure, attenuationDurations: self.convertDurations(summaryData.attenuationDurations), matchedKeyCount: Int(summaryData.matchedKeyCount),  maxRiskScore: Int(summaryData.maximumRiskScore), exposureDate: Date())
-                
-                   if let meta = summaryData.metadata {
-                       info.maximumRiskScoreFullRange = meta["maximumRiskScoreFullRange"] as? Int
-                       info.riskScoreSumFullRange = meta["riskScoreSumFullRange"] as? Int
-                       info.customAttenuationDurations = self.convertDurations(meta["attenuationDurations"] as? [NSNumber])
-                   }
-                
-                   os_log("Success in checking exposures, %d, %d, %d, %d, %d", log: OSLog.checkExposure, type: .debug, info.daysSinceLastExposure, info.matchedKeyCount, info.attenuationDurations.count,
-                       info.maxRiskScore, self.readExposureDetails)
-
-                   if #available(iOS 13.7, *), summaryData.matchedKeyCount > 0 {
-                       ExposureManager.shared.manager.getExposureWindows(summary: summaryData) { exposureWindows, error in
-                     
-                           if let error = error {
-                               return self.finishProcessing(.failure(self.wrapError("Failure in getExposureWindows", error)))
-                           }
-                     
-                           guard let windows = exposureWindows else {
-                               return self.finishProcessing(.success((nil, lastIndex, thresholds)))
-                           }
-                     
-                           let data1: [String] = windows.map { window in
-                            os_log("Some settings value, confidence: %d, date: %d, reportType: %d, infectiousness: %d", log: OSLog.checkExposure, type: .debug, window.calibrationConfidence.rawValue, window.date as CVarArg, window.diagnosisReportType.rawValue, window.infectiousness.rawValue)
-                               window.scanInstances.map { scan in
-                                os_log("Some scan data, minAttenuation: %d, secondsSinceLastScan: %d, typicalAttenuation: %d", log: OSLog.checkExposure, type: .debug, scan.minimumAttenuation, scan.secondsSinceLastScan, scan.typicalAttenuation)
-                             
-                               }
-                               return "test"
-                           }
-                           return self.finishProcessing(.success((info, lastIndex, thresholds)))
-                       }
+                   let info:ExposureProcessor.ExposureInfo?
+                   if #available(iOS 13.7, *) {
+                     info = RiskCalculationV2.calculateRisk(summaryData)
                    } else {
-                        return self.finishProcessing(.success((info, lastIndex, thresholds)))
+                     info = RiskCalculationV1.calculateRisk(summaryData, thresholds)
                    }
+                   
+                   return self.finishProcessing(.success((info, lastIndex)))
                 }
             
             case let .failure(error):
@@ -269,7 +237,8 @@ class ExposureCheck: AsyncOperation {
          }
       }
     }
-      
+
+    
     private func wrapError(_ description: String, _ error: Error) -> Error {
       let err = error as NSError
       
@@ -283,47 +252,23 @@ class ExposureCheck: AsyncOperation {
       }
     }
   
-    private func convertDurations(_ durations: [NSNumber]?) -> [Int] {
-      let empty: [NSNumber] = []
-      
-      return (durations ?? empty).compactMap { item in
-        Int(item.doubleValue / 60.0)
-      }
-    }
-  
-    private func finishProcessing(_ result: Result<(ExposureProcessor.ExposureInfo?, Int, Thresholds), Error>) {
+
+    private func finishProcessing(_ result: Result<(ExposureProcessor.ExposureInfo?, Int), Error>) {
       switch result {
-      case let .success((exposureData, lastFileIndex, thresholds)):
+      case let .success((exposureData, lastFileIndex)):
           os_log("We successfully completed checks", log: OSLog.checkExposure, type: .info)
           Storage.shared.updateRunData(self.storageContext, "", lastFileIndex)
   
-          guard let exposures = exposureData, exposures.matchedKeyCount > 0 else {
-            os_log("No keys matched, no exposures detected", log: OSLog.checkExposure, type: .debug)
-            return self.trackDailyMetrics()
-          }
-          
-          let durations:[Int] = exposures.customAttenuationDurations ?? exposures.attenuationDurations
-          
-          guard thresholds.thresholdWeightings.count >= durations.count else {
-            return self.finishNoProcessing("Failure processing exposure keys, thresholds not correctly defined");
-          }
-          
-          var contactTime = 0
-          for (index, element) in durations.enumerated() {
-            contactTime += Int(Double(element) * thresholds.thresholdWeightings[index])
-          }
-          
-          os_log("Calculated contact time, %@, %d, %d", log: OSLog.checkExposure, type: .debug, durations.map { String($0) }, contactTime, thresholds.timeThreshold)
-          
-          if contactTime >= thresholds.timeThreshold && exposures.maximumRiskScoreFullRange > 0 {
+        
+          if let exposure = exposureData  {
              os_log("Detected exposure event", log: OSLog.checkExposure, type: .info)
-             Storage.shared.saveExposureDetails(self.storageContext, exposures)
+             Storage.shared.saveExposureDetails(self.storageContext, exposure)
             
-             self.triggerUserNotification(exposures) { _ in
+             self.triggerUserNotification(exposure) { _ in
                self.trackDailyMetrics()
              }
           } else {
-            os_log("Exposures outside thresholds", log: OSLog.checkExposure, type: .info)
+            os_log("No exposure detected", log: OSLog.checkExposure, type: .info)
             self.trackDailyMetrics()
           }
       case let .failure(error):
@@ -583,7 +528,7 @@ class ExposureCheck: AsyncOperation {
       }
     }
   
-    private func getExposureConfiguration(_ completion: @escaping  (Result<(ENExposureConfiguration, Thresholds), Error>) -> Void) {
+    private func getExposureConfiguration(_ completion: @escaping  (Result<(ENExposureConfiguration, RiskCalculationV1.Thresholds), Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
@@ -599,6 +544,8 @@ class ExposureCheck: AsyncOperation {
                 let codableExposureConfiguration = try JSONDecoder().decode(CodableExposureConfiguration.self, from: exposureData.exposureConfig.data(using: .utf8)!)
                 let exposureConfiguration = ENExposureConfiguration()
                 
+                let thresholds = RiskCalculationV1.Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold)
+
                 exposureConfiguration.minimumRiskScore = codableExposureConfiguration.minimumRiskScore
                 exposureConfiguration.attenuationLevelValues = codableExposureConfiguration.attenuationLevelValues as [NSNumber]
                 exposureConfiguration.attenuationWeight = codableExposureConfiguration.attenuationWeight
@@ -612,31 +559,29 @@ class ExposureCheck: AsyncOperation {
                 let meta:[AnyHashable: Any] = [AnyHashable("attenuationDurationThresholds"): codableExposureConfiguration.durationAtAttenuationThresholds as [NSNumber]]
                 exposureConfiguration.metadata = meta
                 
-                let thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold)
-                
                 if #available(iOS 13.7, *) {
-                    exposureConfiguration.immediateDurationWeight = codableExposureConfiguration.immediateDurationWeight
-                    exposureConfiguration.nearDurationWeight = codableExposureConfiguration.nearDurationWeight
-                    exposureConfiguration.mediumDurationWeight = codableExposureConfiguration.mediumDurationWeight
-                    exposureConfiguration.otherDurationWeight = codableExposureConfiguration.otherDurationWeight
+                    exposureConfiguration.immediateDurationWeight =  codableExposureConfiguration.immediateDurationWeight
+                    exposureConfiguration.nearDurationWeight =  codableExposureConfiguration.nearDurationWeight
+                    exposureConfiguration.mediumDurationWeight =  codableExposureConfiguration.mediumDurationWeight
+                    exposureConfiguration.otherDurationWeight =  codableExposureConfiguration.otherDurationWeight
 
-                    exposureConfiguration.infectiousnessStandardWeight = codableExposureConfiguration.infectiousnessStandardWeight
-                    exposureConfiguration.infectiousnessHighWeight =  codableExposureConfiguration.infectiousnessHighWeight
-                    
-                    exposureConfiguration.reportTypeConfirmedTestWeight = codableExposureConfiguration.reportTypeConfirmedTestWeight
-                    exposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight = codableExposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight
-                    exposureConfiguration.reportTypeSelfReportedWeight = codableExposureConfiguration.reportTypeSelfReportedWeight
-                    exposureConfiguration.reportTypeRecursiveWeight = codableExposureConfiguration.reportTypeRecursiveWeight
+                    exposureConfiguration.infectiousnessStandardWeight =  codableExposureConfiguration.infectiousnessStandardWeight
+                    exposureConfiguration.infectiousnessHighWeight =   codableExposureConfiguration.infectiousnessHighWeight
+                                        
+                    exposureConfiguration.reportTypeConfirmedTestWeight =  codableExposureConfiguration.reportTypeConfirmedTestWeight
+                    exposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight =  codableExposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight
+                    exposureConfiguration.reportTypeSelfReportedWeight =  codableExposureConfiguration.reportTypeSelfReportedWeight
+                    exposureConfiguration.reportTypeRecursiveWeight =  codableExposureConfiguration.reportTypeRecursiveWeight
 
-                    exposureConfiguration.daysSinceLastExposureThreshold = codableExposureConfiguration.daysSinceLastExposureThreshold
+                    exposureConfiguration.daysSinceLastExposureThreshold =  codableExposureConfiguration.daysSinceLastExposureThreshold
 
                     exposureConfiguration.minimumRiskScoreFullRange = codableExposureConfiguration.minimumRiskScoreFullRange
 
-                    exposureConfiguration.attenuationDurationThresholds = codableExposureConfiguration.attenuationDurationThresholds as [NSNumber]
+                    exposureConfiguration.attenuationDurationThresholds =  codableExposureConfiguration.attenuationDurationThresholds as [NSNumber]
 
                     exposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms = self.convertToMap(codableExposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms)
                     
-                    exposureConfiguration.reportTypeNoneMap = ENDiagnosisReportType(rawValue:  codableExposureConfiguration.reportTypeNoneMap)!
+                    exposureConfiguration.reportTypeNoneMap = ENDiagnosisReportType(rawValue:  codableExposureConfiguration.reportTypeNoneMap) ?? ENDiagnosisReportType.confirmedTest
  
                 }
                 
