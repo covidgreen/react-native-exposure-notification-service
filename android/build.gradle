@@ -121,10 +121,11 @@ dependencies {
 
     implementation 'androidx.concurrent:concurrent-futures:1.0.0'
 
-    implementation 'com.google.android.gms:play-services-base:17.2.1'
-    implementation 'com.google.android.gms:play-services-basement:17.2.1'
+    implementation 'com.google.android.gms:play-services-base:17.4.0'
+    implementation 'com.google.android.gms:play-services-basement:17.4.0'
+    implementation 'com.google.android.gms:play-services-tasks:17.2.0'
+
     implementation 'com.google.android.gms:play-services-safetynet:17.0.0'
-    implementation 'com.google.android.gms:play-services-tasks:17.0.2'
     implementation 'com.google.android.gms:play-services-vision:20.0.0'
 
     implementation 'com.jakewharton.threetenabp:threetenabp:1.2.4'
