@@ -248,7 +248,6 @@ public class StateUpdatedWorker extends ListenableWorker {
     showNotification(context);
   }
 
-   @RequiresApi(api = Build.VERSION_CODES.O)
    public static void simulateExposure(Long timeDelay) {
         Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure");
 
