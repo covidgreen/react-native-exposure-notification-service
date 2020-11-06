@@ -223,29 +223,7 @@ class ExposureCheck: AsyncOperation {
                    os_log("Success in checking exposures, %d, %d, %d, %d, %d", log: OSLog.checkExposure, type: .debug, info.daysSinceLastExposure, info.matchedKeyCount, info.attenuationDurations.count,
                        info.maxRiskScore, self.readExposureDetails)
                    
-                   if info.matchedKeyCount > 0 && !self.readExposureDetails {
-                      return self.finishProcessing(.success((info, lastIndex, thresholds)))
-                   }
-                   os_log("Reading exposure details, only used in test", log: OSLog.checkExposure, type: .debug)
-                   
-                   let userExplanation = "To help with testing we are requesting more detailed information on the exposure event."
-                   ExposureManager.shared.manager.getExposureInfo(summary: summary!, userExplanation: userExplanation) { exposures, error in
-                           if let error = error {
-                            self.finishProcessing(.failure(self.wrapError("Error calling getExposureInfo", error)))
-                              return
-                           }
-                           let exposureData = exposures!.map { exposure in
-                              ExposureProcessor.ExposureDetails(date: exposure.date,
-                                        duration: exposure.duration,
-                                        totalRiskScore: exposure.totalRiskScore,
-                                        transmissionRiskLevel: exposure.transmissionRiskLevel,
-                                        attenuationDurations: self.convertDurations(exposure.attenuationDurations),
-                                        attenuationValue: exposure.attenuationValue)
-                           }
-                           info.details = exposureData
-                           self.finishProcessing(.success((info, lastIndex, thresholds)))
-                   }
-                  
+                   return self.finishProcessing(.success((info, lastIndex, thresholds)))                 
                }
                
             case let .failure(error):
