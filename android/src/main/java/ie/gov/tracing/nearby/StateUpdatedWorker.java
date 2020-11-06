@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.os.Build;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationCompat.Builder;
 import androidx.core.app.NotificationManagerCompat;
@@ -247,6 +248,7 @@ public class StateUpdatedWorker extends ListenableWorker {
     showNotification(context);
   }
 
+   @RequiresApi(api = Build.VERSION_CODES.O)
    public static void simulateExposure(Long timeDelay) {
         Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure");
 
