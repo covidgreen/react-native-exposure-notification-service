@@ -222,7 +222,6 @@ class ExposureCheck: AsyncOperation {
                       return self.finishProcessing(.success((nil, lastIndex)))
                    }
                 
-<<<<<<< HEAD
                    let info:ExposureProcessor.ExposureInfo?
                    if #available(iOS 13.7, *) {
                      info = RiskCalculationV2.calculateRisk(summaryData)
@@ -233,14 +232,6 @@ class ExposureCheck: AsyncOperation {
                    return self.finishProcessing(.success((info, lastIndex)))
                 }
             
-=======
-                   os_log("Success in checking exposures, %d, %d, %d, %d, %d", log: OSLog.checkExposure, type: .debug, info.daysSinceLastExposure, info.matchedKeyCount, info.attenuationDurations.count,
-                       info.maxRiskScore, self.readExposureDetails)
-                   
-                   return self.finishProcessing(.success((info, lastIndex, thresholds)))                 
-               }
-               
->>>>>>> current
             case let .failure(error):
               self.finishNoProcessing("Failed to extract settings, \(error.localizedDescription)")
          }
