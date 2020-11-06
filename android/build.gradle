@@ -113,7 +113,7 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.8.5'
 
     // WorkManager
-    def work_version = "2.4.0"
+    def work_version = "2.5.0-beta01"
     implementation "androidx.work:work-runtime:$work_version"
     implementation "androidx.work:work-runtime-ktx:$work_version"
     implementation "androidx.work:work-rxjava2:$work_version"
@@ -130,7 +130,6 @@ dependencies {
     implementation 'com.jakewharton.threetenabp:threetenabp:1.2.4'
 
     implementation 'commons-io:commons-io:2.5'
-    implementation 'org.apache.httpcomponents:httpclient:4.5.6'
 
     // database
     implementation 'net.zetetic:android-database-sqlcipher:4.4.0@aar'
