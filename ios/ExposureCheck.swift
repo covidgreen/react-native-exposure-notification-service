@@ -224,12 +224,27 @@ class ExposureCheck: AsyncOperation {
                 
                    let info:ExposureProcessor.ExposureInfo?
                    if #available(iOS 13.7, *) {
-                     info = RiskCalculationV2.calculateRisk(summaryData)
+                    RiskCalculationV2.calculateRisk(summaryData, configuration.attenuationDurationThresholds) { result in
+                        switch result {
+                            case let .success(exposureInfo):
+                                return self.finishProcessing(.success((exposureInfo, lastIndex)))
+                            case let .failure(error):
+                                self.finishProcessing((.failure(error)))
+                        }
+                     }
                    } else {
-                     info = RiskCalculationV1.calculateRisk(summaryData, thresholds)
+                     RiskCalculationV1.calculateRisk(summaryData, thresholds) { result in
+                        switch result {
+                            case let .success(exposureInfo):
+                                return self.finishProcessing(.success((exposureInfo, lastIndex)))
+                        case let .failure(error):
+                            self.finishProcessing((.failure(error)))
+                        }
+
+                     }
                    }
                    
-                   return self.finishProcessing(.success((info, lastIndex)))
+                   
                 }
             
             case let .failure(error):
@@ -239,11 +254,14 @@ class ExposureCheck: AsyncOperation {
     }
 
     
-    private func wrapError(_ description: String, _ error: Error) -> Error {
-      let err = error as NSError
+    private func wrapError(_ description: String, _ error: Error?) -> Error {
       
-      return NSError(domain: err.domain, code: err.code, userInfo: [NSLocalizedDescriptionKey: "\(description), \(error.localizedDescription)"])
-      
+      if let err = error {
+        let nsErr = err as NSError
+        return NSError(domain: nsErr.domain, code: nsErr.code, userInfo: [NSLocalizedDescriptionKey: "\(description), \(nsErr.localizedDescription)"])
+      } else {
+        return NSError(domain: "exposurecheck", code: 500, userInfo: [NSLocalizedDescriptionKey: "\(description)"])
+      }
     }
   
     private func deleteLocalFiles(_ files:[URL]) {
@@ -424,78 +442,111 @@ class ExposureCheck: AsyncOperation {
     }
     
     private func downloadFilesForProcessing(_ files: [URL], _ completion: @escaping (Result<[URL], Error>) -> Void) {
+      
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
       
-      var processedFiles: Int = 0
       var validFiles: [URL] = []
-      
+      var errorDetails: [Error]
+
+      let taskGroup = DispatchGroup()
+
       let downloadData: [FileDownloadTracking] = files.enumerated().compactMap { (index, file) in
         let local = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("diagnosisZip-\(index)")
         let unzipPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("diagnosisKeys-\(index)", isDirectory: true)
         return FileDownloadTracking(remoteURL: file, localURL: local, unzipPath: unzipPath)
       }
       
-      func downloadComplete(_ path: String, _ succeeded: Bool, _ error: Error?) {
-        if  error != nil {
-          os_log("Error unzipping keys file, %@", log: OSLog.checkExposure, type: .error, error!.localizedDescription)
+      //Notify when all task completed at main thread queue.
+      taskGroup.notify(queue: .main) {
+        // All tasks are done.
+        if validFiles.count > 0 {
+            completion(.success(validFiles))
+        } else {
+            let errorData = self.flattenError(errorDetails)
+            completion(.failure(self.wrapError("Error downloading files: \(errorData)", nil)))
         }
-        os_log("Keys file successfully unzipped, %@, %d", log: OSLog.checkExposure, type: .debug, path, succeeded)
       }
-      
+              
       downloadData.enumerated().forEach { (index, item) in
+        
+        taskGroup.enter()
+        
         self.downloadURL(item.remoteURL, item.localURL) { result in
           switch result {
           case let .success(url):
-            do {
               if item.remoteURL.path.hasSuffix(".zip") {
-                try? FileManager.default.createDirectory(at: item.unzipPath, withIntermediateDirectories: false, attributes: nil)
-                let success = SSZipArchive.unzipFile(atPath: url.path, toDestination: item.unzipPath.path, progressHandler: nil, completionHandler: downloadComplete)
-                if success {
-                  let fileURLs = try FileManager.default.contentsOfDirectory(at: item.unzipPath, includingPropertiesForKeys: nil)
-                  for (file) in fileURLs.enumerated() {
-                    var renamePath: URL!
-                    if file.element.path.hasSuffix(".sig") {
-                      renamePath = item.unzipPath.appendingPathComponent("export\(index).sig")
-                    } else if file.element.path.hasSuffix(".bin") {
-                      renamePath = item.unzipPath.appendingPathComponent("export\(index).bin")
+                do {
+                    let extractedFiles = try self.unzipFile(index, url, item)
+                    if extractedFiles.count > 0 {
+                        validFiles.append(contentsOf: extractedFiles)
                     }
-                    if renamePath != nil {
-                      try? FileManager.default.moveItem(at: file.element, to: renamePath)
-                      validFiles.append(renamePath)
-                    }
-                  }
+                } catch {
+                   os_log("Error unzipping, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+                    errorDetails.append(self.wrapError("Error unzipping file \(item.remoteURL.path)", error))
                 }
                 /// remove the zip
                 try? FileManager.default.removeItem(at: url)
+
               } else {
                 /// not a zip, used during testing
                 validFiles.append(url)
               }
-              processedFiles += 1
-            } catch {
-              try? FileManager.default.removeItem(at: url)
-              os_log("Error unzipping, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
-              processedFiles += 1
-            }
+              
           case let .failure(error):
             try? FileManager.default.removeItem(at: item.localURL)
             
             os_log("Failed to download the file %@, %@", log: OSLog.checkExposure, type: .error, item.remoteURL.absoluteString, error.localizedDescription)
-            processedFiles += 1
+            errorDetails.append(self.wrapError("Failed to download the file \(item.remoteURL.path)", error))
+            
           }
-          if processedFiles == downloadData.count {
-            if validFiles.count > 0 {
-              completion(.success(validFiles))
-            } else {
-              completion(.failure(NSError(domain:"download", code: 400, userInfo:nil)))
-            }
-          }
+            
+          taskGroup.leave()
         }
       }
     }
   
+    private func flattenError(_ errors: [Error]) -> String {
+        var errText = ""
+        
+        for err in errors {
+            errText = err.localizedDescription + "\n"
+        }
+        
+        return errText
+    }
+    
+    private func unzipFile(_ index: Int, _ url: URL, _ item: FileDownloadTracking) throws -> [URL] {
+        var renamedFiles: [URL] = []
+        
+        try? FileManager.default.createDirectory(at: item.unzipPath, withIntermediateDirectories: false, attributes: nil)
+        let success = SSZipArchive.unzipFile(atPath: url.path, toDestination: item.unzipPath.path, progressHandler: nil, completionHandler: downloadComplete)
+        if success {
+          let fileURLs = try FileManager.default.contentsOfDirectory(at: item.unzipPath, includingPropertiesForKeys: nil)
+          for (file) in fileURLs.enumerated() {
+            var renamePath: URL!
+            if file.element.path.hasSuffix(".sig") {
+              renamePath = item.unzipPath.appendingPathComponent("export\(index).sig")
+            } else if file.element.path.hasSuffix(".bin") {
+              renamePath = item.unzipPath.appendingPathComponent("export\(index).bin")
+            }
+            if renamePath != nil {
+              try? FileManager.default.moveItem(at: file.element, to: renamePath)
+              renamedFiles.append(renamePath)
+            }
+          }
+        }
+        return renamedFiles
+    }
+    
+    private func downloadComplete(_ path: String, _ succeeded: Bool, _ error: Error?) {
+      if  error != nil {
+        os_log("Error unzipping keys file, %@", log: OSLog.checkExposure, type: .error, error!.localizedDescription)
+      }
+      os_log("Keys file successfully unzipped, %@, %d", log: OSLog.checkExposure, type: .debug, path, succeeded)
+    }
+    
     private func cancelProcessing() {
       Storage.shared.updateRunData(self.storageContext, "Background processing expiring, cancelling")
       self.finish()

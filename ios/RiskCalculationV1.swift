@@ -9,19 +9,19 @@ class RiskCalculationV1 {
       let timeThreshold: Int
     }
     
-    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ thresholds: Thresholds) -> ExposureProcessor.ExposureInfo?
-    {
+    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ thresholds: Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo), Error>) -> Void) {
+        
         guard summary.matchedKeyCount > 0 else {
-          os_log("No keys matched, no exposures detected", log: OSLog.checkExposure, type: .debug)
-          return nil
+            return completion(.failure(wrapError("V1 - No keys matched, no exposures detected", nil)))
         }
         var contactTime = 0
         let info = constructSummaryInfo(summary)
         let durations:[Int] = info.customAttenuationDurations ?? info.attenuationDurations
         
         guard thresholds.thresholdWeightings.count >= durations.count else {
-          return nil
+            return completion(.failure(wrapError("V1 - Threshold keys not correctly defined", nil)))
         }
+        
         for (index, element) in durations.enumerated() {
           contactTime += Int(Double(element) * thresholds.thresholdWeightings[index])
         }
@@ -29,12 +29,22 @@ class RiskCalculationV1 {
         os_log("Calculated contact time, %@, %d, %d", log: OSLog.checkExposure, type: .debug, durations.map { String($0) }, contactTime, thresholds.timeThreshold)
         
         if contactTime >= thresholds.timeThreshold && summary.maximumRiskScoreFullRange > 0 {
-            return info
+            return completion(.success(info))
         } else {
-            return nil
+            return completion(.failure(wrapError("V1 - Duration did not exceed threshold or risk score was not met", nil)))
         }
     }
 
+    private static func wrapError(_ description: String, _ error: Error?) -> Error {
+      
+      if let err = error {
+        let nsErr = err as NSError
+        return NSError(domain: nsErr.domain, code: nsErr.code, userInfo: [NSLocalizedDescriptionKey: "\(description), \(nsErr.localizedDescription)"])
+      } else {
+        return NSError(domain: "v1risk", code: 500, userInfo: [NSLocalizedDescriptionKey: "\(description)"])
+      }
+    }
+    
     private static func constructSummaryInfo(_ summary: ENExposureDetectionSummary) -> ExposureProcessor.ExposureInfo {
         
         var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: summary.daysSinceLastExposure, attenuationDurations: self.convertDurations(summary.attenuationDurations), matchedKeyCount: Int(summary.matchedKeyCount),  maxRiskScore: Int(summary.maximumRiskScore), exposureDate: Date())

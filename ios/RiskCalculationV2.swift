@@ -4,12 +4,30 @@ import ExposureNotification
 @available(iOS 13.7, *)
 class RiskCalculationV2 {
     
-    public static func calculateRisk(_ summary: ENExposureDetectionSummary) -> ExposureProcessor.ExposureInfo?
+    public struct Thresholds {
+      let thresholdWeightings: [Double]
+      let timeThreshold: Int
+    }
+    
+    private struct ScanData {
+        var buckets: [Int]
+    }
+    
+    private struct WindowData {
+        let date: Date
+        //let calibrationConfidence: Int
+        //let diagnosisReportType: Int
+        //let infectiousness: Int
+        var cumulativeScans: ScanData
+        var contiguousScans: [ScanData]
+    }
+    
+    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ attenuationRanges: [NSNumber], _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo), Error>) -> Void)
     {
         guard summary.daySummaries.count > 0 else {
-          os_log("No daily summaries, no exposures detected", log: OSLog.checkExposure, type: .debug)
-          return nil
+            return completion(.failure(wrapError("V2 - No daily summaries, no exposures detected", nil)))
         }
+        
         var mostRecentDay: ENExposureDaySummary?
         
         for day in summary.daySummaries {
@@ -23,50 +41,93 @@ class RiskCalculationV2 {
         }
         
         guard let mostRecent = mostRecentDay else {
-            os_log("No daily summary with meeting duration detected", log: OSLog.checkExposure, type: .debug)
-            return nil
+            return completion(.failure(wrapError("V2 - No daily summary meeting duration detected", nil)))
         }
-        /*if #available(iOS 13.7, *) {
-            ExposureManager.shared.manager.getExposureWindows(summary: summaryData) { exposureWindows, error in
-          
-                if let error = error {
-                    return self.finishProcessing(.failure(self.wrapError("Failure in getExposureWindows", error)))
-                }
-          
-                guard let windows = exposureWindows else {
-                    return self.finishProcessing(.success((nil, lastIndex, thresholds)))
-                }
-          
-                let data1: [String] = windows.map { window in
-                 os_log("Some settings value, confidence: %d, date: %d, reportType: %d, infectiousness: %d", log: OSLog.checkExposure, type: .debug, window.calibrationConfidence.rawValue, window.date as CVarArg,
-                     window.diagnosisReportType.rawValue, window.infectiousness.rawValue)
-                    window.scanInstances.map { scan in
-                     os_log("Some scan data, minAttenuation: %d, secondsSinceLastScan: %d, typicalAttenuation: %d", log: OSLog.checkExposure, type: .debug, scan.minimumAttenuation, scan.secondsSinceLastScan,
-                            scan.typicalAttenuation)
-                  
-                    }
-                    return "test"
-                }
-                return self.finishProcessing(.success((info, lastIndex, thresholds)))
+        
+        extractExposureWindowData(summary, attenuationRanges) { result in
+            switch result {
+               case let .success(windows):
+                  completion(.success(constructSummaryInfo(mostRecent, windows)))
+               case let .failure(error):
+                  completion(.failure(error))
             }
-        } else {
-             return self.finishProcessing(.success((info, lastIndex, thresholds)))
-        }*/
+        }
 
-        return constructSummaryInfo(mostRecent)
     }
 
-    private static func constructSummaryInfo(_ day: ENExposureDaySummary) -> ExposureProcessor.ExposureInfo {
+    private static func wrapError(_ description: String, _ error: Error?) -> Error {
+      
+      if let err = error {
+        let nsErr = err as NSError
+        return NSError(domain: nsErr.domain, code: nsErr.code, userInfo: [NSLocalizedDescriptionKey: "\(description), \(nsErr.localizedDescription)"])
+      } else {
+        return NSError(domain: "v2risk", code: 500, userInfo: [NSLocalizedDescriptionKey: "\(description)"])
+      }
+    }
+    
+    private static func constructSummaryInfo(_ day: ENExposureDaySummary, _ windows: [WindowData]) -> ExposureProcessor.ExposureInfo {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.day], from: day.date, to: Date())
         
-        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: [], matchedKeyCount: 1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: Date())
+        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations:windows[0].cumulativeScans.buckets, matchedKeyCount: 1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: Date())
         
-        info.customAttenuationDurations = []
+        info.customAttenuationDurations = windows[0].cumulativeScans.buckets
         info.riskScoreSumFullRange = Int(day.daySummary.scoreSum)
 
         os_log("Exposure detected", log: OSLog.checkExposure, type: .debug)
         
+        
         return info
     }
+    
+    private static func extractExposureWindowData(_ summary: ENExposureDetectionSummary, _ attenuations: [NSNumber], _ completion: @escaping  (Result<([WindowData]), Error>) -> Void) {
+    
+        ExposureManager.shared.manager.getExposureWindows(summary: summary) { exposureWindows, error in
+      
+            if let error = error {
+                return completion(.failure(error))
+            }
+      
+            guard let windows = exposureWindows else {
+                return completion(.failure(wrapError("No exposure window data available", nil)))
+            }
+      
+            var windowList: [WindowData] = []
+                
+            for window in windows {
+                let scan = buildScanData(window.scanInstances, attenuations)
+                var item = windowList.first(where: {$0.date == window.date})
+                
+                if item == nil {
+                    item = WindowData(date: window.date, cumulativeScans: ScanData(buckets: [0,0,0,0]), contiguousScans: [])
+                    windowList.append(item!)
+                }
+                
+                for (index, element) in scan.buckets.enumerated() {
+                    item!.cumulativeScans.buckets[index] += element
+                }
+            }
+            
+
+            return completion(.success(windowList))
+        }
+
+    }
+    
+    private static func buildScanData(_ scanInstances: [ENScanInstance], _ attenuations: [NSNumber]) -> ScanData {
+        
+        var data: ScanData = ScanData(buckets: [0, 0, 0, 0])
+        
+        for scan in scanInstances {
+            for (index, element) in attenuations.enumerated() {
+                if scan.typicalAttenuation <= Int(truncating: element) {
+                    data.buckets[index] += scan.secondsSinceLastScan
+                    break
+                }
+            }
+        }
+        
+        return data
+    }
+    
 }
