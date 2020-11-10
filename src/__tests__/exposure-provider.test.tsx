@@ -89,7 +89,8 @@ jest.mock('../exposure-notification-module', () => ({
   status: jest.fn().mockResolvedValue({
     state: 'active'
   }),
-  getCloseContacts: jest.fn().mockResolvedValue([])
+  getCloseContacts: jest.fn().mockResolvedValue([]),
+  cancelNotifications: jest.fn()
 }));
 
 const mockConfig = {
@@ -108,7 +109,8 @@ const mockConfig = {
   notificationTitle: 'testNotificationTitle',
   notificationDescription: 'testNotificationDescription',
   analyticsOptin: true,
-  callbackNumber: '0123456789'
+  callbackNumber: '0123456789',
+  notificationRepeat: 0
 };
 
 const ExposureProviderWithMockConfig: React.FC<Partial<
@@ -219,7 +221,8 @@ describe('<ExposureProvider />', () => {
       serverURL: mockConfig.serverUrl,
       keyServerUrl: mockConfig.keyServerUrl,
       keyServerType: mockConfig.keyServerType,
-      storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor
+      storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
+      notificationRepeat: 0
     });
   });
 
@@ -261,6 +264,7 @@ describe('useExposure', () => {
       getCloseContacts: expect.any(Function),
       getDiagnosisKeys: expect.any(Function),
       getLogData: expect.any(Function),
+      cancelNotifications: expect.any(Function),
       initialised: true,
       isAuthorised: true,
       permissions: {
@@ -396,7 +400,8 @@ describe('useExposure', () => {
         serverURL: mockConfig.serverUrl,
         keyServerUrl: mockConfig.keyServerUrl,
         keyServerType: mockConfig.keyServerType,
-        storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor
+        storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
+        notificationRepeat: mockConfig.notificationRepeat
       });
     });
 
@@ -623,6 +628,19 @@ describe('useExposure', () => {
       await expect(
         result.current.deleteExposureData()
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('cancelNotifications()', () => {
+    it('cancels any repeating notifications', async () => {
+      const {result} = await renderExposureHook();
+      mocked(ExposureNotificationModule.cancelNotifications).mockClear();
+      await act(async () => {
+        await result.current.cancelNotifications();
+      });
+      expect(
+        ExposureNotificationModule.cancelNotifications
+      ).toHaveBeenCalledTimes(1);
     });
   });
 

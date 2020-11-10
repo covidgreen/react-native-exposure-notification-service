@@ -60,6 +60,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
         notificationDesc: configDict["notificationDesc"] as? String ?? "The COVID Tracker App has detected that you may have been exposed to someone who has tested positive for COVID-19.",
         authToken: token,
         fileLimit: configDict["fileLimit"] as? Int ?? 3,
+        notificationRepeat: configDict["notificationRepeat"] as? Int ?? 0,
         callbackNumber: configDict["callbackNumber"] as? String ?? "",
         analyticsOptin: configDict["analyticsOptin"] as? Bool ?? false
       )
@@ -68,7 +69,11 @@ public class ExposureNotificationModule: RCTEventEmitter {
       
       resolve(true)
     }
-    
+
+    @objc public func clearNotifications() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [ExposureCheck.REPEAT_NOTIFICATION_ID])
+    }
+
     @objc public func authoriseExposure(_ resolve: @escaping RCTPromiseResolveBlock,
                                         rejecter reject: @escaping RCTPromiseRejectBlock) {
         if #available(iOS 13.5, *) {

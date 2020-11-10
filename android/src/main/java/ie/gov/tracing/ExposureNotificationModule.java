@@ -219,6 +219,11 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
             promise.resolve(Tracing.reactContext.getApplicationContext().getPackageName());
     }
 
+    @ReactMethod
+    public void cancelNotifications() {
+        Tracing.cancelNotifications();
+    }
+
     private PackageInfo getPackageInfo() throws Exception {
         return Tracing.reactContext.getApplicationContext().getPackageManager().getPackageInfo(Tracing.reactContext.getApplicationContext().getPackageName(), 0);
     }

@@ -29,6 +29,7 @@ public class Storage {
         var lastKeyChainGetError: Int32?
         var lastUpdated: Date?
         var stopped: Bool!
+        var notificationRepeat: Int!
     }
     
     private struct CodableCallback: Decodable {
@@ -116,7 +117,8 @@ public class Storage {
               lastKeyChainSetError: data[0].value(forKey: "lastKeyError") as? Int32 ?? 0,
               lastKeyChainGetError: lastKeyChainError,
               lastUpdated: data[0].value(forKey: "lastUpdated") as? Date,
-              stopped: data[0].value(forKey: "serviceStopped") as? Bool ?? false
+              stopped: data[0].value(forKey: "serviceStopped") as? Bool ?? false,
+              notificationRepeat: data[0].value(forKey: "notificationRepeat") as? Int ?? 0
             )
          }
        } catch  {
@@ -319,7 +321,8 @@ public class Storage {
          managedObject.setValue(config.notificationDesc, forKey: "notificationDesc")
          managedObject.setValue(config.analyticsOptin, forKey: "analyticsOptin")
          managedObject.setValue(config.fileLimit, forKey: "fileLimit")
-         
+         managedObject.setValue(config.notificationRepeat, forKey: "notificationRepeat")
+        
          managedObject.setValue(lastKeyError, forKey: "lastKeyError")
         
          managedObject.setValue(Date(), forKey: "lastUpdated")

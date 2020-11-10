@@ -67,6 +67,7 @@ RCT_EXTERN_METHOD(version:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(getConfigData:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(clearNotifications)
 @end
 
 

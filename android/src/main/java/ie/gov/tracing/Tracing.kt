@@ -32,6 +32,7 @@ import android.location.LocationManager
 import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.location.LocationManagerCompat
+import androidx.core.app.NotificationManagerCompat;
 
 class Listener: ActivityEventListener {
     override fun onNewIntent(intent: Intent?) {}
@@ -730,6 +731,13 @@ class Tracing {
             map.putString("lastUpdated", SharedPrefs.getString("lastUpdated", context))
             
             promise.resolve(map)
+        }
+
+        @JvmStatic
+        fun cancelNotifications() {
+            val notificationManager = NotificationManagerCompat
+                .from(context)
+            notificationManager.cancel(RequestCodes.CLOSE_CONTACT)
         }
 
         fun handleApiException(ex: Exception) {

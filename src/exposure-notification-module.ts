@@ -27,6 +27,7 @@ export interface ConfigurationOptions {
   notificationDesc: string;
   callbackNumber: string;
   analyticsOptin: boolean;
+  notificationRepeat: number;
 }
 
 export interface DiagnosisKey {
@@ -104,6 +105,8 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
   version(): Promise<Version>;
 
   bundleId(): Promise<string>;
+
+  cancelNotifications(): void;
 
   /**
    * @platform android
