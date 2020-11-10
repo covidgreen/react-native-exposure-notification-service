@@ -11,18 +11,19 @@ class RiskCalculationV2 {
     
     private struct ScanData {
         var buckets: [Int]
+        var exceedsThresholds: Bool
     }
     
     private struct WindowData {
         let date: Date
-        //let calibrationConfidence: Int
-        //let diagnosisReportType: Int
-        //let infectiousness: Int
+        let calibrationConfidence: ENCalibrationConfidence
+        let diagnosisReportType: ENDiagnosisReportType
+        let infectiousness: ENInfectiousness
         var cumulativeScans: ScanData
         var contiguousScans: [ScanData]
     }
     
-    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ attenuationRanges: [NSNumber], _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo), Error>) -> Void)
+    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ attenuationRanges: [NSNumber], _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo), Error>) -> Void)
     {
         guard summary.daySummaries.count > 0 else {
             return completion(.failure(wrapError("V2 - No daily summaries, no exposures detected", nil)))
@@ -44,7 +45,7 @@ class RiskCalculationV2 {
             return completion(.failure(wrapError("V2 - No daily summary meeting duration detected", nil)))
         }
         
-        extractExposureWindowData(summary, attenuationRanges) { result in
+        extractExposureWindowData(summary, attenuationRanges, thresholds) { result in
             switch result {
                case let .success(windows):
                   completion(.success(constructSummaryInfo(mostRecent, windows)))
@@ -80,7 +81,7 @@ class RiskCalculationV2 {
         return info
     }
     
-    private static func extractExposureWindowData(_ summary: ENExposureDetectionSummary, _ attenuations: [NSNumber], _ completion: @escaping  (Result<([WindowData]), Error>) -> Void) {
+    private static func extractExposureWindowData(_ summary: ENExposureDetectionSummary, _ attenuations: [NSNumber], _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<([WindowData]), Error>) -> Void) {
     
         ExposureManager.shared.manager.getExposureWindows(summary: summary) { exposureWindows, error in
       
@@ -95,17 +96,18 @@ class RiskCalculationV2 {
             var windowList: [WindowData] = []
                 
             for window in windows {
-                let scan = buildScanData(window.scanInstances, attenuations)
+                let scan = buildScanData(window.scanInstances, attenuations, thresholds)
                 var item = windowList.first(where: {$0.date == window.date})
                 
                 if item == nil {
-                    item = WindowData(date: window.date, cumulativeScans: ScanData(buckets: [0,0,0,0]), contiguousScans: [])
+                    item = WindowData(date: window.date, calibrationConfidence: window.calibrationConfidence, diagnosisReportType: window.diagnosisReportType, infectiousness: window.infectiousness, cumulativeScans: ScanData(buckets: [0,0,0,0], exceedsThresholds: false), contiguousScans: [])
                     windowList.append(item!)
                 }
                 
                 for (index, element) in scan.buckets.enumerated() {
                     item!.cumulativeScans.buckets[index] += element
                 }
+                item!.contiguousScans.append(scan)
             }
             
 
@@ -114,9 +116,9 @@ class RiskCalculationV2 {
 
     }
     
-    private static func buildScanData(_ scanInstances: [ENScanInstance], _ attenuations: [NSNumber]) -> ScanData {
+    private static func buildScanData(_ scanInstances: [ENScanInstance], _ attenuations: [NSNumber], _ thresholds: ExposureCheck.Thresholds) -> ScanData {
         
-        var data: ScanData = ScanData(buckets: [0, 0, 0, 0])
+        var data: ScanData = ScanData(buckets: [0, 0, 0, 0], exceedsThresholds: false)
         
         for scan in scanInstances {
             for (index, element) in attenuations.enumerated() {
@@ -126,7 +128,13 @@ class RiskCalculationV2 {
                 }
             }
         }
-        
+        var contactTime = 0
+        for (index, element) in data.buckets.enumerated() {
+          contactTime += Int(Double(element) * thresholds.thresholdWeightings[index])
+        }
+        if contactTime >= thresholds.timeThreshold {
+            data.exceedsThresholds = true
+        }
         return data
     }
     

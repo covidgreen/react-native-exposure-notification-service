@@ -3,13 +3,8 @@ import ExposureNotification
 
 @available(iOS 13.5, *)
 class RiskCalculationV1 {
-
-    public struct Thresholds {
-      let thresholdWeightings: [Double]
-      let timeThreshold: Int
-    }
     
-    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ thresholds: Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo), Error>) -> Void) {
+    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo), Error>) -> Void) {
         
         guard summary.matchedKeyCount > 0 else {
             return completion(.failure(wrapError("V1 - No keys matched, no exposures detected", nil)))

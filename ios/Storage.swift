@@ -17,6 +17,7 @@ public class Storage {
         let notificationDesc: String
         var authToken: String
         var fileLimit: Int
+        var v2Mode: Bool
         var datesLastRan: String!
         var lastExposureIndex: Int!
         var paused: Bool!
@@ -105,6 +106,7 @@ public class Storage {
               notificationDesc: data[0].value(forKey: "notificationDesc") as! String,
               authToken: authToken,
               fileLimit: data[0].value(forKey: "fileLimit") as! Int,
+              v2Mode: data[0].value(forKey: "v2Mode") as? Bool ?? false,
               datesLastRan: data[0].value(forKey: "datesLastRan") as? String ?? "",
               lastExposureIndex: data[0].value(forKey: "lastIndex") as? Int,
               paused: data[0].value(forKey: "servicePaused") as? Bool ?? false,
@@ -319,6 +321,7 @@ public class Storage {
          managedObject.setValue(config.notificationDesc, forKey: "notificationDesc")
          managedObject.setValue(config.analyticsOptin, forKey: "analyticsOptin")
          managedObject.setValue(config.fileLimit, forKey: "fileLimit")
+         managedObject.setValue(config.v2Mode, forKey: "v2Mode")
          
          managedObject.setValue(lastKeyError, forKey: "lastKeyError")
         

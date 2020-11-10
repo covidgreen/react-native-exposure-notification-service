@@ -15,6 +15,12 @@ class ExposureCheck: AsyncOperation {
         case refresh
     }
   
+    public struct Thresholds {
+      let thresholdWeightings: [Double]
+      let timeThreshold: Int
+      let numFiles: Int
+    }
+    
     private struct CodableSettings: Decodable {
       let exposureConfig: String
     }
@@ -32,6 +38,7 @@ class ExposureCheck: AsyncOperation {
         let durationAtAttenuationThresholds: [Int]
         let thresholdWeightings: [Double]
         let thresholdWeightingsv2: [Double]
+        let numFilesiOS: Int
         let timeThreshold: Int
         let immediateDurationWeight: Double
         let nearDurationWeight: Double
@@ -157,19 +164,31 @@ class ExposureCheck: AsyncOperation {
         
        os_log("Starting exposure checking", log: OSLog.exposure, type: .debug)
 
-       getExposureFiles { result in
+       self.getExposureConfiguration { result in
             switch result {
               case let .failure(error):
-                 self.finishNoProcessing("Failed to retrieve exposure files for processing, \(error.localizedDescription)")
-              case let .success((urls, lastIndex)):
-                if urls.count > 0 {
-                  self.processExposures(urls, lastIndex)
-                }
-                else {
-                  self.finishNoProcessing("No files available to process", false)
-                }
+                 self.finishNoProcessing("Failed to retrieve settings, \(error.localizedDescription)")
+              case let .success((configuration, thresholds)):
+                self.processExposureFiles(configuration, thresholds)
             }
        }
+    }
+    
+    private func processExposureFiles(_ configuration: ENExposureConfiguration, _ thresholds: Thresholds) {
+        
+        self.getExposureFiles(thresholds.numFiles) { fileResult in
+            switch fileResult {
+                case let .success((urls, lastIndex)):
+                    if urls.count > 0 {
+                      self.processExposures(urls, lastIndex, configuration, thresholds)
+                    }
+                    else {
+                      self.finishNoProcessing("No files available to process", false)
+                    }
+                case let .failure(error):
+                    self.finishNoProcessing("Failed to retrieve exposure files for processing, \(error.localizedDescription)")
+            }
+        }
     }
     
     private func simulateExposureEvent() {
@@ -205,52 +224,40 @@ class ExposureCheck: AsyncOperation {
       }
     }
   
-    private func processExposures(_ files: [URL], _ lastIndex: Int) {
-      getExposureConfiguration() { result in
-        switch result {
-           case let .success((configuration, thresholds)):
-               os_log("We have files and config, %d, %@", log: OSLog.checkExposure, type: .debug, files.count, files[0].absoluteString)
+    private func processExposures(_ files: [URL], _ lastIndex: Int, _ configuration: ENExposureConfiguration, _ thresholds: Thresholds) {
             
-               ExposureManager.shared.manager.detectExposures(configuration: configuration, diagnosisKeyURLs: files) { summary, error in
-                   self.deleteLocalFiles(files)
-                   if let error = error {
-                      return self.finishProcessing(.failure(self.wrapError("Failure in detectExposures", error)))
-                   }
-                    
-                   guard let summaryData = summary else {
-                      os_log("No summary data returned", log: OSLog.checkExposure, type: .debug)
-                      return self.finishProcessing(.success((nil, lastIndex)))
-                   }
-                
-                   let info:ExposureProcessor.ExposureInfo?
-                   if #available(iOS 13.7, *) {
-                    RiskCalculationV2.calculateRisk(summaryData, configuration.attenuationDurationThresholds) { result in
-                        switch result {
-                            case let .success(exposureInfo):
-                                return self.finishProcessing(.success((exposureInfo, lastIndex)))
-                            case let .failure(error):
-                                self.finishProcessing((.failure(error)))
-                        }
-                     }
-                   } else {
-                     RiskCalculationV1.calculateRisk(summaryData, thresholds) { result in
-                        switch result {
-                            case let .success(exposureInfo):
-                                return self.finishProcessing(.success((exposureInfo, lastIndex)))
+       ExposureManager.shared.manager.detectExposures(configuration: configuration, diagnosisKeyURLs: files) { summary, error in
+           self.deleteLocalFiles(files)
+           if let error = error {
+              return self.finishProcessing(.failure(self.wrapError("Failure in detectExposures", error)))
+           }
+            
+           guard let summaryData = summary else {
+              os_log("No summary data returned", log: OSLog.checkExposure, type: .debug)
+              return self.finishProcessing(.success((nil, lastIndex)))
+           }
+        
+            if #available(iOS 13.7, *), self.configData.v2Mode {
+                RiskCalculationV2.calculateRisk(summaryData, configuration.attenuationDurationThresholds, thresholds) { result in
+                    switch result {
+                        case let .success(exposureInfo):
+                            return self.finishProcessing(.success((exposureInfo, lastIndex)))
                         case let .failure(error):
                             self.finishProcessing((.failure(error)))
-                        }
+                    }
+                 }
+            } else {
+                 RiskCalculationV1.calculateRisk(summaryData, thresholds) { result in
+                    switch result {
+                        case let .success(exposureInfo):
+                            return self.finishProcessing(.success((exposureInfo, lastIndex)))
+                    case let .failure(error):
+                        self.finishProcessing((.failure(error)))
+                    }
 
-                     }
-                   }
-                   
-                   
-                }
-            
-            case let .failure(error):
-              self.finishNoProcessing("Failed to extract settings, \(error.localizedDescription)")
-         }
-      }
+                 }
+            }
+        }
     }
 
     
@@ -318,27 +325,27 @@ class ExposureCheck: AsyncOperation {
       
     }
 
-    private func getExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
+    private func getExposureFiles(_ numFiles: Int, completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
       os_log("Key server type set to %@", log: OSLog.checkExposure, type: .debug, self.configData.keyServerType.rawValue)
       switch self.configData.keyServerType {
       case .GoogleRefServer:
-        getGoogleExposureFiles(completion)
+        getGoogleExposureFiles(numFiles, completion)
       default:
-        getNearFormExposureFiles(completion)
+        getNearFormExposureFiles(numFiles, completion)
       }
     }
 
-    private func getNearFormExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
+    private func getNearFormExposureFiles(_ numFiles: Int, _ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
 
       let lastId = self.configData.lastExposureIndex ?? 0
       os_log("Checking for exposures against nearform server since %d", log: OSLog.checkExposure, type: .debug, lastId)
-      self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": self.configData.fileLimit])
+      self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": numFiles])
       .validate()
       .responseDecodable(of: [CodableExposureFiles].self) { response in
         switch response.result {
@@ -351,7 +358,7 @@ class ExposureCheck: AsyncOperation {
       }
     }
 
-    private func getGoogleExposureFiles(_ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
+    private func getGoogleExposureFiles(_ numFiles: Int, _ completion: @escaping  (Result<([URL], Int), Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
@@ -362,7 +369,7 @@ class ExposureCheck: AsyncOperation {
         .responseString { response in
           switch response.result {
           case .success:
-            let files = self.findFilesToProcess(response.value!)
+            let files = self.findFilesToProcess(numFiles, response.value!)
 
             self.processFileLinks(files, completion)
           case let .failure(error):
@@ -397,7 +404,7 @@ class ExposureCheck: AsyncOperation {
         }
     }
     
-    private func findFilesToProcess(_ fileList: String) -> [CodableExposureFiles] {
+    private func findFilesToProcess(_ numFiles:Int, _ fileList: String) -> [CodableExposureFiles] {
         /// fileList if of format
         /*
          v1/1597846020-1597846080-00001.zip
@@ -419,9 +426,9 @@ class ExposureCheck: AsyncOperation {
             }
         }
         if (self.configData.lastExposureIndex <= 0) {
-            return Array(filesToProcess.suffix(self.configData.fileLimit))
+            return Array(filesToProcess.suffix(numFiles))
         } else {
-            return Array(filesToProcess.prefix(self.configData.fileLimit))
+            return Array(filesToProcess.prefix(numFiles))
         }
     }
     
@@ -448,7 +455,7 @@ class ExposureCheck: AsyncOperation {
       }
       
       var validFiles: [URL] = []
-      var errorDetails: [Error]
+      var errorDetails: [Error] = []
 
       let taskGroup = DispatchGroup()
 
@@ -579,7 +586,7 @@ class ExposureCheck: AsyncOperation {
       }
     }
   
-    private func getExposureConfiguration(_ completion: @escaping  (Result<(ENExposureConfiguration, RiskCalculationV1.Thresholds), Error>) -> Void) {
+    private func getExposureConfiguration(_ completion: @escaping  (Result<(ENExposureConfiguration, Thresholds), Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
@@ -595,7 +602,7 @@ class ExposureCheck: AsyncOperation {
                 let codableExposureConfiguration = try JSONDecoder().decode(CodableExposureConfiguration.self, from: exposureData.exposureConfig.data(using: .utf8)!)
                 let exposureConfiguration = ENExposureConfiguration()
                 
-                let thresholds = RiskCalculationV1.Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold)
+                var thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS)
 
                 exposureConfiguration.minimumRiskScore = codableExposureConfiguration.minimumRiskScore
                 exposureConfiguration.attenuationLevelValues = codableExposureConfiguration.attenuationLevelValues as [NSNumber]
@@ -610,7 +617,9 @@ class ExposureCheck: AsyncOperation {
                 let meta:[AnyHashable: Any] = [AnyHashable("attenuationDurationThresholds"): codableExposureConfiguration.durationAtAttenuationThresholds as [NSNumber]]
                 exposureConfiguration.metadata = meta
                 
-                if #available(iOS 13.7, *) {
+                if #available(iOS 13.7, *), self.configData.v2Mode {
+                    thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightingsv2, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS)
+                    
                     exposureConfiguration.immediateDurationWeight =  codableExposureConfiguration.immediateDurationWeight
                     exposureConfiguration.nearDurationWeight =  codableExposureConfiguration.nearDurationWeight
                     exposureConfiguration.mediumDurationWeight =  codableExposureConfiguration.mediumDurationWeight
