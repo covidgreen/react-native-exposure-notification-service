@@ -31,11 +31,10 @@
         <attribute name="servicePaused" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="serviceStopped" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="storeExposuresFor" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="v2Mode" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="version" optional="YES" attributeType="String"/>
     </entity>
     <elements>
         <element name="Exposures" positionX="-54" positionY="-9" width="128" height="178"/>
-        <element name="Settings" positionX="-63" positionY="-18" width="128" height="358"/>
+        <element name="Settings" positionX="-63" positionY="-18" width="128" height="28"/>
     </elements>
 </model>

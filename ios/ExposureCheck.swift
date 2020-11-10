@@ -55,6 +55,7 @@ class ExposureCheck: AsyncOperation {
         let minimumRiskScoreFullRange: Double
         let infectiousnessForDaysSinceOnsetOfSymptoms: [Int]
         let attenuationDurationThresholds: [Int]
+        let v2Mode: Bool
     }
   
     private struct CodableExposureFiles: Codable {
@@ -168,19 +169,19 @@ class ExposureCheck: AsyncOperation {
             switch result {
               case let .failure(error):
                  self.finishNoProcessing("Failed to retrieve settings, \(error.localizedDescription)")
-              case let .success((configuration, thresholds)):
-                self.processExposureFiles(configuration, thresholds)
+              case let .success((configuration, thresholds, v2Mode)):
+                self.processExposureFiles(configuration, thresholds, v2Mode)
             }
        }
     }
     
-    private func processExposureFiles(_ configuration: ENExposureConfiguration, _ thresholds: Thresholds) {
+    private func processExposureFiles(_ configuration: ENExposureConfiguration, _ thresholds: Thresholds, _ v2Mode: Bool) {
         
         self.getExposureFiles(thresholds.numFiles) { fileResult in
             switch fileResult {
                 case let .success((urls, lastIndex)):
                     if urls.count > 0 {
-                      self.processExposures(urls, lastIndex, configuration, thresholds)
+                      self.processExposures(urls, lastIndex, configuration, thresholds, v2Mode)
                     }
                     else {
                       self.finishNoProcessing("No files available to process", false)
@@ -224,7 +225,7 @@ class ExposureCheck: AsyncOperation {
       }
     }
   
-    private func processExposures(_ files: [URL], _ lastIndex: Int, _ configuration: ENExposureConfiguration, _ thresholds: Thresholds) {
+    private func processExposures(_ files: [URL], _ lastIndex: Int, _ configuration: ENExposureConfiguration, _ thresholds: Thresholds, _ v2Mode: Bool) {
             
        ExposureManager.shared.manager.detectExposures(configuration: configuration, diagnosisKeyURLs: files) { summary, error in
            self.deleteLocalFiles(files)
@@ -237,7 +238,7 @@ class ExposureCheck: AsyncOperation {
               return self.finishProcessing(.success((nil, lastIndex)))
            }
         
-            if #available(iOS 13.7, *), self.configData.v2Mode {
+            if #available(iOS 13.7, *), v2Mode {
                 RiskCalculationV2.calculateRisk(summaryData, configuration.attenuationDurationThresholds, thresholds) { result in
                     switch result {
                         case let .success(exposureInfo):
@@ -344,7 +345,7 @@ class ExposureCheck: AsyncOperation {
       }
 
       let lastId = self.configData.lastExposureIndex ?? 0
-      os_log("Checking for exposures against nearform server since %d", log: OSLog.checkExposure, type: .debug, lastId)
+      os_log("Checking for exposures against nearform server since %d, limit %d", log: OSLog.checkExposure, type: .debug, lastId, numFiles)
       self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": numFiles])
       .validate()
       .responseDecodable(of: [CodableExposureFiles].self) { response in
@@ -458,58 +459,60 @@ class ExposureCheck: AsyncOperation {
       var errorDetails: [Error] = []
 
       let taskGroup = DispatchGroup()
-
+      let queue = DispatchQueue(label: "ENSWorkerQueuer")
+        
       let downloadData: [FileDownloadTracking] = files.enumerated().compactMap { (index, file) in
         let local = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("diagnosisZip-\(index)")
         let unzipPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("diagnosisKeys-\(index)", isDirectory: true)
         return FileDownloadTracking(remoteURL: file, localURL: local, unzipPath: unzipPath)
       }
       
-      //Notify when all task completed at main thread queue.
-      taskGroup.notify(queue: .main) {
-        // All tasks are done.
-        if validFiles.count > 0 {
-            completion(.success(validFiles))
-        } else {
-            let errorData = self.flattenError(errorDetails)
-            completion(.failure(self.wrapError("Error downloading files: \(errorData)", nil)))
+      downloadData.enumerated().forEach { (index, item) in
+        taskGroup.enter()
+        queue.async(group: taskGroup) {
+            self.downloadURL(item.remoteURL, item.localURL) { result in
+              switch result {
+              case let .success(url):
+                  if item.remoteURL.path.hasSuffix(".zip") {
+                    do {
+                        let extractedFiles = try self.unzipFile(index, url, item)
+                        if extractedFiles.count > 0 {
+                            os_log("Adding files to list, %d", log: OSLog.checkExposure, type: .debug, extractedFiles.count)
+                            validFiles.append(contentsOf: extractedFiles)
+                        }
+                    } catch {
+                       os_log("Error unzipping, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+                        errorDetails.append(self.wrapError("Error unzipping file \(item.remoteURL.path)", error))
+                    }
+                    /// remove the zip
+                    try? FileManager.default.removeItem(at: url)
+
+                  } else {
+                    /// not a zip, used during testing
+                    validFiles.append(url)
+                  }
+                  
+              case let .failure(error):
+                try? FileManager.default.removeItem(at: item.localURL)
+                
+                os_log("Failed to download the file %@, %@", log: OSLog.checkExposure, type: .error, item.remoteURL.absoluteString, error.localizedDescription)
+                errorDetails.append(self.wrapError("Failed to download the file \(item.remoteURL.path)", error))
+                
+            }
+            taskGroup.leave()
+          }
+          
         }
       }
-              
-      downloadData.enumerated().forEach { (index, item) in
         
-        taskGroup.enter()
-        
-        self.downloadURL(item.remoteURL, item.localURL) { result in
-          switch result {
-          case let .success(url):
-              if item.remoteURL.path.hasSuffix(".zip") {
-                do {
-                    let extractedFiles = try self.unzipFile(index, url, item)
-                    if extractedFiles.count > 0 {
-                        validFiles.append(contentsOf: extractedFiles)
-                    }
-                } catch {
-                   os_log("Error unzipping, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
-                    errorDetails.append(self.wrapError("Error unzipping file \(item.remoteURL.path)", error))
-                }
-                /// remove the zip
-                try? FileManager.default.removeItem(at: url)
-
-              } else {
-                /// not a zip, used during testing
-                validFiles.append(url)
-              }
-              
-          case let .failure(error):
-            try? FileManager.default.removeItem(at: item.localURL)
-            
-            os_log("Failed to download the file %@, %@", log: OSLog.checkExposure, type: .error, item.remoteURL.absoluteString, error.localizedDescription)
-            errorDetails.append(self.wrapError("Failed to download the file \(item.remoteURL.path)", error))
-            
-          }
-            
-          taskGroup.leave()
+      //Notify when all task completed at main thread queue.
+        taskGroup.notify(queue: queue) {
+        // All tasks are done.
+        if validFiles.count > 0 {
+          completion(.success(validFiles))
+        } else {
+          let errorData = self.flattenError(errorDetails)
+          completion(.failure(self.wrapError("Error downloading files: \(errorData)", nil)))
         }
       }
     }
@@ -586,7 +589,7 @@ class ExposureCheck: AsyncOperation {
       }
     }
   
-    private func getExposureConfiguration(_ completion: @escaping  (Result<(ENExposureConfiguration, Thresholds), Error>) -> Void) {
+    private func getExposureConfiguration(_ completion: @escaping  (Result<(ENExposureConfiguration, Thresholds, Bool), Error>) -> Void) {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
@@ -617,7 +620,7 @@ class ExposureCheck: AsyncOperation {
                 let meta:[AnyHashable: Any] = [AnyHashable("attenuationDurationThresholds"): codableExposureConfiguration.durationAtAttenuationThresholds as [NSNumber]]
                 exposureConfiguration.metadata = meta
                 
-                if #available(iOS 13.7, *), self.configData.v2Mode {
+                if #available(iOS 13.7, *), codableExposureConfiguration.v2Mode {
                     thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightingsv2, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS)
                     
                     exposureConfiguration.immediateDurationWeight =  codableExposureConfiguration.immediateDurationWeight
@@ -645,7 +648,7 @@ class ExposureCheck: AsyncOperation {
  
                 }
                 
-                completion(.success((exposureConfiguration, thresholds)))
+                completion(.success((exposureConfiguration, thresholds, codableExposureConfiguration.v2Mode)))
               } catch {
                 os_log("Unable to decode settings data, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
                 completion(.failure(error))
