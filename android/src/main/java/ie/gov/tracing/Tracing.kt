@@ -565,7 +565,7 @@ class Tracing {
                         resolutionPromise = promise
                         gps.getErrorDialog(base.activity,
                                 ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED,
-                                RequestCodes.PLAY_SERVICES_UPDATE).show()
+                                RequestCodes.PLAY_SERVICES_UPDATE)?.show()
                     } else {
                         promise.resolve("unknown result: $result")
                     }
@@ -664,7 +664,7 @@ class Tracing {
         private fun isLocationEnableRequired(): Boolean {
             val locationManager: LocationManager = Tracing.context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
             return (!exposureWrapper.deviceSupportsLocationlessScanning()
-                    && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && locationManager != null && !LocationManagerCompat.isLocationEnabled(locationManager))
+                    && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !LocationManagerCompat.isLocationEnabled(locationManager))
         }
 
         @JvmStatic
