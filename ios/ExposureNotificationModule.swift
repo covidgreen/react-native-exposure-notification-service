@@ -70,13 +70,19 @@ public class ExposureNotificationModule: RCTEventEmitter {
       resolve(true)
     }
 
-    @objc public func clearNotifications() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [ExposureCheck.REPEAT_NOTIFICATION_ID])
+    @objc public func cancelNotifications() {
+        if #available(iOS 13.5, *) {
+            os_log("Cancel repeat notifications", log: OSLog.setup, type: .debug)
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [ExposureCheck.REPEAT_NOTIFICATION_ID])
+        } else {
+            // Nothing to do
+        }
     }
 
     @objc public func authoriseExposure(_ resolve: @escaping RCTPromiseResolveBlock,
                                         rejecter reject: @escaping RCTPromiseRejectBlock) {
         if #available(iOS 13.5, *) {
+            os_log("Cancelling notifications", log: OSLog.setup, type: .debug)
             ExposureProcessor.shared.authoriseExposure(resolve, rejecter: reject)
         } else {
             resolve("unavailable")
@@ -286,7 +292,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
               status["state"] = "disabled"
               status["type"] = ["paused"]
           case .unauthorized:
-              status["state"] = "unavailable"
+              status["state"] = "disabled"
               status["type"] = ["unauthorized"]
           @unknown default:
               status["state"] = "unavailable"

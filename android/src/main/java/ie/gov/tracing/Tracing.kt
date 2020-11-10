@@ -32,7 +32,8 @@ import android.location.LocationManager
 import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.location.LocationManagerCompat
-import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.NotificationManagerCompat
+import ie.gov.tracing.nearby.RequestCodes
 
 class Listener: ActivityEventListener {
     override fun onNewIntent(intent: Intent?) {}

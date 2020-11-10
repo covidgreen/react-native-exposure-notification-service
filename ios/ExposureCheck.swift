@@ -6,8 +6,8 @@ import Alamofire
 
 @available(iOS 13.5, *)
 class ExposureCheck: AsyncOperation {
-    public static let REPEAT_NOTIFICATION_ID: string = "repeatExposure"
-    public static let INITIAL_NOTIFICATION_ID: string = "exposure"
+    public static let REPEAT_NOTIFICATION_ID = "repeatExposure"
+    public static let INITIAL_NOTIFICATION_ID = "exposure"
       
     public enum endPoints {
         case metrics
@@ -603,17 +603,17 @@ class ExposureCheck: AsyncOperation {
       content.sound = .default
       
       let trigger = UNTimeIntervalNotificationTrigger(
-        timeInterval: self.configData.notificationRepeat * 60,
+        timeInterval: TimeInterval(self.configData.notificationRepeat * 60),
                     repeats: true)
         
-      let initialRequest = UNNotificationRequest(identifier: INITIAL_NOTIFICATION_ID, content: content, trigger: nil)
+        let initialRequest = UNNotificationRequest(identifier: ExposureCheck.INITIAL_NOTIFICATION_ID, content: content, trigger: nil)
       UNUserNotificationCenter.current().add(initialRequest) { error in
             DispatchQueue.main.async {
                 if let error = error {
                   os_log("Notification error %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
                 }
                 if (self.configData.notificationRepeat > 0) {
-                    let request = UNNotificationRequest(identifier: REPEAT_NOTIFICATION_ID, content: content, trigger: trigger)
+                    let request = UNNotificationRequest(identifier: ExposureCheck.REPEAT_NOTIFICATION_ID, content: content, trigger: trigger)
                     UNUserNotificationCenter.current().add(request) { error in
                         DispatchQueue.main.async {
                             if let error = error {
