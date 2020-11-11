@@ -184,7 +184,7 @@ class Fetcher {
 
             if (usePinning) {
                 val sslContext = SSLContext.getInstance("TLS");
-                val certs = arrayOf("cert1", "cert2", "cert3", "cert4", "cert5")
+                val certs = arrayOf("cert1", "cert2", "cert3", "cert4", "cert5", "cert6")
                 val trustManager = getTrustManager(certs);
                 sslContext.init(null, arrayOf<TrustManager?>(trustManager), null)
                 builder.sslSocketFactory(sslContext.getSocketFactory(), trustManager)
