@@ -59,8 +59,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private static final String WORKER_NAME = "ProvideDiagnosisKeysWorker";
   private static final BaseEncoding BASE64_LOWER = BaseEncoding.base64();
   private static final int RANDOM_TOKEN_BYTE_LENGTH = 32;
-  private static final String FOREGROUND_NOTIFICATION_ID =
+  private static final String FOREGROUND_NOTIFICATION_ID_LEGACY =
           "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID";
+  private static final String FOREGROUND_NOTIFICATION_ID =
+          "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID.noBadge";
 
   private final DiagnosisKeyDownloader diagnosisKeys;
   private final DiagnosisKeyFileSubmitter submitter;
@@ -216,6 +218,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
               .setProgress(1, 0, true)
               .setSmallIcon(R.mipmap.ic_notification)
               .setOngoing(true)
+              .setNumber(0)
               .build();
 
       return new ForegroundInfo(1, notification, FOREGROUND_SERVICE_TYPE_LOCATION);
@@ -228,10 +231,12 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
             id,
             this.context.getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW
     );
+    channel.setShowBadge(false);
     NotificationManager notificationManager = (NotificationManager) this.context.getSystemService(
             Context.NOTIFICATION_SERVICE
     );
     notificationManager.createNotificationChannel(channel);
+    notificationManager.deleteNotificationChannel(FOREGROUND_NOTIFICATION_ID_LEGACY);
   }
 
   private Result processFailure(Exception ex) {
