@@ -181,8 +181,12 @@ class Fetcher {
             }
 
             if (usePinning) {
-                val sslContext = SSLContext.getInstance("TLS");
-                val certs = arrayOf("cert1", "cert2", "cert3", "cert4", "cert5", "cert6")
+                var certList = SharedPrefs.getString("certList",context)
+                val sslContext = SSLContext.getInstance("TLS")
+                if (certList.isNullOrEmpty()) {
+                    certList = "cert1,cert2,cert3,cert4,cert5"
+                }
+                val certs = certList.split(",").toTypedArray()
                 val trustManager = getTrustManager(certs);
                 sslContext.init(null, arrayOf<TrustManager?>(trustManager), null)
                 builder.sslSocketFactory(sslContext.getSocketFactory(), trustManager)

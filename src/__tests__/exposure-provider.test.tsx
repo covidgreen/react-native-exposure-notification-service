@@ -110,7 +110,8 @@ const mockConfig = {
   notificationDescription: 'testNotificationDescription',
   analyticsOptin: true,
   callbackNumber: '0123456789',
-  notificationRepeat: 0
+  notificationRepeat: 0,
+  certList: "cert12"
 };
 
 const ExposureProviderWithMockConfig: React.FC<Partial<
@@ -222,7 +223,8 @@ describe('<ExposureProvider />', () => {
       keyServerUrl: mockConfig.keyServerUrl,
       keyServerType: mockConfig.keyServerType,
       storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
-      notificationRepeat: 0
+      notificationRepeat: 0,
+      certList: ""
     });
   });
 
@@ -401,7 +403,8 @@ describe('useExposure', () => {
         keyServerUrl: mockConfig.keyServerUrl,
         keyServerType: mockConfig.keyServerType,
         storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
-        notificationRepeat: mockConfig.notificationRepeat
+        notificationRepeat: mockConfig.notificationRepeat,
+        certList: mockConfig.certList
       });
     });
 

@@ -118,6 +118,7 @@ export interface ExposureProviderProps {
   callbackNumber?: string;
   analyticsOptin?: boolean;
   notificationRepeat?: number;
+  certList?: string;
 }
 
 export const getVersion = async () => {
@@ -160,7 +161,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   notificationDescription,
   callbackNumber = '',
   analyticsOptin = false,
-  notificationRepeat = 0
+  notificationRepeat = 0,
+  certList = ""
 }) => {
   const [state, setState] = useState<State>(initialState);
 
@@ -312,7 +314,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         notificationDesc: notificationDescription,
         callbackNumber,
         analyticsOptin,
-        notificationRepeat
+        notificationRepeat,
+        certList
       };
       await ExposureNotification.configure(config);
 

@@ -28,6 +28,7 @@ export interface ConfigurationOptions {
   callbackNumber: string;
   analyticsOptin: boolean;
   notificationRepeat: number;
+  certList: string;
 }
 
 export interface DiagnosisKey {
