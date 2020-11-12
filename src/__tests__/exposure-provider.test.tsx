@@ -223,8 +223,8 @@ describe('<ExposureProvider />', () => {
       keyServerUrl: mockConfig.keyServerUrl,
       keyServerType: mockConfig.keyServerType,
       storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
-      notificationRepeat: 0,
-      certList: ""
+      notificationRepeat: mockConfig.notificationRepeat,
+      certList: mockConfig.certList
     });
   });
 
