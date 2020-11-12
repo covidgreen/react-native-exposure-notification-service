@@ -59,9 +59,6 @@ object ExposureNotificationRepeater {
             return
         }
 
-//        val pendingIntent =
-//                PendingIntent.getService(context.applicationContext, RequestCodes.REPEAT_CLOSE_CONTACT_NOTIFICATION, intent,
-//                        PendingIntent.FLAG_NO_CREATE)
         val pendingIntent = PendingIntent.getBroadcast(context, RequestCodes.REPEAT_CLOSE_CONTACT_NOTIFICATION, intent, PendingIntent.FLAG_NO_CREATE)
         if(pendingIntent == null) {
             Events.raiseEvent(Events.INFO, "ExposureNotificationRepeater - No PendingIntent found")
