@@ -63,7 +63,7 @@ class Events {
             if(eventValue == null) return false
             val map = Arguments.createMap()
             val eventMap = WritableNativeMap()
-            eventMap.merge(map)
+            eventMap.merge(eventValue)
             try {
                 map.putMap(eventName, eventMap)
                 raiseEvent(map)
