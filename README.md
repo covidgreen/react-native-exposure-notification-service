@@ -342,6 +342,7 @@ function Root() {
       refreshToken="your-api-refresh-token"
       notificationTitle="Close contact detected"
       notificationDescription="Open the app for instructions">
+      notificationRepeat=0>
       <App />
     </ExposureProvider>
   );
@@ -398,6 +399,14 @@ function Root() {
 ##### `analyticsOptin` (optional)
 
 `boolean` (default `false`) Consent to send analytics to your exposure API's `/metrics` endpoint
+
+##### `notificationRepeat` (optional)
+
+`number` (default `0`) Used to repeat exposure notifications after set interval. Internal time is in minutes.
+
+##### `certList` (optional)
+
+`string` (default ``) Used to override the cert names to be looked for in the package on android.
 
 ### `useExposure`
 
@@ -516,6 +525,12 @@ Calls `ExposureNotificationModule.deleteAllData()` & checks & update the status
 `() => Promise<void>`
 
 Manually check whether the device supports the exposure API and update the context
+
+##### `cancelNotifications()`
+
+`() => void`
+
+Used to cancel any repeating notifications that have been scheduled
 
 ##### `getCloseContacts()`
 

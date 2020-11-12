@@ -6,6 +6,9 @@ import Alamofire
 
 @available(iOS 13.5, *)
 class ExposureCheck: AsyncOperation {
+    public static let REPEAT_NOTIFICATION_ID = "repeatExposure"
+    public static let INITIAL_NOTIFICATION_ID = "exposure"
+      
     public enum endPoints {
         case metrics
         case exposures
@@ -687,13 +690,28 @@ class ExposureCheck: AsyncOperation {
       content.body = self.configData.notificationDesc
       content.badge = 1
       content.sound = .default
-      let request = UNNotificationRequest(identifier: "exposure", content: content, trigger: nil)
-      UNUserNotificationCenter.current().add(request) { error in
-          DispatchQueue.main.async {
-              if let error = error {
-                os_log("Notification error %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
-              }
-          }
+      
+      let trigger = UNTimeIntervalNotificationTrigger(
+        timeInterval: TimeInterval(self.configData.notificationRepeat * 60),
+                    repeats: true)
+        
+        let initialRequest = UNNotificationRequest(identifier: ExposureCheck.INITIAL_NOTIFICATION_ID, content: content, trigger: nil)
+      UNUserNotificationCenter.current().add(initialRequest) { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                  os_log("Notification error %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+                }
+                if (self.configData.notificationRepeat > 0) {
+                    let request = UNNotificationRequest(identifier: ExposureCheck.REPEAT_NOTIFICATION_ID, content: content, trigger: trigger)
+                    UNUserNotificationCenter.current().add(request) { error in
+                        DispatchQueue.main.async {
+                            if let error = error {
+                              os_log("Repeat Notification error %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+                            }
+                        }
+                    }
+                }
+            }
       }
     
       let payload:[String: Any] = [
@@ -709,30 +727,30 @@ class ExposureCheck: AsyncOperation {
       
     }
   
-  private func triggerCallBack(_ lastExposure: Date, _ daysSinceExposure: Int, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
-    guard !self.isCancelled else {
-      return self.cancelProcessing()
-    }
-    
-    guard let callbackNum = self.configData.callbackNumber, !callbackNum.isEmpty else {
-      os_log("No callback number configured", log: OSLog.checkExposure, type: .info)
-      return completion(.success(true))
-    }
+    private func triggerCallBack(_ lastExposure: Date, _ daysSinceExposure: Int, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
+      guard !self.isCancelled else {
+        return self.cancelProcessing()
+      }
+      
+      guard let callbackNum = self.configData.callbackNumber, !callbackNum.isEmpty else {
+        os_log("No callback number configured", log: OSLog.checkExposure, type: .info)
+        return completion(.success(true))
+      }
            
-    self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload], encoding: JSONEncoding.default)
-      .validate()
-      .response() { response in
-        switch response.result {
-        case .success:
-          os_log("Request for callback sent", log: OSLog.checkExposure, type: .debug)
-          completion(.success(true))
-        case let .failure(error):
-          os_log("Unable to send callback request, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
-          completion(.failure(error))
+      self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload], encoding: JSONEncoding.default)
+        .validate()
+        .response() { response in
+          switch response.result {
+          case .success:
+            os_log("Request for callback sent", log: OSLog.checkExposure, type: .debug)
+            completion(.success(true))
+          case let .failure(error):
+            os_log("Unable to send callback request, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+            completion(.failure(error))
         }
-    }
+      }
     
-  }
+    }
 
   private func saveMetric(event: String, completion: @escaping  (Result<Bool, Error>) -> Void) {
     self.saveMetric(event: event, payload: nil, completion: completion)

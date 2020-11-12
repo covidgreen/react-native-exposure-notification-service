@@ -85,7 +85,7 @@ class Fetcher {
 
         // based on https://github.com/MaxToyberman/react-native-ssl-pinning/blob/master/android/src/main/java/com/toyberman/Utils/OkHttpUtils.java#L160
         private fun getTrustManager(certs: Array<String>): X509TrustManager {
-            var trustManager: X509TrustManager? = null
+            var trustManager: X509TrustManager?
 
             val cf: CertificateFactory = CertificateFactory.getInstance("X.509")
             val keyStoreType: String = KeyStore.getDefaultType()
@@ -95,9 +95,7 @@ class Fetcher {
                 val filename = certs[i]
                 val caInput: InputStream = BufferedInputStream(Fetcher::class.java.getClassLoader()?.getResourceAsStream("assets/$filename.cer"))
                 var ca: Certificate
-                ca = caInput.use { caInput ->
-                    cf.generateCertificate(caInput)
-                }
+                ca = caInput.use { cf.generateCertificate(it) }
                 keyStore.setCertificateEntry(filename, ca)
             }
             val tmfAlgorithm: String = TrustManagerFactory.getDefaultAlgorithm()
@@ -183,8 +181,12 @@ class Fetcher {
             }
 
             if (usePinning) {
-                val sslContext = SSLContext.getInstance("TLS");
-                val certs = arrayOf("cert1", "cert2", "cert3", "cert4", "cert5")
+                var certList = SharedPrefs.getString("certList",context)
+                val sslContext = SSLContext.getInstance("TLS")
+                if (certList.isNullOrEmpty()) {
+                    certList = "cert1,cert2,cert3,cert4,cert5"
+                }
+                val certs = certList.split(",").toTypedArray()
                 val trustManager = getTrustManager(certs);
                 sslContext.init(null, arrayOf<TrustManager?>(trustManager), null)
                 builder.sslSocketFactory(sslContext.getSocketFactory(), trustManager)
@@ -281,11 +283,11 @@ class Fetcher {
 
         @JvmStatic
         fun getToken(originalRequest: Request, context: Context): String {
-            var token = ""
+            var token:String
             if (originalRequest.url.toString().endsWith(REFRESH)) {
 
                 token = getRefreshToken(context)
-                // Events.raiseEvent(Events.INFO, "getToken - Is Refresh: $token")
+//                 Events.raiseEvent(Events.INFO, "getToken - Is Refresh: $token")
             } else {
                 // Events.raiseEvent(Events.INFO, "getToken - Not Refresh: $token")
                 token = getAuthToken(context)

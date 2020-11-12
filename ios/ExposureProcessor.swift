@@ -95,7 +95,7 @@ public class ExposureProcessor {
             result["type"] = ["paused"]
         case .unauthorized:
             result["state"] = "disabled"
-            result["type"] = ["noauth"]
+            result["type"] = ["unauthorized"]            
         default:
             result["state"] = "unavailable"
             result["type"] = ["starting"]

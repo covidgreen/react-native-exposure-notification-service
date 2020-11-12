@@ -1,122 +1,126 @@
 package ie.gov.tracing
 
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import android.content.IntentSender.SendIntentException
+import android.content.pm.PackageInfo
+import android.location.LocationManager
+import android.os.Build
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.pm.PackageInfoCompat
+import androidx.core.location.LocationManagerCompat
 import androidx.work.await
 import com.facebook.react.bridge.*
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.common.api.AvailabilityException
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationStatusCodes
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey
 import com.google.common.io.BaseEncoding
 import ie.gov.tracing.common.Config
 import ie.gov.tracing.common.Events
-import ie.gov.tracing.nearby.*
+import ie.gov.tracing.nearby.ExposureNotificationRepeater
+import ie.gov.tracing.nearby.ExposureNotificationClientWrapper
+import ie.gov.tracing.nearby.ExposureNotificationHelper
+import ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker
+import ie.gov.tracing.nearby.StateUpdatedWorker
 import ie.gov.tracing.nearby.ExposureNotificationHelper.Callback
+import ie.gov.tracing.nearby.RequestCodes
 import ie.gov.tracing.storage.ExposureNotificationDatabase
 import ie.gov.tracing.storage.ExposureNotificationRepository
 import ie.gov.tracing.storage.SharedPrefs
 import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import ie.gov.tracing.nearby.StateUpdatedWorker
-import android.content.IntentFilter
-import android.bluetooth.BluetoothAdapter;
-import android.content.pm.PackageInfo
-import android.location.LocationManager
-import android.os.Build
-import androidx.core.content.pm.PackageInfoCompat
-import androidx.core.location.LocationManagerCompat
 
-class Listener: ActivityEventListener {
-    override fun onNewIntent(intent: Intent?) {}
 
-    override fun onActivityResult(activty: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
-        try {
-            Events.raiseEvent(Events.INFO, "onActivityResult - requestCode: $requestCode, resultCode: $resultCode")
-            if (requestCode == RequestCodes.REQUEST_CODE_START_EXPOSURE_NOTIFICATION) {
-                if (resultCode == Activity.RESULT_OK) {
-                    Events.raiseEvent(Events.INFO, "onActivityResult - START_EXPOSURE_NOTIFICATION_OK")
-                    // call authorize again to resolve the promise if isEnabled set
-                    if(Tracing.status == Tracing.STATUS_STARTING) {
-                        // call start after authorization if starting,
-                        // fulfils promise after successful start
-                        Tracing.start(null)
+object Tracing {
+    class Listener: ActivityEventListener {
+        override fun onNewIntent(intent: Intent?) {}
+
+        override fun onActivityResult(activty: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
+            try {
+                Events.raiseEvent(Events.INFO, "onActivityResult - requestCode: $requestCode, resultCode: $resultCode")
+                if (requestCode == RequestCodes.REQUEST_CODE_START_EXPOSURE_NOTIFICATION) {
+                    if (resultCode == Activity.RESULT_OK) {
+                        Events.raiseEvent(Events.INFO, "onActivityResult - START_EXPOSURE_NOTIFICATION_OK")
+                        // call authorize again to resolve the promise if isEnabled set
+                        if(Tracing.status == Tracing.STATUS_STARTING) {
+                            // call start after authorization if starting,
+                            // fulfils promise after successful start
+                            Tracing.start(null)
+                        } else {
+                            // in order for isAuthorised to work, we must start
+                            // start failure will resolve authorisation permissions promise
+                            Tracing.authoriseExposure(null)
+                        }
                     } else {
-                        // in order for isAuthorised to work, we must start
-                        // start failure will resolve authorisation permissions promise
-                        Tracing.authoriseExposure(null)
+                        Events.raiseEvent(Events.INFO, "onActivityResult - START_EXPOSURE_NOTIFICATION_FAILED: $resultCode")
+
+                        if(Tracing.status == Tracing.STATUS_STARTING) {
+                            Tracing.resolutionPromise?.resolve(false)
+                        } else {
+                            Tracing.resolutionPromise?.resolve("denied")
+                        }
                     }
-                } else {
-                    Events.raiseEvent(Events.INFO, "onActivityResult - START_EXPOSURE_NOTIFICATION_FAILED: $resultCode")
+                    return
+                }
 
-                    if(Tracing.status == Tracing.STATUS_STARTING) {
-                        Tracing.resolutionPromise?.resolve(false)
+                if (requestCode == RequestCodes.REQUEST_CODE_GET_TEMP_EXPOSURE_KEY_HISTORY) {
+                    if (resultCode == Activity.RESULT_OK) {
+                        Events.raiseEvent(Events.INFO, "onActivityResult - GET_TEMP_EXPOSURE_KEY_HISTORY_OK")
+                        Tracing.getDiagnosisKeys(null)
                     } else {
-                        Tracing.resolutionPromise?.resolve("denied")
+                        Tracing.resolutionPromise?.reject(Throwable("Rejected"))
+                        Events.raiseEvent(Events.ERROR, "onActivityResult - GET_TEMP_EXPOSURE_KEY_HISTORY_FAILED: $resultCode")
+                    }
+                    return
+                }
+
+                if (requestCode == RequestCodes.PLAY_SERVICES_UPDATE) {
+                    if (resultCode == Activity.RESULT_OK) {
+                        val gps = GoogleApiAvailability.getInstance()
+                        val result = gps.isGooglePlayServicesAvailable(Tracing.context.applicationContext)
+                        Tracing.base.playServicesVersion = gps.getApkVersion(Tracing.context.applicationContext)
+                        Events.raiseEvent(Events.INFO, "triggerUpdate - version after activity: ${Tracing.base.playServicesVersion}")
+
+                        if(result == ConnectionResult.SUCCESS) {
+                            Events.raiseEvent(Events.INFO, "triggerUpdate - update successful")
+                            Tracing.resolutionPromise?.resolve("success")
+                        } else {
+                            Events.raiseEvent(Events.ERROR, "triggerUpdate - update failed: $result")
+                            Tracing.resolutionPromise?.resolve("failed")
+                        }
+                    } else {
+                        Events.raiseEvent(Events.INFO, "triggerUpdate - update cancelled")
+                        Tracing.resolutionPromise?.resolve("cancelled")
                     }
                 }
-                return
+
+            } catch (ex: Exception) {
+                Events.raiseError("onActivityResult", ex)
+                Tracing.resolutionPromise?.resolve(false)
             }
-
-            if (requestCode == RequestCodes.REQUEST_CODE_GET_TEMP_EXPOSURE_KEY_HISTORY) {
-                if (resultCode == Activity.RESULT_OK) {
-                    Events.raiseEvent(Events.INFO, "onActivityResult - GET_TEMP_EXPOSURE_KEY_HISTORY_OK")
-                    Tracing.getDiagnosisKeys(null)
-                } else {
-                    Tracing.resolutionPromise?.reject(Throwable("Rejected"))
-                    Events.raiseEvent(Events.ERROR, "onActivityResult - GET_TEMP_EXPOSURE_KEY_HISTORY_FAILED: $resultCode")
-                }
-                return
-            }
-
-            if (requestCode == RequestCodes.PLAY_SERVICES_UPDATE) {
-                if (resultCode == Activity.RESULT_OK) {
-                    val gps = GoogleApiAvailability.getInstance()
-                    val result = gps.isGooglePlayServicesAvailable(Tracing.context.applicationContext)
-                    Tracing.base.playServicesVersion = gps.getApkVersion(Tracing.context.applicationContext)
-                    Events.raiseEvent(Events.INFO,"triggerUpdate - version after activity: ${Tracing.base.playServicesVersion}")
-
-                    if(result == ConnectionResult.SUCCESS) {
-                        Events.raiseEvent(Events.INFO,"triggerUpdate - update successful")
-                        Tracing.resolutionPromise?.resolve("success")
-                    } else {
-                        Events.raiseEvent(Events.ERROR,"triggerUpdate - update failed: $result")
-                        Tracing.resolutionPromise?.resolve("failed")
-                    }
-                } else {
-                    Events.raiseEvent(Events.INFO,"triggerUpdate - update cancelled")
-                    Tracing.resolutionPromise?.resolve("cancelled")
-                }
-            }
-
-        } catch(ex: Exception) {
-            Events.raiseError("onActivityResult", ex)
-            Tracing.resolutionPromise?.resolve(false)
         }
     }
-}
 
-class BleStatusReceiver : BroadcastReceiver() {
+    class BleStatusReceiver : BroadcastReceiver() {
 
-    override fun onReceive(context: Context, intent: Intent) {
+        override fun onReceive(context: Context, intent: Intent) {
 
-        if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
-            Tracing.getExposureStatus(null)
+            if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
+                Tracing.getExposureStatus(null)
+            }
+            Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action")
+            Tracing.setExposureStatus(Tracing.exposureStatus, Tracing.exposureDisabledReason)
         }
-        Events.raiseEvent(Events.INFO,"bleStatusUpdate - $intent.action")
-        Tracing.setExposureStatus(Tracing.exposureStatus, Tracing.exposureDisabledReason)
     }
-}
 
-class Tracing {
-    companion object {
-        lateinit var context: Context
+    lateinit var context: Context
         lateinit var currentContext: Context
         lateinit var base: ExposureNotificationModule
         lateinit var reactContext: ReactApplicationContext
@@ -218,7 +222,7 @@ class Tracing {
                             resolutionPromise!!.resolve("denied")
                         }
                     }
-                } catch(ex: Exception) {
+                } catch (ex: Exception) {
                     Events.raiseError("authorisationCallback.onFailure", ex)
                     if(status == STATUS_STARTING)
                         resolutionPromise!!.resolve(false)
@@ -237,7 +241,7 @@ class Tracing {
                     } else {
                         startPromise!!.resolve("granted")
                     }
-                } catch(ex: Exception) {
+                } catch (ex: Exception) {
                     Events.raiseError("authorisationCallback.onSuccess", ex)
                     if (status == STATUS_STARTING) {
                         startPromise?.resolve(false)
@@ -410,7 +414,7 @@ class Tracing {
                 val pinfo: PackageInfo = currentContext.getPackageManager().getPackageInfo(currentContext.getPackageName(), 0)
                 versionName = pinfo.versionName
                 versionCode = PackageInfoCompat.getLongVersionCode(pinfo).toString()           
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 versionName = "unknown"
                 versionCode = "unknown"
             }
@@ -493,10 +497,10 @@ class Tracing {
                 exposureWrapper.isEnabled
                         .addOnSuccessListener { enabled: Boolean? ->
                             if (enabled == true) {
-                                Events.raiseEvent(Events.INFO,"isAuthorised: granted")
+                                Events.raiseEvent(Events.INFO, "isAuthorised: granted")
                                 promise.resolve("granted")
                             } else {
-                                Events.raiseEvent(Events.INFO,"isAuthorised: denied")
+                                Events.raiseEvent(Events.INFO, "isAuthorised: denied")
                                 promise.resolve("blocked")
                             }
                         }
@@ -550,12 +554,12 @@ class Tracing {
         fun triggerUpdate(promise: Promise) = runBlocking<Unit> {
             launch {
                 try {
-                    Events.raiseEvent(Events.INFO,"triggerUpdate - trigger update")
+                    Events.raiseEvent(Events.INFO, "triggerUpdate - trigger update")
                     val gps = GoogleApiAvailability.getInstance()
                     base.playServicesVersion = gps.getApkVersion(context.applicationContext)
-                    Events.raiseEvent(Events.INFO,"triggerUpdate - version: ${base.playServicesVersion}")
+                    Events.raiseEvent(Events.INFO, "triggerUpdate - version: ${base.playServicesVersion}")
                     val result = gps.isGooglePlayServicesAvailable(context.applicationContext)
-                    Events.raiseEvent(Events.INFO,"triggerUpdate - result: $result")
+                    Events.raiseEvent(Events.INFO, "triggerUpdate - result: $result")
                     if (result == ConnectionResult.SUCCESS) {
                         promise.resolve("already_installed")
                     }
@@ -563,7 +567,7 @@ class Tracing {
                         resolutionPromise = promise
                         gps.getErrorDialog(base.activity,
                                 ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED,
-                                RequestCodes.PLAY_SERVICES_UPDATE).show()
+                                RequestCodes.PLAY_SERVICES_UPDATE)?.show()
                     } else {
                         promise.resolve("unknown result: $result")
                     }
@@ -584,6 +588,8 @@ class Tracing {
                     ExposureNotificationRepository(context).deleteAllTokensAsync().await()
                     // drop db
                     ExposureNotificationDatabase.nukeDatabase(context)
+                    // cleanup any pending notification
+                    cancelNotifications()
                     promise.resolve(true)
                 } catch (ex: Exception) {
                     Events.raiseError("deleteData", ex)
@@ -662,7 +668,7 @@ class Tracing {
         private fun isLocationEnableRequired(): Boolean {
             val locationManager: LocationManager = Tracing.context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
             return (!exposureWrapper.deviceSupportsLocationlessScanning()
-                    && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && locationManager != null && !LocationManagerCompat.isLocationEnabled(locationManager))
+                    && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !LocationManagerCompat.isLocationEnabled(locationManager))
         }
 
         @JvmStatic
@@ -732,6 +738,15 @@ class Tracing {
             promise.resolve(map)
         }
 
+        @JvmStatic
+        fun cancelNotifications() {
+            val notificationManager = NotificationManagerCompat
+                .from(context)
+            notificationManager.cancel(RequestCodes.CLOSE_CONTACT)
+
+            ExposureNotificationRepeater.cancel( context )
+        }
+
         fun handleApiException(ex: Exception) {
             if (ex is ApiException) {
                 Events.raiseEvent(Events.ERROR, "handle api exception: ${ExposureNotificationStatusCodes.getStatusCodeString(ex.statusCode)}")
@@ -755,4 +770,3 @@ class Tracing {
             }
         }
     }
-}
