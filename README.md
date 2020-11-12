@@ -404,6 +404,10 @@ function Root() {
 
 `number` (default `0`) Used to repeat exposure notifications after set interval. Internal time is in minutes.
 
+##### `certList` (optional)
+
+`string` (default ``) Used to override the cert names to be looked for in the package on android.
+
 ### `useExposure`
 
 Use the `useExposure` hook in any component to consume the `ExposureProvider` context & methods
