@@ -216,6 +216,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
               .setProgress(1, 0, true)
               .setSmallIcon(R.mipmap.ic_notification)
               .setOngoing(true)
+              .setNumber(0)
               .build();
 
       return new ForegroundInfo(1, notification, FOREGROUND_SERVICE_TYPE_LOCATION);
@@ -228,6 +229,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
             id,
             this.context.getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW
     );
+    channel.setShowBadge(false);
     NotificationManager notificationManager = (NotificationManager) this.context.getSystemService(
             Context.NOTIFICATION_SERVICE
     );
