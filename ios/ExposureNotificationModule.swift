@@ -231,6 +231,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
                                     rejecter reject: @escaping RCTPromiseRejectBlock) {
         if #available(iOS 13.5, *) {
             ExposureProcessor.shared.deleteAllData(resolve, rejecter: reject)
+            cancelNotifications()
         } else {
             resolve(true)
         }
