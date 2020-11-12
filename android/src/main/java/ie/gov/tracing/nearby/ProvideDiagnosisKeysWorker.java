@@ -59,8 +59,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private static final String WORKER_NAME = "ProvideDiagnosisKeysWorker";
   private static final BaseEncoding BASE64_LOWER = BaseEncoding.base64();
   private static final int RANDOM_TOKEN_BYTE_LENGTH = 32;
-  private static final String FOREGROUND_NOTIFICATION_ID =
+  private static final String FOREGROUND_NOTIFICATION_ID_LEGACY =
           "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID";
+  private static final String FOREGROUND_NOTIFICATION_ID =
+          "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID.noBadge";
 
   private final DiagnosisKeyDownloader diagnosisKeys;
   private final DiagnosisKeyFileSubmitter submitter;
@@ -234,6 +236,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
             Context.NOTIFICATION_SERVICE
     );
     notificationManager.createNotificationChannel(channel);
+    notificationManager.deleteNotificationChannel(FOREGROUND_NOTIFICATION_ID_LEGACY);
   }
 
   private Result processFailure(Exception ex) {
