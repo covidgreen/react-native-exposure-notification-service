@@ -11,13 +11,13 @@ import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationCompat.Builder;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.work.Data;
 import androidx.work.ExistingWorkPolicy;
 import androidx.work.ListenableWorker;
-import androidx.work.WorkerParameters;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
-import androidx.work.Data;
-import ie.gov.tracing.R;
+import androidx.work.WorkerParameters;
+
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
 import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
 import com.google.common.util.concurrent.FluentFuture;
@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import ie.gov.tracing.R;
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
@@ -43,211 +44,217 @@ import ie.gov.tracing.storage.SharedPrefs;
 import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEOUT;
 
 public class StateUpdatedWorker extends ListenableWorker {
-  private static final String EXPOSURE_NOTIFICATION_CHANNEL_ID =
-      "ExposureNotificationCallback.EXPOSURE_NOTIFICATION_CHANNEL_ID";
-  private static final String ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION =
-      "com.google.android.apps.exposurenotification.ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION";
+    private static final String EXPOSURE_NOTIFICATION_CHANNEL_ID =
+            "ExposureNotificationCallback.EXPOSURE_NOTIFICATION_CHANNEL_ID";
+    public static final String ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION =
+            "com.google.android.apps.exposurenotification.ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION";
 
-  private final Context context;
-  private final ExposureNotificationRepository repository;
+    private final Context context;
+    private final ExposureNotificationRepository repository;
 
-  public StateUpdatedWorker(
-          @NonNull Context context, @NonNull WorkerParameters workerParams) {
-    super(context, workerParams);
-    this.context = context;
-    this.repository = new ExposureNotificationRepository(context);
-  }
-
-  private static double [] doubleArrayFromString(String string) {
-      try {
-          String[] strings = string.replace("[", "").replace("]", "").split(", ");
-          double[] result = new double[strings.length];
-          for (int i = 0; i < result.length; i++) {
-              result[i] = Double.parseDouble(strings[i]);
-          }
-          return result;
-      } catch (Exception ex) {
-          Events.raiseError("Cannot parse double array", ex);
-      }
-      return null;
-  }
-
-  @NonNull
-  @Override
-  public ListenableFuture<Result> startWork() {
-    Tracing.currentContext = getApplicationContext();
-
-    final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
-    final boolean simulate = getInputData().getBoolean("simulate", false);
-    if (token == null) {
-      return Futures.immediateFuture(Result.failure());
-    } else {
-      return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-          ExposureNotificationClientWrapper.get(context).getExposureSummary(token),
-          DEFAULT_API_TIMEOUT.toMillis(),
-          TimeUnit.MILLISECONDS,
-          AppExecutors.getScheduledExecutor()))
-          .transformAsync((exposureSummary) -> {
-              Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results" + simulate);
-              if (simulate) {
-                ExposureSummary.ExposureSummaryBuilder builder = new ExposureSummary.ExposureSummaryBuilder();
-                int[] dummyAttenuations = new int[]{30, 30, 30};
-                builder.setAttenuationDurations(dummyAttenuations);
-                builder.setDaysSinceLastExposure(1);
-                builder.setMatchedKeyCount(1);
-                builder.setMaximumRiskScore(10);
-                builder.setSummationRiskScore(10);
-                exposureSummary = builder.build();
-              }
-
-              if (exposureSummary == null) {
-                  Events.raiseEvent(Events.INFO, "exposureSummary - no exposure summary, deleting token.");
-                  return repository.deleteTokenEntityAsync(token);
-              }
-
-              if (exposureSummary.getMatchedKeyCount() == 0) {
-                  // No matches so we show no notification and just delete the token.
-                  Events.raiseEvent(Events.INFO, "exposureSummary - no matches, deleting token.");
-                  return repository.deleteTokenEntityAsync(token);
-              }
-
-              if (exposureSummary.getMaximumRiskScore() == 0) {
-                  Events.raiseEvent(Events.INFO, "exposureSummary - maximumRiskScore: " +
-                          exposureSummary.getMaximumRiskScore() + ", deleting token.");
-                  return repository.deleteTokenEntityAsync(token);
-              }
-
-              Events.raiseEvent(Events.INFO, "exposureSummary - maximumRiskScore: " +
-                      exposureSummary.getMaximumRiskScore());
-
-              int[] ad = exposureSummary.getAttenuationDurationsInMinutes();
-
-              double[] tw;
-              long timeThreshold;
-              if (simulate) {
-                  tw = doubleArrayFromString("[1, 1, 0]");
-                  timeThreshold = 15;
-              } else {
-                  tw = doubleArrayFromString(SharedPrefs.getString("thresholdWeightings", context));
-                  timeThreshold = SharedPrefs.getLong("timeThreshold", context);
-              }
-
-              if (tw == null || tw.length != 3 || timeThreshold <= 0) {
-                  Events.raiseEvent(Events.INFO, "exposureSummary - timeThreshold or " +
-                          "weightingThresholds not set or invalid, deleting token and aborting.");
-                  return repository.deleteTokenEntityAsync(token);
-              }
-
-              Events.raiseEvent(Events.INFO, "exposureSummary - Determining if exposure durations: " +
-                      Arrays.toString(ad) + ", using " + "thresholdWeightings: " + Arrays.toString(tw) +
-                      ", exceeds the timeThreshold: " + timeThreshold);
-
-              double totalTime = tw[0] * ad[0] + tw[1] * ad[1] + tw[2] * ad[2];
-
-              if (totalTime < timeThreshold) {
-                  Events.raiseEvent(Events.INFO, "exposureSummary - totalTime: " + totalTime +
-                          " is less than timeThreshold: " + timeThreshold + ", ignoring and deleting token.");
-                  return repository.deleteTokenEntityAsync(token);
-              }
-
-              Events.raiseEvent(Events.INFO, "exposureSummary - totalTime: " + totalTime +
-                      " exceeds timeThreshold: " + timeThreshold + ", recording successful match");
-
-              // store field as a string (otherwise we'd need a new table)
-              String attenuationDurations = "";
-              if (ad.length > 0) {
-                  attenuationDurations = Integer.toString(ad[0]);
-                  for (int i = 1; i < ad.length; i++) {
-                      attenuationDurations += "," + ad[i];
-                  }
-              }
-
-              List<ExposureEntity> exposureEntities = new ArrayList<>();
-              ExposureEntity exposureEntity = ExposureEntity.create(
-                      exposureSummary.getDaysSinceLastExposure(),
-                      exposureSummary.getMatchedKeyCount(),
-                      exposureSummary.getMaximumRiskScore(),
-                      exposureSummary.getSummationRiskScore(),
-                      attenuationDurations
-              );
-              exposureEntities.add(exposureEntity);
-
-              // asynchronously update our summary table while we show notification
-              repository.upsertExposureEntitiesAsync(exposureEntities);
-
-              Events.raiseEvent(Events.ON_EXPOSURE, "exposureSummary - recording summary matches:"
-                      + exposureSummary.getMatchedKeyCount() + ", duration minutes: " + attenuationDurations);
-              showNotification();
-
-              HashMap<String, Object> payload = new HashMap<>();
-
-              payload.put("matchedKeys", exposureSummary.getMatchedKeyCount());
-              payload.put("attenuations", ad);
-              payload.put("maxRiskScore", exposureSummary.getMaximumRiskScore());
-
-              Fetcher.saveMetric("CONTACT_NOTIFICATION", context, payload);
-              Fetcher.triggerCallback(exposureEntity, context, payload);
-
-              // finish by marking token as read if we have positive matchCount for token
-              return repository.markTokenEntityRespondedAsync(token);
-          }, AppExecutors.getBackgroundExecutor())
-          .transform((v) -> Result.success(), AppExecutors.getLightweightExecutor())
-          .catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
+    public StateUpdatedWorker(
+            @NonNull Context context, @NonNull WorkerParameters workerParams) {
+        super(context, workerParams);
+        this.context = context;
+        this.repository = new ExposureNotificationRepository(context);
     }
-  }
 
-  private Result processError(Exception ex) {
-      HashMap<String, Object> payload = new HashMap<>();
-      payload.put("description", "error receiving notification: " + ex);
-      Fetcher.saveMetric("LOG_ERROR", context, payload);
-
-      Events.raiseError("error receiving notification", ex);
-      return Result.failure();
-  }
-
-  static void createNotificationChannel(Context context) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      NotificationChannel channel =
-          new NotificationChannel(EXPOSURE_NOTIFICATION_CHANNEL_ID,
-              context.getString(R.string.notification_channel_name),
-              NotificationManager.IMPORTANCE_HIGH);
-      channel.setDescription(context.getString(R.string.notification_channel_description));
-      NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
-      notificationManager.createNotificationChannel(channel);
+    private static double[] doubleArrayFromString(String string) {
+        try {
+            String[] strings = string.replace("[", "").replace("]", "").split(", ");
+            double[] result = new double[strings.length];
+            for (int i = 0; i < result.length; i++) {
+                result[i] = Double.parseDouble(strings[i]);
+            }
+            return result;
+        } catch (Exception ex) {
+            Events.raiseError("Cannot parse double array", ex);
+        }
+        return null;
     }
-  }
 
-  public static void showNotification(Context context) {
-    Events.raiseEvent(Events.INFO, "show notification");
-    createNotificationChannel(context);
-    String packageName = context.getApplicationContext().getPackageName();
-    Intent intent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-    intent.putExtra("exposureNotificationClicked", true);
+    @NonNull
+    @Override
+    public ListenableFuture<Result> startWork() {
+        Tracing.currentContext = getApplicationContext();
 
-    intent.setAction(ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION);
-    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-    PendingIntent pendingIntent = PendingIntent.getActivity(context, RequestCodes.CLOSE_CONTACT, intent, 0);
-    NotificationCompat.Builder builder =
-        new Builder(context, EXPOSURE_NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_notification)
-                .setContentTitle(SharedPrefs.getString("notificationTitle", context))
-                .setContentText(SharedPrefs.getString("notificationDesc", context))
-                .setStyle(new NotificationCompat.BigTextStyle()
-                .bigText(SharedPrefs.getString("notificationDesc", context)))
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setContentIntent(pendingIntent)
-                .setOnlyAlertOnce(true)
-                .setAutoCancel(true);
-    NotificationManagerCompat notificationManager = NotificationManagerCompat
-        .from(context);
-    notificationManager.notify(RequestCodes.CLOSE_CONTACT, builder.build());
-  }
+        final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
+        final boolean simulate = getInputData().getBoolean("simulate", false);
+        if (token == null) {
+            return Futures.immediateFuture(Result.failure());
+        } else {
+            return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                    ExposureNotificationClientWrapper.get(context).getExposureSummary(token),
+                    DEFAULT_API_TIMEOUT.toMillis(),
+                    TimeUnit.MILLISECONDS,
+                    AppExecutors.getScheduledExecutor()))
+                    .transformAsync((exposureSummary) -> {
+                        Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results" + simulate);
+                        if (simulate) {
+                            ExposureSummary.ExposureSummaryBuilder builder = new ExposureSummary.ExposureSummaryBuilder();
+                            int[] dummyAttenuations = new int[]{30, 30, 30};
+                            builder.setAttenuationDurations(dummyAttenuations);
+                            builder.setDaysSinceLastExposure(1);
+                            builder.setMatchedKeyCount(1);
+                            builder.setMaximumRiskScore(10);
+                            builder.setSummationRiskScore(10);
+                            exposureSummary = builder.build();
+                        }
 
-  private void showNotification() {
-    showNotification(context);
-  }
+                        if (exposureSummary == null) {
+                            Events.raiseEvent(Events.INFO, "exposureSummary - no exposure summary, deleting token.");
+                            return repository.deleteTokenEntityAsync(token);
+                        }
 
-   public static void simulateExposure(Long timeDelay) {
+                        if (exposureSummary.getMatchedKeyCount() == 0) {
+                            // No matches so we show no notification and just delete the token.
+                            Events.raiseEvent(Events.INFO, "exposureSummary - no matches, deleting token.");
+                            return repository.deleteTokenEntityAsync(token);
+                        }
+
+                        if (exposureSummary.getMaximumRiskScore() == 0) {
+                            Events.raiseEvent(Events.INFO, "exposureSummary - maximumRiskScore: " +
+                                    exposureSummary.getMaximumRiskScore() + ", deleting token.");
+                            return repository.deleteTokenEntityAsync(token);
+                        }
+
+                        Events.raiseEvent(Events.INFO, "exposureSummary - maximumRiskScore: " +
+                                exposureSummary.getMaximumRiskScore());
+
+                        int[] ad = exposureSummary.getAttenuationDurationsInMinutes();
+
+                        double[] tw;
+                        long timeThreshold;
+                        if (simulate) {
+                            tw = doubleArrayFromString("[1, 1, 0]");
+                            timeThreshold = 15;
+                        } else {
+                            tw = doubleArrayFromString(SharedPrefs.getString("thresholdWeightings", context));
+                            timeThreshold = SharedPrefs.getLong("timeThreshold", context);
+                        }
+
+                        if (tw == null || tw.length != 3 || timeThreshold <= 0) {
+                            Events.raiseEvent(Events.INFO, "exposureSummary - timeThreshold or " +
+                                    "weightingThresholds not set or invalid, deleting token and aborting.");
+                            return repository.deleteTokenEntityAsync(token);
+                        }
+
+                        Events.raiseEvent(Events.INFO, "exposureSummary - Determining if exposure durations: " +
+                                Arrays.toString(ad) + ", using " + "thresholdWeightings: " + Arrays.toString(tw) +
+                                ", exceeds the timeThreshold: " + timeThreshold);
+
+                        double totalTime = tw[0] * ad[0] + tw[1] * ad[1] + tw[2] * ad[2];
+
+                        if (totalTime < timeThreshold) {
+                            Events.raiseEvent(Events.INFO, "exposureSummary - totalTime: " + totalTime +
+                                    " is less than timeThreshold: " + timeThreshold + ", ignoring and deleting token.");
+                            return repository.deleteTokenEntityAsync(token);
+                        }
+
+                        Events.raiseEvent(Events.INFO, "exposureSummary - totalTime: " + totalTime +
+                                " exceeds timeThreshold: " + timeThreshold + ", recording successful match");
+
+                        // store field as a string (otherwise we'd need a new table)
+                        String attenuationDurations = "";
+                        if (ad.length > 0) {
+                            attenuationDurations = Integer.toString(ad[0]);
+                            for (int i = 1; i < ad.length; i++) {
+                                attenuationDurations += "," + ad[i];
+                            }
+                        }
+
+                        List<ExposureEntity> exposureEntities = new ArrayList<>();
+                        ExposureEntity exposureEntity = ExposureEntity.create(
+                                exposureSummary.getDaysSinceLastExposure(),
+                                exposureSummary.getMatchedKeyCount(),
+                                exposureSummary.getMaximumRiskScore(),
+                                exposureSummary.getSummationRiskScore(),
+                                attenuationDurations
+                        );
+                        exposureEntities.add(exposureEntity);
+
+                        // asynchronously update our summary table while we show notification
+                        repository.upsertExposureEntitiesAsync(exposureEntities);
+
+                        Events.raiseEvent(Events.ON_EXPOSURE, "exposureSummary - recording summary matches:"
+                                + exposureSummary.getMatchedKeyCount() + ", duration minutes: " + attenuationDurations);
+                        showNotification();
+
+                        HashMap<String, Object> payload = new HashMap<>();
+
+                        payload.put("matchedKeys", exposureSummary.getMatchedKeyCount());
+                        payload.put("attenuations", ad);
+                        payload.put("maxRiskScore", exposureSummary.getMaximumRiskScore());
+
+                        Fetcher.saveMetric("CONTACT_NOTIFICATION", context, payload);
+                        Fetcher.triggerCallback(exposureEntity, context, payload);
+
+                        // finish by marking token as read if we have positive matchCount for token
+                        return repository.markTokenEntityRespondedAsync(token);
+                    }, AppExecutors.getBackgroundExecutor())
+                    .transform((v) -> Result.success(), AppExecutors.getLightweightExecutor())
+                    .catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
+        }
+    }
+
+    private Result processError(Exception ex) {
+        HashMap<String, Object> payload = new HashMap<>();
+        payload.put("description", "error receiving notification: " + ex);
+        Fetcher.saveMetric("LOG_ERROR", context, payload);
+
+        Events.raiseError("error receiving notification", ex);
+        return Result.failure();
+    }
+
+    static void createNotificationChannel(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel =
+                    new NotificationChannel(EXPOSURE_NOTIFICATION_CHANNEL_ID,
+                            context.getString(R.string.notification_channel_name),
+                            NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription(context.getString(R.string.notification_channel_description));
+            NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
+    }
+
+    public static NotificationCompat.Builder buildNotification(Context context) {
+        Events.raiseEvent(Events.INFO, "show notification");
+        createNotificationChannel(context);
+        String packageName = context.getApplicationContext().getPackageName();
+        Intent intent = context.getPackageManager().getLaunchIntentForPackage(packageName);
+        intent.putExtra("exposureNotificationClicked", true);
+
+        intent.setAction(ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, RequestCodes.CLOSE_CONTACT, intent, 0);
+        return
+                new Builder(context, EXPOSURE_NOTIFICATION_CHANNEL_ID)
+                        .setSmallIcon(R.mipmap.ic_notification)
+                        .setContentTitle(SharedPrefs.getString("notificationTitle", context))
+                        .setContentText(SharedPrefs.getString("notificationDesc", context))
+                        .setStyle(new NotificationCompat.BigTextStyle()
+                                .bigText(SharedPrefs.getString("notificationDesc", context)))
+                        .setPriority(NotificationCompat.PRIORITY_MAX)
+                        .setContentIntent(pendingIntent)
+//                .setOnlyAlertOnce(true)
+                        .setAutoCancel(true);
+    }
+
+    public static void showNotification(Context context) {
+        NotificationCompat.Builder builder = buildNotification(context);
+        NotificationManagerCompat notificationManager = NotificationManagerCompat
+                .from(context);
+        notificationManager.notify(RequestCodes.CLOSE_CONTACT, builder.build());
+
+        ExposureNotificationRepeater.setup(context);
+    }
+
+    public void showNotification() {
+        showNotification(context);
+    }
+
+    public static void simulateExposure(Long timeDelay) {
         Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure");
 
         WorkManager workManager = WorkManager.getInstance(Tracing.context);
@@ -259,5 +266,5 @@ public class StateUpdatedWorker extends ListenableWorker {
                                 .build())
                 .build();
         workManager.enqueueUniqueWork("SimulateWorker", ExistingWorkPolicy.REPLACE, workRequest);
-   }
+    }
 }
