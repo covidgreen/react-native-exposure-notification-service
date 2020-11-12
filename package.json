@@ -1,7 +1,7 @@
 {
   "name": "react-native-exposure-notification-service",
   "title": "React Native Exposure Notification Service",
-  "version": "1.1.38",
+  "version": "1.1.39",
   "description": "React native module providing a common interface to Apple/Google's Exposure Notification APIs",
   "main": "dist/index.js",
   "files": [
@@ -58,7 +58,7 @@
     "@testing-library/react-hooks": "^3.3.0",
     "@testing-library/react-native": "^5.0.3",
     "@types/jest": "^26.0.4",
-    "@types/react-native": "^0.62.0",
+    "@types/react-native": "^0.63.3",
     "babel-jest": "^26.1.0",
     "eslint": "^7.4.0",
     "husky": "^4.2.5",

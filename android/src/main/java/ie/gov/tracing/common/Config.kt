@@ -38,6 +38,8 @@ class Config {
                 SharedPrefs.setString("callbackNumber", params.getString("callbackNumber")!!, Tracing.context)
                 val ran = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis())
                 SharedPrefs.setString("lastUpdated", ran, Tracing.context)
+                SharedPrefs.setLong("notificationRepeat", params.getInt("notificationRepeat").toLong(), Tracing.context)
+                SharedPrefs.setString("certList", params.getString("certList")!!, Tracing.context)
 
             } catch(ex: Exception) {
                 Events.raiseError("Error setting configuration: ", ex)

@@ -60,6 +60,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
         notificationDesc: configDict["notificationDesc"] as? String ?? "The COVID Tracker App has detected that you may have been exposed to someone who has tested positive for COVID-19.",
         authToken: token,
         fileLimit: configDict["fileLimit"] as? Int ?? 3,
+        notificationRepeat: configDict["notificationRepeat"] as? Int ?? 0,
         callbackNumber: configDict["callbackNumber"] as? String ?? "",
         analyticsOptin: configDict["analyticsOptin"] as? Bool ?? false
       )
@@ -68,10 +69,20 @@ public class ExposureNotificationModule: RCTEventEmitter {
       
       resolve(true)
     }
-    
+
+    @objc public func cancelNotifications() {
+        if #available(iOS 13.5, *) {
+            os_log("Cancel repeat notifications", log: OSLog.setup, type: .debug)
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [ExposureCheck.REPEAT_NOTIFICATION_ID])
+        } else {
+            // Nothing to do
+        }
+    }
+
     @objc public func authoriseExposure(_ resolve: @escaping RCTPromiseResolveBlock,
                                         rejecter reject: @escaping RCTPromiseRejectBlock) {
         if #available(iOS 13.5, *) {
+            os_log("Cancelling notifications", log: OSLog.setup, type: .debug)
             ExposureProcessor.shared.authoriseExposure(resolve, rejecter: reject)
         } else {
             resolve("unavailable")
@@ -220,6 +231,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
                                     rejecter reject: @escaping RCTPromiseRejectBlock) {
         if #available(iOS 13.5, *) {
             ExposureProcessor.shared.deleteAllData(resolve, rejecter: reject)
+            cancelNotifications()
         } else {
             resolve(true)
         }
@@ -281,7 +293,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
               status["state"] = "disabled"
               status["type"] = ["paused"]
           case .unauthorized:
-              status["state"] = "unavailable"
+              status["state"] = "disabled"
               status["type"] = ["unauthorized"]
           @unknown default:
               status["state"] = "unavailable"

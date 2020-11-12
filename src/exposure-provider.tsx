@@ -62,6 +62,7 @@ export interface ExposureContextValue extends State {
   readPermissions: () => Promise<void>;
   askPermissions: () => Promise<void>;
   setExposureState: (setStateAction: SetStateAction<State>) => void;
+  cancelNotifications: () => void;
 }
 
 const initialState = {
@@ -100,7 +101,8 @@ export const ExposureContext = createContext<ExposureContextValue>({
   deleteExposureData: () => Promise.resolve(),
   readPermissions: () => Promise.resolve(),
   askPermissions: () => Promise.resolve(),
-  setExposureState: () => {}
+  setExposureState: () => {},
+  cancelNotifications: () => {}
 });
 
 export interface ExposureProviderProps {
@@ -115,6 +117,8 @@ export interface ExposureProviderProps {
   notificationDescription: string;
   callbackNumber?: string;
   analyticsOptin?: boolean;
+  notificationRepeat?: number;
+  certList?: string;
 }
 
 export const getVersion = async () => {
@@ -156,7 +160,9 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   notificationTitle,
   notificationDescription,
   callbackNumber = '',
-  analyticsOptin = false
+  analyticsOptin = false,
+  notificationRepeat = 0,
+  certList = ""
 }) => {
   const [state, setState] = useState<State>(initialState);
 
@@ -307,7 +313,9 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         notificationTitle,
         notificationDesc: notificationDescription,
         callbackNumber,
-        analyticsOptin
+        analyticsOptin,
+        notificationRepeat,
+        certList
       };
       await ExposureNotification.configure(config);
 
@@ -390,6 +398,14 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     }
   };
 
+  const cancelNotifications = async () => {
+    try {
+      ExposureNotification.cancelNotifications();
+    } catch (e) {
+      console.log('cancel notifications exposure data error', e);
+    }
+  };
+
   const readPermissions = useCallback(async () => {
     console.log('Read permissions...');
 
@@ -429,7 +445,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     deleteExposureData,
     readPermissions,
     askPermissions,
-    setExposureState: setState
+    setExposureState: setState,
+    cancelNotifications
   };
 
   return (
