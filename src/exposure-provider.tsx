@@ -162,7 +162,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   callbackNumber = '',
   analyticsOptin = false,
   notificationRepeat = 0,
-  certList = ""
+  certList = ''
 }) => {
   const [state, setState] = useState<State>(initialState);
 

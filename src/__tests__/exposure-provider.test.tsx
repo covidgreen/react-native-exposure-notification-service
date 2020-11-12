@@ -111,7 +111,7 @@ const mockConfig = {
   analyticsOptin: true,
   callbackNumber: '0123456789',
   notificationRepeat: 0,
-  certList: "cert12"
+  certList: 'cert12'
 };
 
 const ExposureProviderWithMockConfig: React.FC<Partial<
