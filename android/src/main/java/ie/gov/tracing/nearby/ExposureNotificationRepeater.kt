@@ -11,6 +11,8 @@ import ie.gov.tracing.storage.SharedPrefs
 object ExposureNotificationRepeater {
     const val ACTION_REPEAT_EXPOSURE_NOTIFICATION = "com.google.android.apps.exposurenotification.ACTION_REPEAT_EXPOSURE_NOTIFICATION"
 
+    var pendingIntent: PendingIntent? = null
+
     private fun notificationRepeatAsMilliseconds(context: Context): Long {
         val notificationRepeat = SharedPrefs.getLong("notificationRepeat", context)
         return notificationRepeat * 60 * 1000
@@ -57,9 +59,10 @@ object ExposureNotificationRepeater {
             return
         }
 
-        val pendingIntent =
-                PendingIntent.getService(context.applicationContext, RequestCodes.REPEAT_CLOSE_CONTACT_NOTIFICATION, intent,
-                        PendingIntent.FLAG_NO_CREATE)
+//        val pendingIntent =
+//                PendingIntent.getService(context.applicationContext, RequestCodes.REPEAT_CLOSE_CONTACT_NOTIFICATION, intent,
+//                        PendingIntent.FLAG_NO_CREATE)
+        val pendingIntent = PendingIntent.getBroadcast(context, RequestCodes.REPEAT_CLOSE_CONTACT_NOTIFICATION, intent, PendingIntent.FLAG_NO_CREATE)
         if(pendingIntent == null) {
             Events.raiseEvent(Events.INFO, "ExposureNotificationRepeater - No PendingIntent found")
             return
