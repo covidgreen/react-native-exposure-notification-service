@@ -601,18 +601,15 @@ class ExposureCheck: AsyncOperation {
       content.body = self.configData.notificationDesc
       content.badge = 1
       content.sound = .default
-      
-      let trigger = UNTimeIntervalNotificationTrigger(
-        timeInterval: TimeInterval(self.configData.notificationRepeat * 60),
-                    repeats: true)
-        
-        let initialRequest = UNNotificationRequest(identifier: ExposureCheck.INITIAL_NOTIFICATION_ID, content: content, trigger: nil)
+              
+      let initialRequest = UNNotificationRequest(identifier: ExposureCheck.INITIAL_NOTIFICATION_ID, content: content, trigger: nil)
       UNUserNotificationCenter.current().add(initialRequest) { error in
             DispatchQueue.main.async {
                 if let error = error {
                   os_log("Notification error %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
                 }
                 if (self.configData.notificationRepeat > 0) {
+                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(self.configData.notificationRepeat * 60), repeats: true)
                     let request = UNNotificationRequest(identifier: ExposureCheck.REPEAT_NOTIFICATION_ID, content: content, trigger: trigger)
                     UNUserNotificationCenter.current().add(request) { error in
                         DispatchQueue.main.async {
