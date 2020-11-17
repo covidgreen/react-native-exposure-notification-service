@@ -295,11 +295,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const configure = async () => {
     try {
-      const iosLimit =
-        traceConfiguration.fileLimitiOS > 0
-          ? traceConfiguration.fileLimitiOS
-          : traceConfiguration.fileLimit;
-
       const config = {
         exposureCheckFrequency: traceConfiguration.exposureCheckInterval,
         serverURL: serverUrl,
@@ -308,8 +303,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         authToken,
         refreshToken,
         storeExposuresFor: traceConfiguration.storeExposuresFor,
-        fileLimit:
-          Platform.OS === 'ios' ? iosLimit : traceConfiguration.fileLimit,
         notificationTitle,
         notificationDesc: notificationDescription,
         callbackNumber,

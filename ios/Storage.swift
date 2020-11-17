@@ -16,7 +16,6 @@ public class Storage {
         let notificationTitle: String
         let notificationDesc: String
         var authToken: String
-        var fileLimit: Int
         var notificationRepeat: Int
         var datesLastRan: String!
         var lastExposureIndex: Int!
@@ -105,7 +104,6 @@ public class Storage {
               notificationTitle: data[0].value(forKey: "notificationTitle") as! String,
               notificationDesc: data[0].value(forKey: "notificationDesc") as! String,
               authToken: authToken,
-              fileLimit: data[0].value(forKey: "fileLimit") as! Int,
               notificationRepeat: data[0].value(forKey: "notificationRepeat") as? Int ?? 0,
               datesLastRan: data[0].value(forKey: "datesLastRan") as? String ?? "",
               lastExposureIndex: data[0].value(forKey: "lastIndex") as? Int,
@@ -320,7 +318,6 @@ public class Storage {
          managedObject.setValue(config.notificationTitle, forKey: "notificationTitle")
          managedObject.setValue(config.notificationDesc, forKey: "notificationDesc")
          managedObject.setValue(config.analyticsOptin, forKey: "analyticsOptin")
-         managedObject.setValue(config.fileLimit, forKey: "fileLimit")
          managedObject.setValue(config.notificationRepeat, forKey: "notificationRepeat")
         
          managedObject.setValue(lastKeyError, forKey: "lastKeyError")

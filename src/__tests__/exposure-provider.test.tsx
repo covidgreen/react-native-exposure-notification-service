@@ -102,9 +102,7 @@ const mockConfig = {
   refreshToken: 'testRefreshToken',
   traceConfiguration: {
     exposureCheckInterval: 180,
-    storeExposuresFor: 14,
-    fileLimit: 1,
-    fileLimitiOS: 3
+    storeExposuresFor: 14
   },
   notificationTitle: 'testNotificationTitle',
   notificationDescription: 'testNotificationDescription',
@@ -215,7 +213,6 @@ describe('<ExposureProvider />', () => {
       callbackNumber: mockConfig.callbackNumber,
       exposureCheckFrequency:
         mockConfig.traceConfiguration.exposureCheckInterval,
-      fileLimit: mockConfig.traceConfiguration.fileLimitiOS,
       notificationDesc: mockConfig.notificationDescription,
       notificationTitle: mockConfig.notificationTitle,
       refreshToken: mockConfig.refreshToken,
@@ -395,7 +392,6 @@ describe('useExposure', () => {
         callbackNumber: mockConfig.callbackNumber,
         exposureCheckFrequency:
           mockConfig.traceConfiguration.exposureCheckInterval,
-        fileLimit: mockConfig.traceConfiguration.fileLimitiOS,
         notificationDesc: mockConfig.notificationDescription,
         notificationTitle: mockConfig.notificationTitle,
         refreshToken: mockConfig.refreshToken,

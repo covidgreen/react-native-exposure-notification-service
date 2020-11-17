@@ -59,7 +59,6 @@ public class ExposureNotificationModule: RCTEventEmitter {
         notificationTitle: configDict["notificationTitle"] as? String ?? "Close Contact Warning",
         notificationDesc: configDict["notificationDesc"] as? String ?? "The COVID Tracker App has detected that you may have been exposed to someone who has tested positive for COVID-19.",
         authToken: token,
-        fileLimit: configDict["fileLimit"] as? Int ?? 3,
         notificationRepeat: configDict["notificationRepeat"] as? Int ?? 0,
         callbackNumber: configDict["callbackNumber"] as? String ?? "",
         analyticsOptin: configDict["analyticsOptin"] as? Bool ?? false

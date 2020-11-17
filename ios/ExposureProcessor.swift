@@ -240,7 +240,6 @@ public class ExposureProcessor {
       data["keyServerURL"] = config.keyServerUrl
       data["serverType"] = config.keyServerType.rawValue
       data["analyticsOptin"] = config.analyticsOptin
-      data["fileLimit"] = config.fileLimit
       data["keychainGetError"] = config.lastKeyChainGetError
       data["keychainSetError"] = config.lastKeyChainSetError
       data["lastExposureIndex"] = config.lastExposureIndex

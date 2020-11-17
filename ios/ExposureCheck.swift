@@ -22,6 +22,7 @@ class ExposureCheck: AsyncOperation {
       let thresholdWeightings: [Double]
       let timeThreshold: Int
       let numFiles: Int
+      let contiguousMode: Bool
     }
     
     private struct CodableSettings: Decodable {
@@ -40,7 +41,6 @@ class ExposureCheck: AsyncOperation {
         let transmissionRiskWeight: Double
         let durationAtAttenuationThresholds: [Int]
         let thresholdWeightings: [Double]
-        let thresholdWeightingsv2: [Double]
         let numFilesiOS: Int
         let timeThreshold: Int
         let immediateDurationWeight: Double
@@ -59,6 +59,7 @@ class ExposureCheck: AsyncOperation {
         let infectiousnessForDaysSinceOnsetOfSymptoms: [Int]
         let attenuationDurationThresholds: [Int]
         let v2Mode: Bool
+        let contiguousMode: Bool
     }
   
     private struct CodableExposureFiles: Codable {
@@ -609,7 +610,7 @@ class ExposureCheck: AsyncOperation {
                 let codableExposureConfiguration = try JSONDecoder().decode(CodableExposureConfiguration.self, from: exposureData.exposureConfig.data(using: .utf8)!)
                 let exposureConfiguration = ENExposureConfiguration()
                 
-                var thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS)
+                var thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS, contiguousMode: codableExposureConfiguration.contiguousMode)
 
                 exposureConfiguration.minimumRiskScore = codableExposureConfiguration.minimumRiskScore
                 exposureConfiguration.attenuationLevelValues = codableExposureConfiguration.attenuationLevelValues as [NSNumber]

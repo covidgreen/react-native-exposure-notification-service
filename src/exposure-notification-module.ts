@@ -22,7 +22,6 @@ export interface ConfigurationOptions {
   authToken: string;
   refreshToken: string;
   storeExposuresFor: number;
-  fileLimit: number;
   notificationTitle: string;
   notificationDesc: string;
   callbackNumber: string;

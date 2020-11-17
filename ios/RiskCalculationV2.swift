@@ -21,14 +21,23 @@ class RiskCalculationV2 {
         extractExposureWindowData(summary, configuration, thresholds, mostRecent.date) { result in
             switch result {
                case let .success(windows):
-                  completion(.success(constructSummaryInfo(mostRecent, windows)))
+                if thresholds.contiguousMode {
+                    if windows.filter({ $0.scanData.exceedsThreshold }).count > 0 {
+                        completion(.success(constructSummaryInfo(mostRecent, windows)))
+                    } else {
+                        os_log("V2 - Running in Contiguous mode, no contiguos match", log: OSLog.checkExposure, type: .info)
+
+                        completion(.success(nil))
+                    }
+                } else {
+                    completion(.success(constructSummaryInfo(mostRecent, windows)))
+                }
                case let .failure(error):
                   completion(.failure(error))
             }
         }
-
     }
-
+    
     private static func wrapError(_ description: String, _ error: Error?) -> Error {
       
       if let err = error {
@@ -85,7 +94,7 @@ class RiskCalculationV2 {
                 
                 return ExposureProcessor.ExposureDetailsWindow(date: dayDate, calibrationConfidence: window.calibrationConfidence.rawValue, diagnosisReportType: window.diagnosisReportType.rawValue, infectiousness: window.infectiousness.rawValue, scanData: scan)
             }
-            
+                        
             return completion(.success(windowList))
         }
 
