@@ -492,7 +492,7 @@ Calls `ExposureNotificationModule.configure()`
 
 ##### `checkExposure()`
 
-`(readDetails: boolean, skipTimeCheck: boolean) => void`
+`(skipTimeCheck: boolean) => void`
 
 Calls `ExposureNotificationModule.checkExposure()`
 

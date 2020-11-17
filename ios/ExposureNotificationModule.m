@@ -45,8 +45,7 @@ RCT_EXTERN_METHOD(getCloseContacts:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(getLogData:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(checkExposure:(BOOL *)readExposureDetails
-                  :(BOOL *)skipTimeCheck)
+RCT_EXTERN_METHOD(checkExposure:(BOOL *)skipTimeCheck)
 
 RCT_EXTERN_METHOD(deleteAllData:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

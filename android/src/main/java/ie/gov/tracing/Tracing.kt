@@ -147,8 +147,6 @@ object Tracing {
         var resolutionPromise: Promise? = null
         var startPromise: Promise? = null
 
-        private var extraDetails = false
-
         @JvmStatic
         fun setExposureStatus(status: String, reason: String = "") {
             var changed = false
@@ -390,16 +388,13 @@ object Tracing {
         }
 
         @JvmStatic
-        fun checkExposure(readExposureDetails: Boolean = false, skipTimeCheck: Boolean = false) {
-            extraDetails = readExposureDetails
+        fun checkExposure(skipTimeCheck: Boolean = false) {
             ProvideDiagnosisKeysWorker.startOneTimeWorkRequest(skipTimeCheck)
         }
 
         @JvmStatic
         fun simulateExposure(timeDelay: Long = 0) {
-            extraDetails = false
             StateUpdatedWorker.simulateExposure(timeDelay)
-
         }
 
         @JvmStatic

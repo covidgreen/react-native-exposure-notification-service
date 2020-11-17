@@ -4,48 +4,21 @@ import ExposureNotification
 @available(iOS 13.7, *)
 class RiskCalculationV2 {
     
-    public struct Thresholds {
-      let thresholdWeightings: [Double]
-      let timeThreshold: Int
-    }
-    
-    private struct ScanData {
-        var buckets: [Int]
-        var exceedsThresholds: Bool
-    }
-    
-    private struct WindowData {
-        let date: Date
-        let calibrationConfidence: ENCalibrationConfidence
-        let diagnosisReportType: ENDiagnosisReportType
-        let infectiousness: ENInfectiousness
-        var cumulativeScans: ScanData
-        var contiguousScans: [ScanData]
-    }
-    
-    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ attenuationRanges: [NSNumber], _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo), Error>) -> Void)
+    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo?), Error>) -> Void)
     {
         guard summary.daySummaries.count > 0 else {
-            return completion(.failure(wrapError("V2 - No daily summaries, no exposures detected", nil)))
+            os_log("V2 - No daily summaries returned, no exposures matched", log: OSLog.checkExposure, type: .info)
+            return completion(.success(nil))
         }
         
-        var mostRecentDay: ENExposureDaySummary?
+        let aboveThresholdDays = summary.daySummaries.filter({ Int(($0.daySummary.weightedDurationSum / 60.0)) > thresholds.timeThreshold}).sorted(by: { $0.date > $1.date })
         
-        for day in summary.daySummaries {
-            if (day.daySummary.weightedDurationSum / 60.0) > 30 {
-                if mostRecentDay == nil {
-                    mostRecentDay = day
-                } else if mostRecentDay!.date < day.date {
-                    mostRecentDay = day
-                }
-            }
+        guard let mostRecent = aboveThresholdDays.first else {
+            os_log("V2 - No daily summary meeting duration threshold", log: OSLog.checkExposure, type: .info)
+            return completion(.success(nil))
         }
         
-        guard let mostRecent = mostRecentDay else {
-            return completion(.failure(wrapError("V2 - No daily summary meeting duration detected", nil)))
-        }
-        
-        extractExposureWindowData(summary, attenuationRanges, thresholds) { result in
+        extractExposureWindowData(summary, configuration, thresholds, mostRecent.date) { result in
             switch result {
                case let .success(windows):
                   completion(.success(constructSummaryInfo(mostRecent, windows)))
@@ -66,22 +39,35 @@ class RiskCalculationV2 {
       }
     }
     
-    private static func constructSummaryInfo(_ day: ENExposureDaySummary, _ windows: [WindowData]) -> ExposureProcessor.ExposureInfo {
+    private static func constructSummaryInfo(_ day: ENExposureDaySummary, _ windows: [ExposureProcessor.ExposureDetailsWindow]) -> ExposureProcessor.ExposureInfo {
+        
         let calendar = Calendar.current
         let components = calendar.dateComponents([.day], from: day.date, to: Date())
         
-        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations:windows[0].cumulativeScans.buckets, matchedKeyCount: 1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: Date())
+        let summedDurations = sumDurations(windows)
+        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: summedDurations.buckets, matchedKeyCount: -1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: Date())
         
-        info.customAttenuationDurations = windows[0].cumulativeScans.buckets
+        info.customAttenuationDurations = summedDurations.buckets
         info.riskScoreSumFullRange = Int(day.daySummary.scoreSum)
-
-        os_log("Exposure detected", log: OSLog.checkExposure, type: .debug)
+        info.windows = windows
         
+        os_log("Exposure detected", log: OSLog.checkExposure, type: .debug)
         
         return info
     }
+        
+    private static func sumDurations(_ windows: [ExposureProcessor.ExposureDetailsWindow]) -> ExposureProcessor.ExposureScanData {
+        var data: ExposureProcessor.ExposureScanData = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], exceedsThreshold: false)
+        
+        for window in windows {
+            for (index, element) in window.scanData.buckets.enumerated() {
+                data.buckets[index] += element
+            }
+        }
+        return data
+    }
     
-    private static func extractExposureWindowData(_ summary: ENExposureDetectionSummary, _ attenuations: [NSNumber], _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<([WindowData]), Error>) -> Void) {
+    private static func extractExposureWindowData(_ summary: ENExposureDetectionSummary, _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds, _ dayDate: Date, _ completion: @escaping  (Result<([ExposureProcessor.ExposureDetailsWindow]), Error>) -> Void) {
     
         ExposureManager.shared.manager.getExposureWindows(summary: summary) { exposureWindows, error in
       
@@ -92,48 +78,35 @@ class RiskCalculationV2 {
             guard let windows = exposureWindows else {
                 return completion(.failure(wrapError("No exposure window data available", nil)))
             }
-      
-            var windowList: [WindowData] = []
+            
+            let matchWindows = windows.filter({$0.date == dayDate})
+            let windowList: [ExposureProcessor.ExposureDetailsWindow] = matchWindows.map { window in
+                let scan = buildScanData(window.scanInstances, configuration, thresholds)
                 
-            for window in windows {
-                let scan = buildScanData(window.scanInstances, attenuations, thresholds)
-                var item = windowList.first(where: {$0.date == window.date})
-                
-                if item == nil {
-                    item = WindowData(date: window.date, calibrationConfidence: window.calibrationConfidence, diagnosisReportType: window.diagnosisReportType, infectiousness: window.infectiousness, cumulativeScans: ScanData(buckets: [0,0,0,0], exceedsThresholds: false), contiguousScans: [])
-                    windowList.append(item!)
-                }
-                
-                for (index, element) in scan.buckets.enumerated() {
-                    item!.cumulativeScans.buckets[index] += element
-                }
-                item!.contiguousScans.append(scan)
+                return ExposureProcessor.ExposureDetailsWindow(date: dayDate, calibrationConfidence: window.calibrationConfidence.rawValue, diagnosisReportType: window.diagnosisReportType.rawValue, infectiousness: window.infectiousness.rawValue, scanData: scan)
             }
             
-
             return completion(.success(windowList))
         }
 
     }
     
-    private static func buildScanData(_ scanInstances: [ENScanInstance], _ attenuations: [NSNumber], _ thresholds: ExposureCheck.Thresholds) -> ScanData {
+    private static func buildScanData(_ scanInstances: [ENScanInstance], _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds) -> ExposureProcessor.ExposureScanData {
         
-        var data: ScanData = ScanData(buckets: [0, 0, 0, 0], exceedsThresholds: false)
+        var data = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], exceedsThreshold: false)
+        let thresholdWeightings = [configuration.immediateDurationWeight, configuration.nearDurationWeight, configuration.mediumDurationWeight, configuration.otherDurationWeight]
         
         for scan in scanInstances {
-            for (index, element) in attenuations.enumerated() {
+            for (index, element) in configuration.attenuationDurationThresholds.enumerated() {
                 if scan.typicalAttenuation <= Int(truncating: element) {
-                    data.buckets[index] += scan.secondsSinceLastScan
+                    data.buckets[index] += scan.secondsSinceLastScan / 60 * Int(thresholdWeightings[index] / 100.0)
                     break
                 }
             }
         }
-        var contactTime = 0
-        for (index, element) in data.buckets.enumerated() {
-          contactTime += Int(Double(element) * thresholds.thresholdWeightings[index])
-        }
-        if contactTime >= thresholds.timeThreshold {
-            data.exceedsThresholds = true
+        let contactTime = data.buckets.reduce(0, +)
+        if Int(contactTime) >= thresholds.timeThreshold {
+            data.exceedsThreshold = true
         }
         return data
     }

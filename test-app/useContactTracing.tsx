@@ -101,7 +101,7 @@ export default function useContactTracing() {
     const checkExposure = async () => {
         loading()
         try {
-            ExposureNotificationModule.checkExposure(false, true)
+            ExposureNotificationModule.checkExposure(true)
             setResult(`checkExposure: called`)
         } catch(e) {
             setResult(`checkExposure - Error: ${e}`)

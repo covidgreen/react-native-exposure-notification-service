@@ -4,10 +4,11 @@ import ExposureNotification
 @available(iOS 13.5, *)
 class RiskCalculationV1 {
     
-    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo), Error>) -> Void) {
+    public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo?), Error>) -> Void) {
         
         guard summary.matchedKeyCount > 0 else {
-            return completion(.failure(wrapError("V1 - No keys matched, no exposures detected", nil)))
+            os_log("V1 - No keys matched, no exposures detected", log: OSLog.checkExposure, type: .info)
+            return completion(.success(nil))
         }
         var contactTime = 0
         let info = constructSummaryInfo(summary)
@@ -26,7 +27,8 @@ class RiskCalculationV1 {
         if contactTime >= thresholds.timeThreshold && summary.maximumRiskScoreFullRange > 0 {
             return completion(.success(info))
         } else {
-            return completion(.failure(wrapError("V1 - Duration did not exceed threshold or risk score was not met", nil)))
+            os_log("V1 - Duration did not exceed threshold or risk score was not met", log: OSLog.checkExposure, type: .info)
+            return completion(.success(nil))
         }
     }
 

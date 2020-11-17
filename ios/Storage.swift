@@ -409,11 +409,10 @@ public class Storage {
         managedObject.setValue(attenuations.joined(separator: ","), forKey: "attenuations")
         
         let encoder = JSONEncoder()
-        
-        if exposureInfo.details != nil {
-          if let jsonData = try? encoder.encode(exposureInfo.details) {
+        if exposureInfo.windows != nil {
+          if let jsonData = try? encoder.encode(exposureInfo.windows) {
             let coded = String(data: jsonData, encoding: .utf8)
-            managedObject.setValue(coded, forKey: "exposureDetails")
+            managedObject.setValue(coded, forKey: "exposureWindows")
           }
         }
         try context.save()
@@ -449,13 +448,14 @@ public class Storage {
               maximumRiskScoreFullRange: exposure.value(forKey: "maximumRiskScoreFullRange") as? Int ?? 0,
               riskScoreSumFullRange: exposure.value(forKey: "riskScoreSumFullRange") as? Int ?? 0,
               customAttenuationDurations: customAttenuations)
-          
-          if exposure.value(forKey: "exposureDetails") != nil {
-            let details = exposure.value(forKey: "exposureDetails") as! String
-            let decoder = JSONDecoder()
-            let data = try? decoder.decode([ExposureProcessor.ExposureDetails].self, from: details.data(using: .utf8)!)
-            info.details = data
+            
+          if exposure.value(forKey: "exposureWindows") != nil {
+              let details = exposure.value(forKey: "exposureWindows") as! String
+              let decoder = JSONDecoder()
+              let data = try? decoder.decode([ExposureProcessor.ExposureDetailsWindow].self, from: details.data(using: .utf8)!)
+              info.windows = data
           }
+          
           return info
         }
       } catch  {

@@ -91,7 +91,7 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
 
   getDiagnosisKeys(): Promise<DiagnosisKey[]>;
 
-  checkExposure(readDetails?: boolean, skipTimeCheck?: boolean): void;
+  checkExposure(skipTimeCheck?: boolean): void;
 
   simulateExposure(timeDelay?: number): void;
 

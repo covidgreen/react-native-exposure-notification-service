@@ -103,17 +103,15 @@ class ExposureCheck: AsyncOperation {
     private let defaultSession = URLSession(configuration: .default)
     private var dataTask: URLSessionDataTask?
     private var configData: Storage.Config!
-    private var readExposureDetails: Bool = false
     private var skipTimeCheck: Bool = false
     private var simulateExposureOnly: Bool = false
     private let storageContext = Storage.PersistentContainer.shared.newBackgroundContext()
     private var sessionManager: Session!
     
-    init(_ skipTimeCheck: Bool, _ accessDetails: Bool, _ simulateExposureOnly: Bool) {
+    init(_ skipTimeCheck: Bool, _ simulateExposureOnly: Bool) {
         super.init()
     
         self.skipTimeCheck = skipTimeCheck
-        self.readExposureDetails = accessDetails
         self.simulateExposureOnly = simulateExposureOnly
     }
     
@@ -131,7 +129,7 @@ class ExposureCheck: AsyncOperation {
        let serverDomain: String = Storage.getDomain(self.configData.serverURL)
        let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
        var manager: ServerTrustManager
-       if (self.configData.keyServerType != Storage.KeyServerType.NearForm) {
+       if (self.configData.keyServerType != Storage.KeyServerType.NearForm && serverDomain != keyServerDomain) {
           manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator(), keyServerDomain: DefaultTrustEvaluator()])
        } else {
           manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
@@ -229,8 +227,11 @@ class ExposureCheck: AsyncOperation {
     }
   
     private func processExposures(_ files: [URL], _ lastIndex: Int, _ configuration: ENExposureConfiguration, _ thresholds: Thresholds, _ v2Mode: Bool) {
-            
+       
+        os_log("Checking exposures against %d files", log: OSLog.checkExposure, type: .info, files.count)
+        
        ExposureManager.shared.manager.detectExposures(configuration: configuration, diagnosisKeyURLs: files) { summary, error in
+           
            self.deleteLocalFiles(files)
            if let error = error {
               return self.finishProcessing(.failure(self.wrapError("Failure in detectExposures", error)))
@@ -242,7 +243,7 @@ class ExposureCheck: AsyncOperation {
            }
         
             if #available(iOS 13.7, *), v2Mode {
-                RiskCalculationV2.calculateRisk(summaryData, configuration.attenuationDurationThresholds, thresholds) { result in
+                RiskCalculationV2.calculateRisk(summaryData, configuration, thresholds) { result in
                     switch result {
                         case let .success(exposureInfo):
                             return self.finishProcessing(.success((exposureInfo, lastIndex)))
@@ -623,9 +624,7 @@ class ExposureCheck: AsyncOperation {
                 let meta:[AnyHashable: Any] = [AnyHashable("attenuationDurationThresholds"): codableExposureConfiguration.durationAtAttenuationThresholds as [NSNumber]]
                 exposureConfiguration.metadata = meta
                 
-                if #available(iOS 13.7, *), codableExposureConfiguration.v2Mode {
-                    thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightingsv2, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS)
-                    
+                if #available(iOS 13.7, *), codableExposureConfiguration.v2Mode {                    
                     exposureConfiguration.immediateDurationWeight =  codableExposureConfiguration.immediateDurationWeight
                     exposureConfiguration.nearDurationWeight =  codableExposureConfiguration.nearDurationWeight
                     exposureConfiguration.mediumDurationWeight =  codableExposureConfiguration.mediumDurationWeight
@@ -633,7 +632,7 @@ class ExposureCheck: AsyncOperation {
 
                     exposureConfiguration.infectiousnessStandardWeight =  codableExposureConfiguration.infectiousnessStandardWeight
                     exposureConfiguration.infectiousnessHighWeight =   codableExposureConfiguration.infectiousnessHighWeight
-                                        
+                  
                     exposureConfiguration.reportTypeConfirmedTestWeight =  codableExposureConfiguration.reportTypeConfirmedTestWeight
                     exposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight =  codableExposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight
                     exposureConfiguration.reportTypeSelfReportedWeight =  codableExposureConfiguration.reportTypeSelfReportedWeight
@@ -641,7 +640,7 @@ class ExposureCheck: AsyncOperation {
 
                     exposureConfiguration.daysSinceLastExposureThreshold =  codableExposureConfiguration.daysSinceLastExposureThreshold
 
-                    exposureConfiguration.minimumRiskScoreFullRange = codableExposureConfiguration.minimumRiskScoreFullRange
+                    exposureConfiguration.minimumRiskScoreFullRange =  codableExposureConfiguration.minimumRiskScoreFullRange
 
                     exposureConfiguration.attenuationDurationThresholds =  codableExposureConfiguration.attenuationDurationThresholds as [NSNumber]
 

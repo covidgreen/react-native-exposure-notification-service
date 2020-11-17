@@ -206,9 +206,9 @@ public class ExposureNotificationModule: RCTEventEmitter {
     @objc public func simulateExposure(_ timeDelay: Int) {
         
         if #available(iOS 13.5, *) {
-            os_log("Reqwuest to simulate exposure after %f", log: OSLog.setup, type: .debug, timeDelay)
+            os_log("Request to simulate exposure after %f", log: OSLog.setup, type: .debug, timeDelay)
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(timeDelay)) {
-                ExposureProcessor.shared.checkExposureForeground(false, true, true)
+                ExposureProcessor.shared.checkExposureForeground(true, true)
             }
         }
     }
@@ -217,13 +217,13 @@ public class ExposureNotificationModule: RCTEventEmitter {
          if #available(iOS 13.5, *) {
             ExposureProcessor.shared.registerBackgroundProcessing()
          } else {
-             os_log("Skipping regustering backgroiund as not 13.5 or higher", log: OSLog.setup, type: .debug)
+             os_log("Skipping registering background as not 13.5 or higher", log: OSLog.setup, type: .debug)
         }
     }
      
-    @objc public func checkExposure(_ readExposureDetails: Bool, _ skipTimeCheck: Bool) {
+    @objc public func checkExposure(_ skipTimeCheck: Bool) {
         if #available(iOS 13.5, *) {
-            ExposureProcessor.shared.checkExposureForeground(readExposureDetails, skipTimeCheck, false)
+            ExposureProcessor.shared.checkExposureForeground(skipTimeCheck, false)
         }
     }
      

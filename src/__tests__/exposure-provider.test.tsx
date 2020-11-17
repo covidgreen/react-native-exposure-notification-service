@@ -422,11 +422,10 @@ describe('useExposure', () => {
       const {result} = await renderExposureHook();
       mocked(ExposureNotificationModule.checkExposure).mockClear();
       await act(async () => {
-        await result.current.checkExposure(true, true);
+        await result.current.checkExposure(true);
       });
       expect(ExposureNotificationModule.checkExposure).toHaveBeenCalledTimes(1);
       expect(ExposureNotificationModule.checkExposure).toHaveBeenCalledWith(
-        true,
         true
       );
     });
