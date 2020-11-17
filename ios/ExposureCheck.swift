@@ -350,8 +350,9 @@ class ExposureCheck: AsyncOperation {
       }
 
       let lastId = self.configData.lastExposureIndex ?? 0
+      let version = Storage.shared.version()["display"] ?? "unknown"
       os_log("Checking for exposures against nearform server since %d, limit %d", log: OSLog.checkExposure, type: .debug, lastId, numFiles)
-      self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": numFiles])
+      self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": numFiles, "version": version])
       .validate()
       .responseDecodable(of: [CodableExposureFiles].self) { response in
         switch response.result {
@@ -598,8 +599,8 @@ class ExposureCheck: AsyncOperation {
       guard !self.isCancelled else {
         return self.cancelProcessing()
       }
-      
-      self.sessionManager.request(self.serverURL(.settings))
+      let version = Storage.shared.version()["display"] ?? "unknown"
+      self.sessionManager.request(self.serverURL(.settings), parameters: ["version": version])
           .validate()
           .responseDecodable(of: CodableSettings.self) { response in
           
@@ -610,7 +611,7 @@ class ExposureCheck: AsyncOperation {
                 let codableExposureConfiguration = try JSONDecoder().decode(CodableExposureConfiguration.self, from: exposureData.exposureConfig.data(using: .utf8)!)
                 let exposureConfiguration = ENExposureConfiguration()
                 
-                var thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS, contiguousMode: codableExposureConfiguration.contiguousMode)
+                let thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS, contiguousMode: codableExposureConfiguration.contiguousMode)
 
                 exposureConfiguration.minimumRiskScore = codableExposureConfiguration.minimumRiskScore
                 exposureConfiguration.attenuationLevelValues = codableExposureConfiguration.attenuationLevelValues as [NSNumber]
@@ -746,7 +747,8 @@ class ExposureCheck: AsyncOperation {
         return completion(.success(true))
       }
            
-      self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload], encoding: JSONEncoding.default)
+      let version = Storage.shared.version()["display"] ?? "unknown"
+      self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload, "version": version], encoding: JSONEncoding.default)
         .validate()
         .response() { response in
           switch response.result {
