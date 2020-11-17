@@ -710,17 +710,29 @@ class ExposureCheck: AsyncOperation {
             }
       }
     
-      let payload:[String: Any] = [
+      var payload:[String: Any] = [
         "matchedKeys": exposures.matchedKeyCount,
         "attenuations": exposures.customAttenuationDurations ?? exposures.attenuationDurations,
         "maxRiskScore": exposures.maxRiskScore,
         "daysSinceExposure": exposures.daysSinceLastExposure
       ]
+        
+      if let windowData = exposures.windows {
+          let windowInfo = windowData.compactMap { window -> [String: Any]? in
+           return ["date": Int64(window.date.timeIntervalSince1970 * 1000.0),
+                   "calibrationConfidence": window.calibrationConfidence,
+                   "diagnosisReportType": window.diagnosisReportType,
+                   "infectiousness": window.infectiousness,
+                   "buckets": window.scanData.buckets,
+                   "exceedsThreshold": window.scanData.exceedsThreshold
+            ]
+          }
+          payload["windows"] = windowInfo
+      }
       self.saveMetric(event: "CONTACT_NOTIFICATION", payload: payload) { _ in
         let lastExposure = calendar.date(byAdding: .day, value: (0 - exposures.daysSinceLastExposure), to: dateToday)
         self.triggerCallBack(lastExposure!, exposures.daysSinceLastExposure, payload, completion)
       }
-      
     }
   
     private func triggerCallBack(_ lastExposure: Date, _ daysSinceExposure: Int, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
