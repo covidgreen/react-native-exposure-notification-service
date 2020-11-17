@@ -2,14 +2,18 @@ export {
   ExposureProvider,
   ExposureContext,
   ExposureContextValue,
-  useExposure
+  useExposure,
+  getBundleId,
+  getVersion,
+  getConfigData
 } from './exposure-provider';
 
 export {
   TraceConfiguration,
   PermissionStatus,
   PermissionDetails,
-  ExposurePermissions
+  ExposurePermissions,
+  Version
 } from './types';
 
 export {

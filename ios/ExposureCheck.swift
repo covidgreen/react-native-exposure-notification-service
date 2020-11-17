@@ -6,6 +6,9 @@ import Alamofire
 
 @available(iOS 13.5, *)
 class ExposureCheck: AsyncOperation {
+    public static let REPEAT_NOTIFICATION_ID = "repeatExposure"
+    public static let INITIAL_NOTIFICATION_ID = "exposure"
+      
     public enum endPoints {
         case metrics
         case exposures
@@ -100,17 +103,12 @@ class ExposureCheck: AsyncOperation {
     }
        
     override func main() {
-      self.configData = Storage.shared.readSettings(self.storageContext)
+       self.configData = Storage.shared.readSettings(self.storageContext)
        guard self.configData != nil else {
-          self.finishNoProcessing("No config set so can't proceeed with checking exposures", false)
+          self.finishNoProcessing("No config set so can't proceed with checking exposures", false)
           return
        }
-
-       guard ENManager.authorizationStatus == .authorized else {
-            self.finishNoProcessing("Not authorised so can't run exposure checks")
-            return
-       }
-      
+ 
        let serverDomain: String = Storage.getDomain(self.configData.serverURL)
        let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
        var manager: ServerTrustManager
@@ -122,14 +120,24 @@ class ExposureCheck: AsyncOperation {
        self.sessionManager = Session(interceptor: RequestInterceptor(self.configData, self.serverURL(.refresh)), serverTrustManager: manager)
         
        os_log("Running with params %@, %@, %@", log: OSLog.checkExposure, type: .debug, self.configData.serverURL, self.configData.authToken, self.configData.refreshToken)
-       
-       guard (self.configData.lastRunDate!.addingTimeInterval(TimeInterval(self.configData.checkExposureInterval * 60)) < Date() || self.skipTimeCheck) else {
+               
+       /*guard (self.configData.lastRunDate!.addingTimeInterval(TimeInterval(self.configData.checkExposureInterval * 60)) < Date() || self.skipTimeCheck) else {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
             self.finishNoProcessing("Check was run at \(formatter.string(from: self.configData.lastRunDate!)), interval is \(self.configData.checkExposureInterval), its too soon to check again", false)
             return
+       }*/
+
+       guard ENManager.authorizationStatus == .authorized else {
+            self.finishNoProcessing("Not authorised so can't run exposure checks")
+            return
        }
-      
+
+       guard !ExposureManager.shared.isPaused() else {
+            self.finishNoProcessing("ENS is paused", false)
+            return
+       }
+        
        // clean out any expired exposures
        Storage.shared.deleteOldExposures(self.configData.storeExposuresFor)
         
@@ -218,29 +226,7 @@ class ExposureCheck: AsyncOperation {
                    os_log("Success in checking exposures, %d, %d, %d, %d, %d", log: OSLog.checkExposure, type: .debug, info.daysSinceLastExposure, info.matchedKeyCount, info.attenuationDurations.count,
                        info.maxRiskScore, self.readExposureDetails)
                    
-                   if info.matchedKeyCount > 0 && !self.readExposureDetails {
-                      return self.finishProcessing(.success((info, lastIndex, thresholds)))
-                   }
-                   os_log("Reading exposure details, only used in test", log: OSLog.checkExposure, type: .debug)
-                   
-                   let userExplanation = "To help with testing we are requesting more detailed information on the exposure event."
-                   ExposureManager.shared.manager.getExposureInfo(summary: summary!, userExplanation: userExplanation) { exposures, error in
-                           if let error = error {
-                            self.finishProcessing(.failure(self.wrapError("Error calling getExposureInfo", error)))
-                              return
-                           }
-                           let exposureData = exposures!.map { exposure in
-                              ExposureProcessor.ExposureDetails(date: exposure.date,
-                                        duration: exposure.duration,
-                                        totalRiskScore: exposure.totalRiskScore,
-                                        transmissionRiskLevel: exposure.transmissionRiskLevel,
-                                        attenuationDurations: self.convertDurations(exposure.attenuationDurations),
-                                        attenuationValue: exposure.attenuationValue)
-                           }
-                           info.details = exposureData
-                           self.finishProcessing(.success((info, lastIndex, thresholds)))
-                   }
-                  
+                   return self.finishProcessing(.success((info, lastIndex, thresholds)))                 
                }
                
             case let .failure(error):
@@ -615,59 +601,64 @@ class ExposureCheck: AsyncOperation {
       content.body = self.configData.notificationDesc
       content.badge = 1
       content.sound = .default
-      let request = UNNotificationRequest(identifier: "exposure", content: content, trigger: nil)
-      UNUserNotificationCenter.current().add(request) { error in
-          DispatchQueue.main.async {
-              if let error = error {
-                os_log("Notification error %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
-              }
-          }
+              
+      let initialRequest = UNNotificationRequest(identifier: ExposureCheck.INITIAL_NOTIFICATION_ID, content: content, trigger: nil)
+      UNUserNotificationCenter.current().add(initialRequest) { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                  os_log("Notification error %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+                }
+                if (self.configData.notificationRepeat > 0) {
+                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(self.configData.notificationRepeat * 60), repeats: true)
+                    let request = UNNotificationRequest(identifier: ExposureCheck.REPEAT_NOTIFICATION_ID, content: content, trigger: trigger)
+                    UNUserNotificationCenter.current().add(request) { error in
+                        DispatchQueue.main.async {
+                            if let error = error {
+                              os_log("Repeat Notification error %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+                            }
+                        }
+                    }
+                }
+            }
       }
     
       let payload:[String: Any] = [
         "matchedKeys": exposures.matchedKeyCount,
         "attenuations": exposures.customAttenuationDurations ?? exposures.attenuationDurations,
-        "maxRiskScore": exposures.maxRiskScore
+        "maxRiskScore": exposures.maxRiskScore,
+        "daysSinceExposure": exposures.daysSinceLastExposure
       ]
       self.saveMetric(event: "CONTACT_NOTIFICATION", payload: payload) { _ in
         let lastExposure = calendar.date(byAdding: .day, value: (0 - exposures.daysSinceLastExposure), to: dateToday)
-        self.triggerCallBack(lastExposure!, payload, completion)
+        self.triggerCallBack(lastExposure!, exposures.daysSinceLastExposure, payload, completion)
       }
       
     }
   
-  private func triggerCallBack(_ lastExposure: Date, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
-    guard !self.isCancelled else {
-      return self.cancelProcessing()
-    }
-    
-    guard let callbackNum = self.configData.callbackNumber, !callbackNum.isEmpty else {
-      os_log("No callback number configured", log: OSLog.checkExposure, type: .info)
-      return completion(.success(true))
-    }
-   
-    let notificationRaised = self.configData.notificationRaised
-    
-    guard !(notificationRaised ?? false) else {
-      os_log("Callback number already sent to server", log: OSLog.checkExposure, type: .info)
-      return completion(.success(true))
-    }
-    
-    self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "payload": payload], encoding: JSONEncoding.default)
-      .validate()
-      .response() { response in
-        switch response.result {
-        case .success:
-          os_log("Request for callback sent", log: OSLog.checkExposure, type: .debug)
-          Storage.shared.flagNotificationRaised(self.storageContext)
-          completion(.success(true))
-        case let .failure(error):
-          os_log("Unable to send callback request, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
-          completion(.failure(error))
+    private func triggerCallBack(_ lastExposure: Date, _ daysSinceExposure: Int, _ payload: [String: Any], _ completion: @escaping  (Result<Bool, Error>) -> Void) {
+      guard !self.isCancelled else {
+        return self.cancelProcessing()
+      }
+      
+      guard let callbackNum = self.configData.callbackNumber, !callbackNum.isEmpty else {
+        os_log("No callback number configured", log: OSLog.checkExposure, type: .info)
+        return completion(.success(true))
+      }
+           
+      self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload], encoding: JSONEncoding.default)
+        .validate()
+        .response() { response in
+          switch response.result {
+          case .success:
+            os_log("Request for callback sent", log: OSLog.checkExposure, type: .debug)
+            completion(.success(true))
+          case let .failure(error):
+            os_log("Unable to send callback request, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+            completion(.failure(error))
         }
-    }
+      }
     
-  }
+    }
 
   private func saveMetric(event: String, completion: @escaping  (Result<Bool, Error>) -> Void) {
     self.saveMetric(event: event, payload: nil, completion: completion)
@@ -678,10 +669,15 @@ class ExposureCheck: AsyncOperation {
       return self.cancelProcessing()
     }
     guard self.configData != nil else {
-      // don't track daily trace if config not setup
-      return self.finish()
+      // don'trun if config not setup
+      return completion(.success(true))
     }
-
+    
+    guard self.sessionManager != nil else {
+      // don't run if session manager not setup
+      return completion(.success(true))
+    }
+    
     if (!self.configData.analyticsOptin) {
       os_log("Metric opt out", log: OSLog.exposure, type: .error)
       return completion(.success(true))
@@ -690,7 +686,7 @@ class ExposureCheck: AsyncOperation {
     var params: Parameters = [:]
     params["os"] = "ios"
     params["event"] = event
-    params["version"] = self.configData.version
+    params["version"] = Storage.shared.version()["display"]
     if let packet = payload {
         params["payload"] = packet
     }
@@ -764,7 +760,7 @@ class RequestInterceptor: Alamofire.RequestInterceptor {
         switch response.result {
          case .success:
              self.config.authToken = response.value!.token
-             Storage.shared.updateAppSettings(self.config)
+             Storage.shared.updateAuthToken(self.config.authToken)
              completion(.success(true))
          case let .failure(error):
              completion(.failure(error))

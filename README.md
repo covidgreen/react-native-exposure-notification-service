@@ -176,6 +176,16 @@ Used to stop contact tracing and all scheduled tasks. Exposure notifications mus
 
 ---
 
+##### `pause()`
+
+```javascript
+ExposureNotificationModule.pause();
+```
+
+Used to pause contact tracing. Use start() to unpause.
+
+---
+
 ##### `deleteAllData()`
 
 ```javascript
@@ -320,17 +330,19 @@ function Root() {
   return (
     <ExposureProvider
       traceConfiguration={{
-        exposureCheckInterval: 120,
+        exposureCheckInterval: 180,
         storeExposuresFor: 14,
         fileLimit: 1,
         fileLimitiOS: 2
-      }}
-      appVersion="1.0.0"
+      }
       serverUrl="https://your.exposure.api/api"
+      keyServerUrl="https://your.exposure.api/api"
+      keyServerType=KeyServerType.nearform
       authToken="your-api-auth-token"
       refreshToken="your-api-refresh-token"
       notificationTitle="Close contact detected"
       notificationDescription="Open the app for instructions">
+      notificationRepeat=0>
       <App />
     </ExposureProvider>
   );
@@ -387,6 +399,14 @@ function Root() {
 ##### `analyticsOptin` (optional)
 
 `boolean` (default `false`) Consent to send analytics to your exposure API's `/metrics` endpoint
+
+##### `notificationRepeat` (optional)
+
+`number` (default `0`) Used to repeat exposure notifications after set interval. Internal time is in minutes.
+
+##### `certList` (optional)
+
+`string` (default ``) Used to override the cert names to be looked for in the package on android.
 
 ### `useExposure`
 
@@ -506,6 +526,12 @@ Calls `ExposureNotificationModule.deleteAllData()` & checks & update the status
 
 Manually check whether the device supports the exposure API and update the context
 
+##### `cancelNotifications()`
+
+`() => void`
+
+Used to cancel any repeating notifications that have been scheduled
+
 ##### `getCloseContacts()`
 
 `() => Promise<CloseContact[] | null>`
@@ -549,6 +575,24 @@ Checks the current status of `exposure` and `notifications` permissions and upda
 `() => Promise<void>`
 
 Requests permissions from the user for `exposure` and `notifications` permissions and updates the context
+
+##### `getVersion()`
+
+`() => Promise<Version>`
+
+Returns the version number for the app
+
+##### `getBundleId()`
+
+`() => Promise<string>`
+
+Returns the bundle identifier / package name for the app
+
+##### `getConfigData()`
+
+`() => Promise<{[key: string]: any}>`
+
+Returns the config being used by the module
 
 ##### `setExposureState()`
 
@@ -678,6 +722,7 @@ In order to upload/download diagnosis keys for exposure notifications, an applic
 ### Contributors
 
 * @moogster31 - Katie Roberts <katie@geekworld.co>
+* @AlanSl - Alan Slater <alan.slater@nearform.com>
 * TBD
 
 ### Past Contributors

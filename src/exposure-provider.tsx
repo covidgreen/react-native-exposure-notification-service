@@ -44,8 +44,9 @@ interface State {
 }
 
 export interface ExposureContextValue extends State {
-  start: () => void;
+  start: () => Promise<boolean>;
   stop: () => void;
+  pause: () => Promise<boolean>;
   configure: () => void;
   checkExposure: (readDetails: boolean, skipTimeCheck: boolean) => void;
   simulateExposure: (timeDelay: number) => void;
@@ -61,6 +62,7 @@ export interface ExposureContextValue extends State {
   readPermissions: () => Promise<void>;
   askPermissions: () => Promise<void>;
   setExposureState: (setStateAction: SetStateAction<State>) => void;
+  cancelNotifications: () => void;
 }
 
 const initialState = {
@@ -82,8 +84,9 @@ const initialState = {
 
 export const ExposureContext = createContext<ExposureContextValue>({
   ...initialState,
-  start: () => {},
+  start: () => Promise.resolve(false),
   stop: () => {},
+  pause: () => Promise.resolve(false),
   configure: () => {},
   checkExposure: () => {},
   simulateExposure: () => {},
@@ -98,13 +101,13 @@ export const ExposureContext = createContext<ExposureContextValue>({
   deleteExposureData: () => Promise.resolve(),
   readPermissions: () => Promise.resolve(),
   askPermissions: () => Promise.resolve(),
-  setExposureState: () => {}
+  setExposureState: () => {},
+  cancelNotifications: () => {}
 });
 
 export interface ExposureProviderProps {
   isReady: boolean;
   traceConfiguration: TraceConfiguration;
-  appVersion: string;
   serverUrl: string;
   keyServerUrl: string;
   keyServerType: KeyServerType;
@@ -114,13 +117,41 @@ export interface ExposureProviderProps {
   notificationDescription: string;
   callbackNumber?: string;
   analyticsOptin?: boolean;
+  notificationRepeat?: number;
+  certList?: string;
 }
+
+export const getVersion = async () => {
+  try {
+    const result = await ExposureNotification.version();
+    return result;
+  } catch (e) {
+    console.log('build version error', e);
+  }
+};
+
+export const getBundleId = async () => {
+  try {
+    const result = await ExposureNotification.bundleId();
+    return result;
+  } catch (e) {
+    console.log('bundle id error', e);
+  }
+};
+
+export const getConfigData = async () => {
+  try {
+    const result = await ExposureNotification.getConfigData();
+    return result;
+  } catch (e) {
+    console.log('getConfigData error', e);
+  }
+};
 
 export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   children,
   isReady = false,
   traceConfiguration,
-  appVersion,
   serverUrl,
   keyServerUrl,
   keyServerType = KeyServerType.nearform,
@@ -129,7 +160,9 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   notificationTitle,
   notificationDescription,
   callbackNumber = '',
-  analyticsOptin = false
+  analyticsOptin = false,
+  notificationRepeat = 0,
+  certList = ''
 }) => {
   const [state, setState] = useState<State>(initialState);
 
@@ -171,10 +204,19 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
         await configure();
-        start();
+        const latestStatus = await ExposureNotification.status();
+
+        if (
+          !(
+            latestStatus &&
+            (latestStatus.type?.indexOf(StatusType.paused) > -1 ||
+              latestStatus.type?.indexOf(StatusType.stopped) > -1)
+          )
+        ) {
+          start();
+        }
       }
     }
-
     checkSupportAndStart();
   }, [state.permissions, isReady]);
 
@@ -194,9 +236,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       isAuthorised
     }));
     await validateStatus(status);
-    if (enabled) {
-      getCloseContacts();
-    }
+    await getCloseContacts();
   };
 
   const validateStatus = async (status?: Status) => {
@@ -211,6 +251,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       newStatus.state === StatusState.unavailable &&
       newStatus.type?.includes(StatusType.starting);
     const initialised = !isStarting || !canSupport;
+
     setState((s) => ({
       ...s,
       status: newStatus,
@@ -223,11 +264,23 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const start = async () => {
     try {
-      await ExposureNotification.start();
+      const result = await ExposureNotification.start();
       await validateStatus();
       await getCloseContacts();
+
+      return result;
     } catch (err) {
       console.log('start err', err);
+    }
+  };
+
+  const pause = async () => {
+    try {
+      const result = await ExposureNotification.pause();
+      await validateStatus();
+      return result;
+    } catch (err) {
+      console.log('pause err', err);
     }
   };
 
@@ -257,13 +310,13 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         storeExposuresFor: traceConfiguration.storeExposuresFor,
         fileLimit:
           Platform.OS === 'ios' ? iosLimit : traceConfiguration.fileLimit,
-        version: appVersion,
         notificationTitle,
         notificationDesc: notificationDescription,
         callbackNumber,
-        analyticsOptin
+        analyticsOptin,
+        notificationRepeat,
+        certList
       };
-
       await ExposureNotification.configure(config);
 
       return true;
@@ -300,12 +353,9 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
 
   const getCloseContacts = async () => {
     try {
-      if (state.permissions.exposure.status === PermissionStatus.Allowed) {
-        const contacts = await ExposureNotification.getCloseContacts();
-        setState((s) => ({...s, contacts}));
-        return contacts;
-      }
-      return [];
+      const contacts = await ExposureNotification.getCloseContacts();
+      setState((s) => ({...s, contacts}));
+      return contacts;
     } catch (err) {
       console.log('getCloseContacts err', err);
       return null;
@@ -348,6 +398,14 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     }
   };
 
+  const cancelNotifications = async () => {
+    try {
+      ExposureNotification.cancelNotifications();
+    } catch (e) {
+      console.log('cancel notifications exposure data error', e);
+    }
+  };
+
   const readPermissions = useCallback(async () => {
     console.log('Read permissions...');
 
@@ -372,6 +430,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     ...state,
     start,
     stop,
+    pause,
     configure,
     checkExposure,
     simulateExposure,
@@ -386,7 +445,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     deleteExposureData,
     readPermissions,
     askPermissions,
-    setExposureState: setState
+    setExposureState: setState,
+    cancelNotifications
   };
 
   return (

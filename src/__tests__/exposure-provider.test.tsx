@@ -31,10 +31,15 @@ import NativeEventEmitter from 'react-native/Libraries/EventEmitter/NativeEventE
 import {
   ExposureProvider,
   ExposureProviderProps,
-  useExposure
+  useExposure,
+  getBundleId,
+  getVersion,
+  getConfigData
 } from '../exposure-provider';
 
-import ExposureNotificationModule, { KeyServerType } from '../exposure-notification-module';
+import ExposureNotificationModule, {
+  KeyServerType
+} from '../exposure-notification-module';
 import {getPermissions, requestPermissions} from '../utils/permissions';
 import {PermissionStatus} from '../types';
 
@@ -61,7 +66,7 @@ jest.mock('../exposure-notification-module', () => ({
   },
   KeyServerType: {
     nearform: 'nearform'
-  },  
+  },
   authoriseExposure: jest.fn().mockResolvedValue(true),
   configure: jest.fn().mockResolvedValue(true),
   start: jest.fn().mockResolvedValue(true),
@@ -75,12 +80,17 @@ jest.mock('../exposure-notification-module', () => ({
   isSupported: jest.fn().mockResolvedValue(true),
   exposureEnabled: jest.fn().mockResolvedValue(true),
   isAuthorised: jest.fn().mockResolvedValue(true),
+  pause: jest.fn().mockResolvedValue(true),
   getLogData: jest.fn().mockResolvedValue({}),
+  bundleId: jest.fn().mockResolvedValue('testbundle'),
+  version: jest.fn().mockResolvedValue({version: '123', build: '5'}),
+  getConfigData: jest.fn().mockResolvedValue({lastRan: '123'}),
   triggerUpdate: jest.fn().mockResolvedValue(true),
   status: jest.fn().mockResolvedValue({
     state: 'active'
   }),
-  getCloseContacts: jest.fn().mockResolvedValue([])
+  getCloseContacts: jest.fn().mockResolvedValue([]),
+  cancelNotifications: jest.fn()
 }));
 
 const mockConfig = {
@@ -90,9 +100,8 @@ const mockConfig = {
   keyServerType: KeyServerType.nearform,
   authToken: 'testAuthToken',
   refreshToken: 'testRefreshToken',
-  appVersion: '0.0.1-test',
   traceConfiguration: {
-    exposureCheckInterval: 120,
+    exposureCheckInterval: 180,
     storeExposuresFor: 14,
     fileLimit: 1,
     fileLimitiOS: 3
@@ -100,7 +109,9 @@ const mockConfig = {
   notificationTitle: 'testNotificationTitle',
   notificationDescription: 'testNotificationDescription',
   analyticsOptin: true,
-  callbackNumber: '0123456789'
+  callbackNumber: '0123456789',
+  notificationRepeat: 0,
+  certList: 'cert12'
 };
 
 const ExposureProviderWithMockConfig: React.FC<Partial<
@@ -212,7 +223,8 @@ describe('<ExposureProvider />', () => {
       keyServerUrl: mockConfig.keyServerUrl,
       keyServerType: mockConfig.keyServerType,
       storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
-      version: mockConfig.appVersion
+      notificationRepeat: mockConfig.notificationRepeat,
+      certList: mockConfig.certList
     });
   });
 
@@ -254,6 +266,7 @@ describe('useExposure', () => {
       getCloseContacts: expect.any(Function),
       getDiagnosisKeys: expect.any(Function),
       getLogData: expect.any(Function),
+      cancelNotifications: expect.any(Function),
       initialised: true,
       isAuthorised: true,
       permissions: {
@@ -272,6 +285,7 @@ describe('useExposure', () => {
         state: 'active'
       },
       stop: expect.any(Function),
+      pause: expect.any(Function),
       supported: true,
       supportsExposureApi: expect.any(Function),
       triggerUpdate: expect.any(Function)
@@ -348,6 +362,25 @@ describe('useExposure', () => {
     });
   });
 
+  describe('pause()', () => {
+    it('pauses the exposure module', async () => {
+      const {result} = await renderExposureHook();
+      await act(async () => {
+        await result.current.pause();
+      });
+      expect(ExposureNotificationModule.pause).toHaveBeenCalledTimes(1);
+    });
+
+    it('validates the status', async () => {
+      const {result} = await renderExposureHook();
+      mocked(ExposureNotificationModule.status).mockClear();
+      await act(async () => {
+        await result.current.pause();
+      });
+      expect(ExposureNotificationModule.status).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('configure()', () => {
     it('configures the exposure module', async () => {
       const {result} = await renderExposureHook();
@@ -370,7 +403,8 @@ describe('useExposure', () => {
         keyServerUrl: mockConfig.keyServerUrl,
         keyServerType: mockConfig.keyServerType,
         storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
-        version: mockConfig.appVersion
+        notificationRepeat: mockConfig.notificationRepeat,
+        certList: mockConfig.certList
       });
     });
 
@@ -482,7 +516,17 @@ describe('useExposure', () => {
       expect(result.current.contacts).toEqual(mockCloseContacts);
     });
 
-    it('does not load close contacts if permissions are not granted', async () => {
+    it('does load close contacts regardless if permissions granted or not', async () => {
+      const mockCloseContacts = [
+        {
+          exposureAlertDate: 'exposureAlertDate',
+          attenuationDurations: [1, 2, 3],
+          daysSinceLastExposure: 1,
+          matchedKeyCount: 1,
+          maxRiskScore: 1,
+          summationRiskScore: 1
+        }
+      ];
       mocked(getPermissions).mockResolvedValueOnce({
         exposure: {status: PermissionStatus.NotAllowed},
         notifications: {status: PermissionStatus.Allowed}
@@ -492,10 +536,8 @@ describe('useExposure', () => {
       await act(async () => {
         await result.current.getCloseContacts();
       });
-      expect(
-        ExposureNotificationModule.getCloseContacts
-      ).not.toHaveBeenCalled();
-      expect(result.current.contacts).toEqual([]);
+      expect(ExposureNotificationModule.getCloseContacts).toHaveBeenCalled();
+      expect(result.current.contacts).toEqual(mockCloseContacts);
     });
 
     it('does not throw', async () => {
@@ -592,6 +634,19 @@ describe('useExposure', () => {
     });
   });
 
+  describe('cancelNotifications()', () => {
+    it('cancels any repeating notifications', async () => {
+      const {result} = await renderExposureHook();
+      mocked(ExposureNotificationModule.cancelNotifications).mockClear();
+      await act(async () => {
+        await result.current.cancelNotifications();
+      });
+      expect(
+        ExposureNotificationModule.cancelNotifications
+      ).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('readPermissions()', () => {
     it('gets current permissions & updates the state', async () => {
       const {result} = await renderExposureHook();
@@ -629,10 +684,39 @@ describe('useExposure', () => {
       await act(async () => {
         await result.current.simulateExposure(10);
       });
-      expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledTimes(1);
+      expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledTimes(
+        1
+      );
       expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledWith(
         10
       );
     });
-  });  
+  });
+
+  describe('getVersion()', () => {
+    it('gets the app build version details', async () => {
+      mocked(ExposureNotificationModule.version).mockClear();
+      const val = await getVersion();
+      expect(ExposureNotificationModule.version).toHaveBeenCalledTimes(1);
+      expect(val).toEqual({build: '5', version: '123'});
+    });
+  });
+
+  describe('getConfigData()', () => {
+    it('gets the config used by the module', async () => {
+      mocked(ExposureNotificationModule.getConfigData).mockClear();
+      const val = await getConfigData();
+      expect(ExposureNotificationModule.getConfigData).toHaveBeenCalledTimes(1);
+      expect(val).toEqual({lastRan: '123'});
+    });
+  });
+
+  describe('bundleId()', () => {
+    it('gets the app bundle id', async () => {
+      mocked(ExposureNotificationModule.bundleId).mockClear();
+      const val = await getBundleId();
+      expect(ExposureNotificationModule.bundleId).toHaveBeenCalledTimes(1);
+      expect(val).toEqual('testbundle');
+    });
+  });
 });

@@ -40,22 +40,27 @@ public class ExposureNotificationModule: RCTEventEmitter {
       }
 
       guard let serverURL = configDict["serverURL"] as? String, let refresh = configDict["refreshToken"] as? String, let token = configDict["authToken"] as? String else {
-          os_log("Error configuring module, refresh token or auth missing", log: OSLog.setup, type: .error)
+          os_log("Error configuring module, server url, refresh token or auth missing is missing", log: OSLog.setup, type: .error)
           return resolve(false)
       }
       
+      guard !serverURL.isEmpty, !refresh.isEmpty, !token.isEmpty else {
+          os_log("Error configuring module, server url, refresh token or auth token is empty", log: OSLog.setup, type: .error)
+          return resolve(false)
+      }
+        
       let configData = Storage.Config(
         refreshToken: refresh,
         serverURL: serverURL,
         keyServerUrl: configDict["keyServerUrl"] as? String ?? serverURL,
         keyServerType: Storage.KeyServerType (rawValue: configDict["keyServerType"] as! String) ?? Storage.KeyServerType.NearForm,
-        checkExposureInterval: configDict["exposureCheckFrequency"] as? Int ?? 120,
+        checkExposureInterval: configDict["exposureCheckFrequency"] as? Int ?? 180,
         storeExposuresFor: configDict["storeExposuresFor"] as? Int ?? 14,
         notificationTitle: configDict["notificationTitle"] as? String ?? "Close Contact Warning",
         notificationDesc: configDict["notificationDesc"] as? String ?? "The COVID Tracker App has detected that you may have been exposed to someone who has tested positive for COVID-19.",
         authToken: token,
-        version: (configDict["version"] as? String ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)!,
         fileLimit: configDict["fileLimit"] as? Int ?? 3,
+        notificationRepeat: configDict["notificationRepeat"] as? Int ?? 0,
         callbackNumber: configDict["callbackNumber"] as? String ?? "",
         analyticsOptin: configDict["analyticsOptin"] as? Bool ?? false
       )
@@ -64,10 +69,20 @@ public class ExposureNotificationModule: RCTEventEmitter {
       
       resolve(true)
     }
-    
+
+    @objc public func cancelNotifications() {
+        if #available(iOS 13.5, *) {
+            os_log("Cancel repeat notifications", log: OSLog.setup, type: .debug)
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [ExposureCheck.REPEAT_NOTIFICATION_ID])
+        } else {
+            // Nothing to do
+        }
+    }
+
     @objc public func authoriseExposure(_ resolve: @escaping RCTPromiseResolveBlock,
                                         rejecter reject: @escaping RCTPromiseRejectBlock) {
         if #available(iOS 13.5, *) {
+            os_log("Cancelling notifications", log: OSLog.setup, type: .debug)
             ExposureProcessor.shared.authoriseExposure(resolve, rejecter: reject)
         } else {
             resolve("unavailable")
@@ -125,6 +140,16 @@ public class ExposureNotificationModule: RCTEventEmitter {
             resolve(false)
         }
     }
+
+    @objc public func pause(_ resolve: @escaping RCTPromiseResolveBlock,
+                            rejecter reject: @escaping RCTPromiseRejectBlock) {
+        if #available(iOS 13.5, *) {
+          ExposureProcessor.shared.pause(resolve, rejecter: reject)
+        } else {
+            //nothing to do here
+            resolve(false)
+        }
+    }
     
     @objc public func stop(_ resolve: @escaping RCTPromiseResolveBlock,
                            rejecter reject: @escaping RCTPromiseRejectBlock) {
@@ -163,6 +188,16 @@ public class ExposureNotificationModule: RCTEventEmitter {
       }
     }
 
+    @objc public func getConfigData(_ resolve: @escaping RCTPromiseResolveBlock,
+                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
+        if #available(iOS 13.5, *) {
+            ExposureProcessor.shared.getConfigData(resolve, rejecter: reject)
+        } else {
+            resolve([])
+        }
+        
+    }
+    
     @objc public func triggerUpdate(_ resolve: @escaping RCTPromiseResolveBlock,
                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
         resolve(false)
@@ -196,6 +231,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
                                     rejecter reject: @escaping RCTPromiseRejectBlock) {
         if #available(iOS 13.5, *) {
             ExposureProcessor.shared.deleteAllData(resolve, rejecter: reject)
+            cancelNotifications()
         } else {
             resolve(true)
         }
@@ -209,7 +245,19 @@ public class ExposureNotificationModule: RCTEventEmitter {
             resolve(true)
         }
     }
-  
+
+    @objc public func bundleId(_ resolve: @escaping RCTPromiseResolveBlock,
+                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
+        resolve(Bundle.main.bundleIdentifier!)
+    }
+    
+    @objc public func version(_ resolve: @escaping RCTPromiseResolveBlock,
+                                    rejecter reject: @escaping RCTPromiseRejectBlock) {
+        let version = Storage.shared.version()
+        
+        resolve(version)
+    }
+    
     private func setupNotifications() {
         notificationCenter.addObserver(self,
               selector: #selector(onStatusChanged),
@@ -241,10 +289,23 @@ public class ExposureNotificationModule: RCTEventEmitter {
               status["type"] = ["bluetooth"]
           case .restricted:
               status["state"] = "restricted"
+          case .paused:
+              status["state"] = "disabled"
+              status["type"] = ["paused"]
+          case .unauthorized:
+              status["state"] = "disabled"
+              status["type"] = ["unauthorized"]
           @unknown default:
               status["state"] = "unavailable"
         }
-
+        if ExposureManager.shared.isPaused() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
+           status["state"] = "disabled"
+           status["type"] = ["paused"]
+        }
+        if ExposureManager.shared.isStopped() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
+           status["state"] = "disabled"
+           status["type"] = ["stopped"]
+        }
         os_log("Status of exposure service has changed %@", log: OSLog.exposure, type: .debug, status)
         sendEvent(withName: "exposureEvent", body: ["onStatusChanged": status])
       }

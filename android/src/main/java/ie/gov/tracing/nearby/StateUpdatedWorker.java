@@ -18,12 +18,8 @@ import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 import androidx.work.WorkerParameters;
 
-import com.google.android.gms.nearby.exposurenotification.CalibrationConfidence;
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
-import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
-import com.google.android.gms.nearby.exposurenotification.Infectiousness;
-import com.google.android.gms.nearby.exposurenotification.ReportType;
-import com.google.android.gms.nearby.exposurenotification.ScanInstance;
+import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -31,7 +27,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +46,7 @@ import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEO
 public class StateUpdatedWorker extends ListenableWorker {
   private static final String EXPOSURE_NOTIFICATION_CHANNEL_ID =
       "ExposureNotificationCallback.EXPOSURE_NOTIFICATION_CHANNEL_ID";
-  private static final String ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION =
+    public static final String ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION =
       "com.google.android.apps.exposurenotification.ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION";
 
   private final Context context;
@@ -64,7 +59,7 @@ public class StateUpdatedWorker extends ListenableWorker {
     this.repository = new ExposureNotificationRepository(context);
   }
 
-  private static double [] doubleArrayFromString(String string) {
+    private static double[] doubleArrayFromString(String string) {
       try {
           String[] strings = string.replace("[", "").replace("]", "").split(", ");
           double[] result = new double[strings.length];
@@ -111,7 +106,7 @@ public class StateUpdatedWorker extends ListenableWorker {
               scanInstanceBuilder.setTypicalAttenuationDb(typicalAttenuationDb);
 
               scanInstances.add(scanInstanceBuilder.build());
-          }
+              }
 
           exposureWindowBuilder.setScanInstances(scanInstances);
 
@@ -131,10 +126,10 @@ public class StateUpdatedWorker extends ListenableWorker {
 
           exposureWindows.add(exposureWindowBuilder.build());
 
-      }
+                  }
 
       return  exposureWindows;
-  }
+              }
 
 
   @NonNull
@@ -168,9 +163,9 @@ public class StateUpdatedWorker extends ListenableWorker {
                         return;
 
 
-                    }, AppExecutors.getBackgroundExecutor())
-                    .transform((v) -> Result.success(), AppExecutors.getLightweightExecutor())
-                    .catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
+          }, AppExecutors.getBackgroundExecutor())
+          .transform((v) -> Result.success(), AppExecutors.getLightweightExecutor())
+          .catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
 
 
 
@@ -197,7 +192,7 @@ public class StateUpdatedWorker extends ListenableWorker {
     }
   }
 
-  public static void showNotification(Context context) {
+    public static NotificationCompat.Builder buildNotification(Context context) {
     Events.raiseEvent(Events.INFO, "show notification");
     createNotificationChannel(context);
     String packageName = context.getApplicationContext().getPackageName();
@@ -207,7 +202,7 @@ public class StateUpdatedWorker extends ListenableWorker {
     intent.setAction(ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION);
     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
     PendingIntent pendingIntent = PendingIntent.getActivity(context, RequestCodes.CLOSE_CONTACT, intent, 0);
-    NotificationCompat.Builder builder =
+        return
         new Builder(context, EXPOSURE_NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_notification)
                 .setContentTitle(SharedPrefs.getString("notificationTitle", context))
@@ -216,14 +211,20 @@ public class StateUpdatedWorker extends ListenableWorker {
                 .bigText(SharedPrefs.getString("notificationDesc", context)))
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setContentIntent(pendingIntent)
-                .setOnlyAlertOnce(true)
+//                .setOnlyAlertOnce(true)
                 .setAutoCancel(true);
+    }
+
+    public static void showNotification(Context context) {
+        NotificationCompat.Builder builder = buildNotification(context);
     NotificationManagerCompat notificationManager = NotificationManagerCompat
         .from(context);
     notificationManager.notify(RequestCodes.CLOSE_CONTACT, builder.build());
+
+        ExposureNotificationRepeater.setup(context);
   }
 
-  private void showNotification() {
+    public void showNotification() {
     showNotification(context);
   }
 

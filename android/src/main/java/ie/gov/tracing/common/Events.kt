@@ -4,6 +4,7 @@ import android.content.pm.ApplicationInfo
 import android.util.Log
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.WritableNativeMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationStatusCodes
@@ -22,7 +23,7 @@ class Events {
         const val ON_STATUS_CHANGED = "onStatusChanged" // tracing api status
         const val ON_EXPOSURE = "exposure"
 
-        private const val TAG = "RNExposureNotificationService"
+        private const val TAG = "RN_ENService"
 
         private fun raiseEvent(map: ReadableMap) {
             Tracing.reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)?.emit("exposureEvent", map)
@@ -59,10 +60,12 @@ class Events {
         fun raiseEvent(eventName: String, eventValue: ReadableMap?): Boolean {
             Log.d(TAG, eventName)
             if(!allowed(eventName)) return false
+            if(eventValue == null) return false
             val map = Arguments.createMap()
-            
+            val eventMap = WritableNativeMap()
+            eventMap.merge(eventValue)
             try {
-                map.putMap(eventName, eventValue)
+                map.putMap(eventName, eventMap)
                 raiseEvent(map)
                 return true
             } catch (ex: Exception) {

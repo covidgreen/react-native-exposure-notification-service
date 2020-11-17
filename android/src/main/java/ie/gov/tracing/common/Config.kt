@@ -3,6 +3,7 @@ package ie.gov.tracing.common
 import com.facebook.react.bridge.ReadableMap
 import ie.gov.tracing.Tracing
 import ie.gov.tracing.storage.SharedPrefs
+import java.text.SimpleDateFormat
 
 class Config {
     companion object {
@@ -13,7 +14,6 @@ class Config {
                 SharedPrefs.setLong("storeExposuresFor", params.getInt("storeExposuresFor").toLong(), Tracing.context)
                 SharedPrefs.setLong("fileLimit", params.getInt("fileLimit").toLong(), Tracing.context)
                 SharedPrefs.setBoolean("analyticsOptin", params.getBoolean("analyticsOptin"), Tracing.context)
-                SharedPrefs.setString("version", params.getString("version")!!, Tracing.context)
                 SharedPrefs.setString("serverUrl", params.getString("serverURL")!!, Tracing.context)
                 var keyServer = params.getString("keyServerUrl")!!
                 if (keyServer.isEmpty()) {
@@ -28,9 +28,19 @@ class Config {
                 SharedPrefs.setString("notificationTitle", params.getString("notificationTitle")!!, Tracing.context)
                 SharedPrefs.setString("notificationDesc", params.getString("notificationDesc")!!, Tracing.context)
                 // this is sensitive user data, our shared prefs class is uses EncryptedSharedPreferences and MasterKeys
-                SharedPrefs.setString("refreshToken", params.getString("refreshToken")!!, Tracing.context)
-                SharedPrefs.setString("authToken", params.getString("authToken")!!, Tracing.context)
+                if (!params.getString("refreshToken").isNullOrEmpty()) {
+                    SharedPrefs.setString("refreshToken", params.getString("refreshToken")!!, Tracing.context)
+                }
+                if (!params.getString("authToken").isNullOrEmpty()) {
+                    SharedPrefs.setString("authToken", params.getString("authToken")!!, Tracing.context)
+                }
                 SharedPrefs.setString("callbackNumber", params.getString("callbackNumber")!!, Tracing.context)
+                SharedPrefs.setString("callbackNumber", params.getString("callbackNumber")!!, Tracing.context)
+                val ran = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis())
+                SharedPrefs.setString("lastUpdated", ran, Tracing.context)
+                SharedPrefs.setLong("notificationRepeat", params.getInt("notificationRepeat").toLong(), Tracing.context)
+                SharedPrefs.setString("certList", params.getString("certList")!!, Tracing.context)
+
             } catch(ex: Exception) {
                 Events.raiseError("Error setting configuration: ", ex)
             }

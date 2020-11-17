@@ -10,9 +10,9 @@
 //   original location:
 //   - https://github.com/facebook/react-native/blob/0.58-stable/local-cli/templates/HelloWorld/android/app/build.gradle
 
-def DEFAULT_COMPILE_SDK_VERSION = 28
-def DEFAULT_MIN_SDK_VERSION = 23
-def DEFAULT_TARGET_SDK_VERSION = 28
+def DEFAULT_COMPILE_SDK_VERSION = 29
+def DEFAULT_MIN_SDK_VERSION = 21
+def DEFAULT_TARGET_SDK_VERSION = 29
 
 def safeExtGet(prop, fallback) {
     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
@@ -26,8 +26,8 @@ apply plugin: 'kotlin-kapt'
 
 buildscript {
     ext {
-        kotlinVersion = '1.3.71'
-        kotlin_version = '1.3.71'
+        kotlinVersion = '1.4.10'
+        kotlin_version = '1.4.10'
     }
     dependencies {
         //classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
@@ -74,11 +74,11 @@ repositories {
     mavenLocal()
     maven {
         // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
-        url "$rootDir/../../node_modules/react-native/android"
+        url "$rootDir/../node_modules/react-native/android"
     }
     maven {
         // Android JSC is installed from npm
-        url "$rootDir/../../node_modules/jsc-android/dist"
+        url "$rootDir/../node_modules/jsc-android/dist"
     }
     google()
     jcenter()
@@ -88,6 +88,10 @@ repositories {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
 
+    // network
+    implementation "com.squareup.okhttp3:okhttp:4.2.1"
+    implementation "com.squareup.okhttp3:logging-interceptor:4.2.1"
+    
     //noinspection GradleDynamicVersion
     implementation 'com.facebook.react:react-native:+'  // From node_modules
 
@@ -109,26 +113,24 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.8.5'
 
     // WorkManager
-    def work_version = "2.3.4"
+    def work_version = "2.4.0"
     implementation "androidx.work:work-runtime:$work_version"
     implementation "androidx.work:work-runtime-ktx:$work_version"
     implementation "androidx.work:work-rxjava2:$work_version"
     implementation "androidx.work:work-gcm:$work_version"
-    implementation 'androidx.work:work-gcm:2.3.4'
-    implementation 'androidx.work:work-runtime:2.3.4'
 
     implementation 'androidx.concurrent:concurrent-futures:1.0.0'
 
-    implementation 'com.google.android.gms:play-services-base:17.2.1'
-    implementation 'com.google.android.gms:play-services-basement:17.2.1'
+    implementation 'com.google.android.gms:play-services-base:17.4.0'
+    implementation 'com.google.android.gms:play-services-basement:17.4.0'
+    implementation 'com.google.android.gms:play-services-tasks:17.2.0'
+
     implementation 'com.google.android.gms:play-services-safetynet:17.0.0'
-    implementation 'com.google.android.gms:play-services-tasks:17.0.2'
     implementation 'com.google.android.gms:play-services-vision:20.0.0'
 
     implementation 'com.jakewharton.threetenabp:threetenabp:1.2.4'
 
     implementation 'commons-io:commons-io:2.5'
-    implementation 'org.apache.httpcomponents:httpclient:4.5.6'
 
     // database
     implementation 'net.zetetic:android-database-sqlcipher:4.4.0@aar'

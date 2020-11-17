@@ -93,10 +93,18 @@ public class ExposureProcessor {
         case .paused:
             result["state"] = "disabled"
             result["type"] = ["paused"]
+        case .unauthorized:
+            result["state"] = "disabled"
+            result["type"] = ["unauthorized"]            
         default:
             result["state"] = "unavailable"
             result["type"] = ["starting"]
       }
+      if ExposureManager.shared.isPaused() && (result["state"] as! String == "disabled" || result["state"] as! String == "unknown") {
+         result["state"] = "disabled"
+         result["type"] = ["paused"]
+      }
+        
       os_log("Status is %d", log: OSLog.checkExposure, type: .debug, ExposureManager.shared.manager.exposureNotificationStatus.rawValue)
       
       self.keyValueObservers.append(ExposureManager.shared.manager.observe(\.exposureNotificationStatus) { manager, change in
@@ -111,16 +119,42 @@ public class ExposureProcessor {
             os_log("Not authorised so can't start", log: OSLog.exposure, type: .info)
             return reject("NOTAUTH", "Not authorised to start", nil)
         }
-        
+        let context = Storage.PersistentContainer.shared.newBackgroundContext()
+        Storage.shared.flagPauseStatus(context, false)
+        Storage.shared.flagStopped(context, false)
         ExposureManager.shared.manager.setExposureNotificationEnabled(true) { error in
             if let error = error as? ENError {
                 os_log("Error starting notification services, %@", log: OSLog.exposure, type: .error, error.localizedDescription)
                 return reject("START", "Error starting notification services", error)
             } else {
                 os_log("Service started", log: OSLog.exposure, type: .debug)
+                self.scheduleCheckExposure()
                 resolve(true)
             }
         }
+        self.scheduleCheckExposure()
+    }
+
+    public func pause(_ resolve: @escaping RCTPromiseResolveBlock,
+                        rejecter reject: @escaping RCTPromiseRejectBlock) {
+        guard ENManager.authorizationStatus == .authorized else {
+            os_log("Not authorised so can't pause", log: OSLog.exposure, type: .info)
+            return reject("NOTAUTH", "Not authorised to start", nil)
+        }
+        let context = Storage.PersistentContainer.shared.newBackgroundContext()
+        Storage.shared.flagPauseStatus(context, true)
+        ExposureManager.shared.manager.setExposureNotificationEnabled(false) { error in
+            if let error = error as? ENError {
+                os_log("Error pausing./stopping notification services, %@", log: OSLog.exposure, type: .error, error.localizedDescription)
+                /// clear pause flag if we failed to stop ens
+                Storage.shared.flagPauseStatus(context, false)
+                return reject("PAUSE", "Error pausing notification services", error)
+            } else {
+                os_log("Service paused", log: OSLog.exposure, type: .debug)
+                resolve(true)
+            }
+        }
+        
     }
     
     public func stop(_ resolve: @escaping RCTPromiseResolveBlock,
@@ -129,12 +163,15 @@ public class ExposureProcessor {
             os_log("Not authorised so can't stop", log: OSLog.exposure, type: .info)
             return reject("NOTAUTH", "Not authorised to stop", nil)
         }
+        let context = Storage.PersistentContainer.shared.newBackgroundContext()
+        Storage.shared.flagPauseStatus(context, false)
+        Storage.shared.flagStopped(context, true)
         ExposureManager.shared.manager.setExposureNotificationEnabled(false) { error in
             if let error = error as? ENError {
               os_log("Error stopping notification services, %@", log: OSLog.setup, type: .error, error.localizedDescription)
               return reject("STOP", "Error stopping notification services", error)
             } else {
-               os_log("Service stopped", log: OSLog.setup, type: .debug)
+              os_log("Service stopped", log: OSLog.setup, type: .debug)
               resolve(true)
             }
         }
@@ -188,6 +225,41 @@ public class ExposureProcessor {
       
     }
   
+    public func getConfigData(_ resolve: @escaping RCTPromiseResolveBlock,
+                           rejecter reject: @escaping RCTPromiseRejectBlock) {
+      let context = Storage.PersistentContainer.shared.newBackgroundContext()
+      guard let config = Storage.shared.readSettings(context) else {
+        return resolve([])
+      }
+      var data:[String: Any] = [:]
+      data["token"] = config.authToken
+      data["refreshToken"] = config.refreshToken
+      data["serverURL"] = config.serverURL
+      data["keyServerURL"] = config.keyServerUrl
+      data["serverType"] = config.keyServerType.rawValue
+      data["analyticsOptin"] = config.analyticsOptin
+      data["fileLimit"] = config.fileLimit
+      data["keychainGetError"] = config.lastKeyChainGetError
+      data["keychainSetError"] = config.lastKeyChainSetError
+      data["lastExposureIndex"] = config.lastExposureIndex
+        
+      let formatter = DateFormatter()
+      formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+      
+      if let when = config.lastUpdated {
+        data["lastUpdated"] = formatter.string(from: when)
+      } else {
+        data["lastUpdated"] = "Not updated"
+      }
+      if let ran = config.lastRunDate {
+        data["lastRunDate"] = formatter.string(from: ran)
+      } else {
+        data["lastRunDate"] = "Not run"
+      }
+      resolve(data)
+      
+    }
+
     public func getCloseContacts(_ resolve: @escaping RCTPromiseResolveBlock,
                                   rejecter reject: @escaping RCTPromiseRejectBlock) {
        
@@ -281,7 +353,7 @@ public class ExposureProcessor {
            os_log("Foreground exposure check is complete, %d", log: OSLog.exposure, type: .debug, lastOperation?.isCancelled ?? false)
        }
     }
-
+    
     private func scheduleCheckExposure() {
       let context = Storage.PersistentContainer.shared.newBackgroundContext()
       
