@@ -37,7 +37,6 @@ import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-
 object Tracing {
     class Listener: ActivityEventListener {
         override fun onNewIntent(intent: Intent?) {}

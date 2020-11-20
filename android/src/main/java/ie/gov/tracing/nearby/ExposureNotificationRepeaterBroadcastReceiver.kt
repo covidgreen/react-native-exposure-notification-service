@@ -7,7 +7,7 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import ie.gov.tracing.Tracing
 import ie.gov.tracing.common.Events
-import ie.gov.tracing.common.Events.Companion.raiseEvent
+import ie.gov.tracing.common.Events.raiseEvent
 
 class ExposureNotificationRepeaterBroadcastReceiver: BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {

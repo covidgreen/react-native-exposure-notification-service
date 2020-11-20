@@ -15,4 +15,5 @@ data class ExposureConfig(
         val transmissionRiskWeight: Int,
         val durationAtAttenuationThresholds: IntArray?,
         val thresholdWeightings: DoubleArray?,
-        val timeThreshold: Int)
+        val timeThreshold: Int,
+        val numFilesAndroid: Int)
