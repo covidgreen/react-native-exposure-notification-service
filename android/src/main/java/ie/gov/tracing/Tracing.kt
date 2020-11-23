@@ -151,6 +151,9 @@ object Tracing {
 
         @JvmStatic
         fun setExposureStatus(status: String, reason: String = "") {
+            if (exposureStatus == EXPOSURE_STATUS_UNAVAILABLE) {
+                return;
+            }
             var changed = false
             if (exposureStatus != status) {
                 exposureStatus = status
@@ -683,13 +686,11 @@ object Tracing {
                 // check bluetooth
                 val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter();
                 if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
-                    exposureStatus = EXPOSURE_STATUS_DISABLED
-                    exposureDisabledReason = "bluetooth";
+                    setExposureStatus(EXPOSURE_STATUS_DISABLED, "bluetooth");
                 }
 
                 if (isLocationEnableRequired()) {
-                    exposureStatus = EXPOSURE_STATUS_DISABLED
-                    exposureDisabledReason = "bluetooth";
+                    setExposureStatus(EXPOSURE_STATUS_DISABLED, "bluetooth");
                 }                
 
                 result.putString("state", exposureStatus)
