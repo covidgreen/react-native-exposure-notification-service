@@ -115,7 +115,7 @@ object Tracing {
             if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
                 if (isBluetoothAvailable()) {
                     if (newExposureDisabledReason == "bluetooth") {
-                        newExposureDisabledReason = "starting"
+                        newExposureDisabledReason = ""
                     }
                 } else {
                     newExposureDisabledReason = "bluetooth"
@@ -703,23 +703,19 @@ object Tracing {
                 if (!isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
                     exposureDisabledReason = "bluetooth"
-                } else if (!isPaused) {
-                    if (exposureStatus == EXPOSURE_STATUS_ACTIVE) {
-                        exposureDisabledReason = ""
-                    } else {
-                        exposureDisabledReason = "starting"
-                    }
+                } else if (exposureDisabledReason == "bluetooth") {
+                    exposureDisabledReason = ""
                 }
 
                 result.putString("state", exposureStatus)
                 typeData.pushString(exposureDisabledReason)
-                result.putArray("type", typeData)                
+                result.putArray("type", typeData)
                 promise?.resolve(result)
             } catch (ex: Exception) {
                 Events.raiseError("getExposureStatus", ex)
                 result.putString("state", EXPOSURE_STATUS_UNKNOWN)
                 typeData.pushString("error")
-                result.putArray("type", typeData)                
+                result.putArray("type", typeData)
                 promise?.resolve(result)
             }
             return result
