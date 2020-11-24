@@ -1,7 +1,7 @@
 {
   "name": "react-native-exposure-notification-service",
   "title": "React Native Exposure Notification Service",
-  "version": "1.1.41",
+  "version": "1.1.42",
   "description": "React native module providing a common interface to Apple/Google's Exposure Notification APIs",
   "main": "dist/index.js",
   "files": [
