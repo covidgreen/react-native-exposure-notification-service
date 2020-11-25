@@ -9,7 +9,6 @@ import React, {
 import {
   NativeEventEmitter,
   Alert,
-  Platform,
   AppState,
   AppStateStatus
 } from 'react-native';
@@ -204,7 +203,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
         await configure();
-        const latestStatus = await ExposureNotification.status();
+        const latestStatus = state.status;
 
         if (
           !(
@@ -218,7 +217,11 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
       }
     }
     checkSupportAndStart();
-  }, [state.permissions, isReady]);
+  }, [
+    state.permissions.exposure.status,
+    state.permissions.notifications.status,
+    isReady
+  ]);
 
   const supportsExposureApi = async function () {
     const can = await ExposureNotification.canSupport();

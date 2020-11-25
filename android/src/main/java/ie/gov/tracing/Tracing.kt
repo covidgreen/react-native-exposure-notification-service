@@ -111,13 +111,32 @@ object Tracing {
     class BleStatusReceiver : BroadcastReceiver() {
 
         override fun onReceive(context: Context, intent: Intent) {
-
+            var newExposureDisabledReason = Tracing.exposureDisabledReason
             if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
-                Tracing.getExposureStatus(null)
+                if (isBluetoothAvailable()) {
+                    if (newExposureDisabledReason == "bluetooth") {
+                        newExposureDisabledReason = ""
+                    }
+                } else {
+                    newExposureDisabledReason = "bluetooth"
+                }
             }
             Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action")
-            Tracing.setExposureStatus(Tracing.exposureStatus, Tracing.exposureDisabledReason)
+            Tracing.setExposureStatus(Tracing.exposureStatus, newExposureDisabledReason)
         }
+    }
+
+    private fun isBluetoothAvailable(): Boolean {
+        val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter();
+
+        if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
+            return false
+        }
+
+        if (isLocationEnableRequired()) {
+            return false
+        }
+        return true
     }
 
     lateinit var context: Context
@@ -674,28 +693,24 @@ object Tracing {
             if (isPaused) {
                 exposureDisabledReason = "paused"
             }
-            try {
-                // check bluetooth
-                val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter();
-                if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
-                    exposureStatus = EXPOSURE_STATUS_DISABLED
-                    exposureDisabledReason = "bluetooth";
-                }
 
-                if (isLocationEnableRequired()) {
+            try {
+                if (!isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
-                    exposureDisabledReason = "bluetooth";
-                }                
+                    exposureDisabledReason = "bluetooth"
+                } else if (exposureDisabledReason == "bluetooth") {
+                    exposureDisabledReason = ""
+                }
 
                 result.putString("state", exposureStatus)
                 typeData.pushString(exposureDisabledReason)
-                result.putArray("type", typeData)                
+                result.putArray("type", typeData)
                 promise?.resolve(result)
             } catch (ex: Exception) {
                 Events.raiseError("getExposureStatus", ex)
                 result.putString("state", EXPOSURE_STATUS_UNKNOWN)
                 typeData.pushString("error")
-                result.putArray("type", typeData)                
+                result.putArray("type", typeData)
                 promise?.resolve(result)
             }
             return result
