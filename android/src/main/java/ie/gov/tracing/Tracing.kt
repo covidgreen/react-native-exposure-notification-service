@@ -170,7 +170,8 @@ object Tracing {
 
         @JvmStatic
         fun setExposureStatus(status: String, reason: String = "", skipEvents: Boolean = false) {
-            if (exposureStatus == EXPOSURE_STATUS_UNAVAILABLE) {
+            // cannot transition again after handling ExposureNotificationStatusCodes.API_NOT_CONNECTED
+            if (exposureStatus == EXPOSURE_STATUS_UNAVAILABLE && exposureDisabledReason == "not_connected") {
                 return;
             }
             var changed = false
