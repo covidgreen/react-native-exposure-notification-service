@@ -213,7 +213,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
         }
     }
 
-    @objc static public func registerBackgroundProcessing() {
+    @objc public func registerBackgroundProcessing() {
          if #available(iOS 13.5, *) {
             ExposureProcessor.shared.registerBackgroundProcessing()
          } else {

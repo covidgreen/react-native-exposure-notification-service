@@ -68,6 +68,7 @@ RCT_EXTERN_METHOD(getConfigData:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(cancelNotifications)
+
+RCT_EXTERN_METHOD(registerBackgroundProcessing)
+
 @end
-
-
