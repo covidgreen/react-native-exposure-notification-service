@@ -1,7 +1,8 @@
 package ie.gov.tracing.nearby.riskcalculation
 
 data class Thresholds(
-        val thresholdWeightings: IntArray,
+        val thresholdWeightings: List<Int>,
         val timeThreshold: Int,
         val numFiles: Int,
+        val contiguousMode: Boolean
 )

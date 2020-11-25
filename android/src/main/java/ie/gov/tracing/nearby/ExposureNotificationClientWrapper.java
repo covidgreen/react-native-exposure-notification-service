@@ -21,6 +21,7 @@ import java.util.Map;
 
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
+import ie.gov.tracing.common.ExposureConfigContainer;
 import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.SharedPrefs;
 
@@ -79,7 +80,7 @@ public class ExposureNotificationClientWrapper {
                     .setDurationAtAttenuationThresholds(config.getDurationAtAttenuationThresholds()).build();
 
     // we use these when we receive match broadcasts from exposure API
-    SharedPrefs.setString("thresholdWeightings", Arrays.toString(config.getThresholdWeightings()), appContext);
+    SharedPrefs.setString("thresholdWeightings", config.getThresholdWeightings()!!.toString(), appContext);
     SharedPrefs.setLong("timeThreshold", config.getTimeThreshold(), appContext);
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with: " + exposureConfiguration);
@@ -91,9 +92,8 @@ public class ExposureNotificationClientWrapper {
   public ExposureConfig fetchExposureConfig() {
     String settings = Fetcher.fetch("/settings/exposures", appContext);
     Gson gson = new Gson();
-    Map map = gson.fromJson(settings, Map.class);
-    String exposureConfig = (String) map.get("exposureConfig");
-    return gson.fromJson(exposureConfig, ExposureConfig.class);
+    ExposureConfigContainer container = gson.fromJson(settings, ExposureConfigContainer.class);
+    return container.getExposureConfig();
   }
 
 
@@ -114,7 +114,7 @@ public class ExposureNotificationClientWrapper {
     DailySummariesConfig.DailySummariesConfigBuilder builder = new DailySummariesConfig.DailySummariesConfigBuilder();
     DailySummariesConfig dailySummaryConfig = builder
             // A map that stores a weight for each possible value of reportType.
-//            .setReportTypeWeight() //FIXME what is the good value ?
+            .setReportTypeWeight(config.reportTypeW) //FIXME what is the good value ?
 
             // attenuationBucketThresholdDb, attenuationBucketWeights:
             // - attenuationBucketThresholdDb: Thresholds defining the BLE attenuation buckets edges. This list must have 3 elements: the immediate, near, and medium thresholds.

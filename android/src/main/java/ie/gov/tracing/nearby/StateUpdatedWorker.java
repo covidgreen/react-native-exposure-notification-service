@@ -28,6 +28,8 @@ import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -42,6 +44,7 @@ import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.nearby.riskcalculation.RiskCalculatorV2;
+import ie.gov.tracing.nearby.riskcalculation.Thresholds;
 import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.ExposureNotificationRepository;
 import ie.gov.tracing.storage.SharedPrefs;
@@ -65,6 +68,7 @@ public class StateUpdatedWorker extends ListenableWorker {
         this.repository = new ExposureNotificationRepository(context);
     }
 
+    @NotNull
     private List<ExposureWindow> getSimulatedExposureWindows() {
 
         ArrayList<ExposureWindow> exposureWindows = new ArrayList<ExposureWindow>();
@@ -122,9 +126,15 @@ public class StateUpdatedWorker extends ListenableWorker {
         return exposureWindows;
     }
 
+    private void processExposureFiles(Context context, ExposureConfig config, Thresholds thresholds) {
+        ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
+        // FIXME impl differs from iOS, this is done in DiagnosisKeysWorker
+//        exposureNotificationClient.get
+    }
+
     @NonNull
     @Override
-    public ListenableFuture<Result> startWork() {
+    public ListenableFuture<Result> startWork() { // FIXME change the order
         Tracing.currentContext = getApplicationContext();
 
         final boolean simulate = getInputData().getBoolean("simulate", false);
@@ -143,7 +153,7 @@ public class StateUpdatedWorker extends ListenableWorker {
                             DEFAULT_API_TIMEOUT.toMillis(),
                             TimeUnit.MILLISECONDS,
                             AppExecutors.getScheduledExecutor()))
-                            .transformAsync((exposureWindows) -> {
+                            .transformAsync((exposureWindows) -> { // FIXME if all results are sync, should switch to transform instead
                                 if (simulate) {
                                     exposureWindows = getSimulatedExposureWindows();
                                 }

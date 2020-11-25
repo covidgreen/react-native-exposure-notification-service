@@ -11,48 +11,53 @@ object RiskCalculatorV2 {
     fun calculateRisk(windows: List<ExposureWindow>, dailySummaries: List<DailySummary>, config: ExposureConfig, context: Context): Boolean {
         // we use these when we receive match broadcasts from exposure API
         val thresholdsWeightings = config.thresholdWeightings!!.map{it.toInt()}
-        val thresholds =  Thresholds(thresholdsWeightings.toIntArray(), config.timeThreshold, config.numFilesAndroid) // FIXME check numFiles config
+        val thresholds =  Thresholds(thresholdsWeightings, config.timeThreshold, config.numFilesAndroid, config.contiguousMode) // FIXME check numFiles config
 
-        // FIXME numFiles should be used to retrieve the diagnosis file
-        var mostRecentDay: DailySummary? = null
+        if(dailySummaries.isEmpty()) {
+            Events.raiseEvent(Events.INFO, "V2 - No daily summaries returned, no exposures matched")
+            return false
+        }
 
-        for (day in dailySummaries) {
-            if ((day.summaryData.weightedDurationSum / 60.0) <= 30 ) { continue }
+        val aboveThresholdDays = dailySummaries.filter{
+            (it.summaryData.weightedDurationSum / 60.0).toInt() > thresholds.timeThreshold
+        }.sortedBy { it.daysSinceEpoch }
 
-            if (mostRecentDay == null || mostRecentDay.daysSinceEpoch < day.daysSinceEpoch) {
-                mostRecentDay = day
+        if(aboveThresholdDays.isEmpty()) {
+            Events.raiseEvent(Events.INFO, "V2 - No daily summary meeting duration threshold")
+            return false
+        }
+
+        val mostRecent = aboveThresholdDays.first()
+
+        try {
+            val windowsData = extractExposureWindowData(windows, config, thresholds, mostRecent.daysSinceEpoch)
+
+            if (thresholds.contiguousMode) {
+                if (windowsData.filter{ it.scanData.exceedsThreshold }.count > 0) {
+                    return constructSummaryInfo(mostRecent, windowsData) // FIXME showNotification ?
+                } else {
+                    Events.raiseEvent(Events.INFO, "V2 - Running in Contiguous mode, no contiguous match);
+                    return false;
+                }
             }
+
+            return constructSummaryInfo(mostRecent, windowsData)
+
+        } catch (error: Exception) {
+            Events.raiseError("Error while extracting window data", error)
+            return false
         }
 
-        if(mostRecentDay == null) {
-            val err = Exception("V2 - No daily summary meeting duration detected")
-            Events.raiseError("V2 - No daily summary meeting duration detected", err)
-            throw err
-        }
-
-        val windowDataList = extractExposureWindowData(windows, config.attenuationLevelValues.toList(), thresholds)
-
-//     FIXME, should do something like  constructSummaryInfo(mostRecentDay, windowDataList)
-
-//        extractExposureWindowData(summary, attenuationRanges, thresholds) { result in
-//                switch result {
-//            case let .success(windows):
-//            completion(.success(constructSummaryInfo(mostRecent, windows)))
-//            case let .failure(error):
-//            completion(.failure(error))
-//        }
-//        }
-
-        return false //FIXME real impl
     }
 
-    private fun buildScanData(scanInstances: List<ScanInstance>, attenuations: List<Int>, thresholds: Thresholds): ScanData {
+    private fun buildScanData(scanInstances: List<ScanInstance>, config: ExposureConfig, thresholds: Thresholds): ScanData {
         val data: ScanData = ScanData(mutableListOf(0, 0, 0, 0), false)
+        val thresholdWeightings = listOf(config.immediateDurationWeight, config.nearDurationWeight, config.mediumDurationWeight, config.otherDurationWeight)
 
         scanInstances.forEach { scan ->
-            attenuations.forEachIndexed{ index, attenuation ->
+            config.attenuationDurationThresholds.forEachIndexed{ index, attenuation ->
                 if( scan.typicalAttenuationDb <= attenuation) {
-                    data.buckets[index] += scan.secondsSinceLastScan
+                    data.buckets[index] += scan.secondsSinceLastScan / 60 * (thresholdWeightings[index] / 100.0).toInt()
                     return@forEach
                 }
             }
@@ -77,10 +82,12 @@ object RiskCalculatorV2 {
         return newItem
     }
 
-    private fun extractExposureWindowData(windows: List<ExposureWindow>, attenuations: List<Int>, thresholds: Thresholds): List<WindowData> {
+    private fun extractExposureWindowData(windows: List<ExposureWindow>, config: ExposureConfig, thresholds: Thresholds, daysSinceEpoch: Int): List<WindowData> {
         val items: MutableMap<Long, WindowData> = mutableMapOf()
 
-        windows.forEach{ window ->
+        val  matchWindows = windows.filter{ Math.floor(it.dateMillisSinceEpoch.toDouble() / 24*60*60*1000).toInt() == daysSinceEpoch}
+
+        matchWindows.forEach{ window ->
                 val scan = buildScanData(window.scanInstances, attenuations, thresholds);
                 val item: WindowData = items[window.dateMillisSinceEpoch] ?: createWindowDataAndUpdateItems(window, items)
                 scan.buckets.forEachIndexed { index, element ->
@@ -92,20 +99,23 @@ object RiskCalculatorV2 {
         return items.values.toList()
     }
 
-    private fun constructSummaryInfo(day: DailySummary.ExposureSummaryData, windows: ExposureWindow) {
-//        private static func constructSummaryInfo(_ summary: ENExposureDetectionSummary) -> ExposureProcessor.ExposureInfo {
-//
-//            var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: summary.daysSinceLastExposure, attenuationDurations: self.convertDurations(summary.attenuationDurations), matchedKeyCount: Int(summary.matchedKeyCount),  maxRiskScore: Int(summary.maximumRiskScore), exposureDate: Date())
-//
-//            if let meta = summary.metadata {
-//                info.maximumRiskScoreFullRange = meta["maximumRiskScoreFullRange"] as? Int
-//                info.riskScoreSumFullRange = meta["riskScoreSumFullRange"] as? Int
-//                info.customAttenuationDurations = self.convertDurations(meta["attenuationDurations"] as? [NSNumber])
-//            }
-//
-//            os_log("Exposure detected", log: OSLog.checkExposure, type: .debug)
-//
-//            return info
-//        }
+    private fun constructSummaryInfo(summary: DailySummary, windows: List<WindowData>): Boolean {
+
+        // FIXME impl
+        return false // tru => notification , false => nope
+//        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: summary.daysSinceLastExposure, attenuationDurations: self.convertDurations(summary.attenuationDurations), matchedKeyCount: Int(summary.matchedKeyCount),  maxRiskScore: Int(summary.maximumRiskScore), exposureDate: Date())
+        //        let calendar = Calendar.current
+        //        let components = calendar.dateComponents([.day], from: day.date, to: Date())
+        //
+        //        let summedDurations = sumDurations(windows)
+        //        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: summedDurations.buckets, matchedKeyCount: -1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: Date())
+        //
+        //        info.customAttenuationDurations = summedDurations.buckets
+        //        info.riskScoreSumFullRange = Int(day.daySummary.scoreSum)
+        //        info.windows = windows
+        //
+        //        os_log("Exposure detected", log: OSLog.checkExposure, type: .debug)
+        //
+        //        return info
     }
 }
