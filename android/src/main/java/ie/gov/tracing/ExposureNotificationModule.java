@@ -21,7 +21,7 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     private static int apiError = 0;
 
     public boolean nearbyNotSupported(){
-        return false;
+        return !Tracing.isENSSupported();
     }
 
     // after update performed this should be called

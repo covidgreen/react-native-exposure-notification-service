@@ -112,6 +112,7 @@ object Tracing {
 
         override fun onReceive(context: Context, intent: Intent) {
             var newExposureDisabledReason = Tracing.exposureDisabledReason
+            var newStatus = Tracing.exposureStatus
             if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
                 if (isBluetoothAvailable()) {
                     if (newExposureDisabledReason == "bluetooth") {
@@ -119,10 +120,11 @@ object Tracing {
                     }
                 } else {
                     newExposureDisabledReason = "bluetooth"
+                    newStatus = Tracing.EXPOSURE_STATUS_DISABLED
                 }
             }
             Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action")
-            Tracing.setExposureStatus(Tracing.exposureStatus, newExposureDisabledReason)
+            Tracing.setExposureStatus(newStatus, newExposureDisabledReason)
         }
     }
 
@@ -160,7 +162,8 @@ object Tracing {
         var status = STATUS_STOPPED
         var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
         var exposureDisabledReason = "starting"
-
+        var doesSupportENS = false
+        
         private lateinit var exposureWrapper: ExposureNotificationClientWrapper
 
         var resolutionPromise: Promise? = null
@@ -293,6 +296,11 @@ object Tracing {
             } catch (ex: Exception) {
                 Events.raiseError("init", ex)
             }
+        }
+
+        @JvmStatic
+        fun isENSSupported(): Boolean {
+            return doesSupportENS
         }
 
         private fun setNewStatus(newStatus: String) {
@@ -552,18 +560,24 @@ object Tracing {
         @JvmStatic
         fun isSupported(promise: Promise) = runBlocking<Unit> {
             launch {
+
                 try {
-                    val apiResult = ExposureNotificationHelper.checkAvailability()
+                    val apiResult = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
                     Events.raiseEvent(Events.INFO, "isSupported - checkAvailability: $apiResult")
                     if (apiResult == ConnectionResult.SUCCESS) {
+                        val version = ExposureNotificationHelper.checkAvailability().await()
+                        Events.raiseEvent(Events.INFO, "isSupported - version: $version")
+                        doesSupportENS = true
                         promise.resolve(true)
                     } else if (apiResult == ConnectionResult.SERVICE_INVALID || apiResult == ConnectionResult.SERVICE_DISABLED || apiResult == ConnectionResult.SERVICE_MISSING) {
                         promise.resolve(false)
+                        doesSupportENS = false
                         base.setApiError(apiResult)
                     }
                 } catch (ex: Exception) {
                     Events.raiseError("isSupported - Exception", ex)
                     promise.resolve(false)
+                    doesSupportENS = false
                     base.setApiError(1)
                 }
             }
@@ -695,12 +709,12 @@ object Tracing {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
-            if (isPaused) {
+            if (doesSupportENS && isPaused) {
                 exposureDisabledReason = "paused"
             }
 
             try {
-                if (!isBluetoothAvailable()) {
+                if (doesSupportENS && !isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
                     exposureDisabledReason = "bluetooth"
                 } else if (exposureDisabledReason == "bluetooth") {

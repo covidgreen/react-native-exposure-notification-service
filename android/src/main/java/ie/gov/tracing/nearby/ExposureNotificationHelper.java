@@ -5,8 +5,6 @@ import ie.gov.tracing.common.Events;
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.TaskToFutureAdapter;
-import com.google.android.gms.common.GoogleApiAvailability;
-import com.google.android.gms.nearby.Nearby;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -112,7 +110,11 @@ public class ExposureNotificationHelper implements LifecycleObserver {
         AppExecutors.getScheduledExecutor());
   }
 
-  public static int checkAvailability() {
-    return GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(Tracing.reactContext);
+  public static ListenableFuture<Long> checkAvailability() {
+    return TaskToFutureAdapter.getFutureWithTimeout(
+            ExposureNotificationClientWrapper.get(Tracing.reactContext).deviceSupportsENS(),
+            API_TIMEOUT.toMillis(),
+            TimeUnit.MILLISECONDS,
+            AppExecutors.getScheduledExecutor());
   }
 }
