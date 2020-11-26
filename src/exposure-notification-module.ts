@@ -113,11 +113,6 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
    * @platform android
    */
   triggerUpdate(): Promise<string>;
-
-  /**
-   * @platform ios
-   */
-  registerBackgroundProcessing(): void;
 }
 
 const {

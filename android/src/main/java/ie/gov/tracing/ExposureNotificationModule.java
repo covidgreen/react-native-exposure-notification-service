@@ -224,11 +224,6 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
         Tracing.cancelNotifications();
     }
 
-    @ReactMethod
-    public void registerBackgroundProcessing() {
-        // only iOS
-    }
-
     private PackageInfo getPackageInfo() throws Exception {
         return Tracing.reactContext.getApplicationContext().getPackageManager().getPackageInfo(Tracing.reactContext.getApplicationContext().getPackageName(), 0);
     }
