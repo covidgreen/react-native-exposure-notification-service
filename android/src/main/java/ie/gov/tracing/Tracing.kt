@@ -123,8 +123,10 @@ object Tracing {
                     newStatus = Tracing.EXPOSURE_STATUS_DISABLED
                 }
             }
-            Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action")
-            Tracing.setExposureStatus(newStatus, newExposureDisabledReason)
+            Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action, $doesSupportENS")
+            if (doesSupportENS) {
+                Tracing.setExposureStatus(newStatus, newExposureDisabledReason)
+            }            
         }
     }
 
