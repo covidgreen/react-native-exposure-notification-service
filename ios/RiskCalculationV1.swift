@@ -43,8 +43,11 @@ class RiskCalculationV1 {
     }
     
     private static func constructSummaryInfo(_ summary: ENExposureDetectionSummary) -> ExposureProcessor.ExposureInfo {
+        let calendar = Calendar.current
+        let dateToday = calendar.startOfDay(for: Date())
+        let contactDate = calendar.date(byAdding: .day, value: (0 - summary.daysSinceLastExposure), to: dateToday)
         
-        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: summary.daysSinceLastExposure, attenuationDurations: self.convertDurations(summary.attenuationDurations), matchedKeyCount: Int(summary.matchedKeyCount),  maxRiskScore: Int(summary.maximumRiskScore), exposureDate: Date())
+        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: summary.daysSinceLastExposure, attenuationDurations: self.convertDurations(summary.attenuationDurations), matchedKeyCount: Int(summary.matchedKeyCount),  maxRiskScore: Int(summary.maximumRiskScore), exposureDate: dateToday, exposureContactDate: contactDate!)
      
         if let meta = summary.metadata {
             info.maximumRiskScoreFullRange = meta["maximumRiskScoreFullRange"] as? Int

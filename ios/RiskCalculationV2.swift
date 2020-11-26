@@ -11,7 +11,10 @@ class RiskCalculationV2 {
             return completion(.success(nil))
         }
         
-        let aboveThresholdDays = summary.daySummaries.filter({ Int(($0.daySummary.weightedDurationSum / 60.0)) > thresholds.timeThreshold}).sorted(by: { $0.date > $1.date })
+        if (!thresholds.contiguousMode) {
+            let aboveThresholdDays = summary.daySummaries.filter({ Int(($0.daySummary.weightedDurationSum / 60.0)) > thresholds.timeThreshold}).sorted(by: { $0.date > $1.date })
+            
+        }
         
         guard let mostRecent = aboveThresholdDays.first else {
             os_log("V2 - No daily summary meeting duration threshold", log: OSLog.checkExposure, type: .info)
@@ -38,6 +41,13 @@ class RiskCalculationV2 {
         }
     }
     
+    private static func findDayToProcess(_ summary: ENExposureDetectionSummary, _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds) -> ENExposureDaySummary? {
+        
+ else {
+            
+        }
+    }
+    
     private static func wrapError(_ description: String, _ error: Error?) -> Error {
       
       if let err = error {
@@ -51,10 +61,11 @@ class RiskCalculationV2 {
     private static func constructSummaryInfo(_ day: ENExposureDaySummary, _ windows: [ExposureProcessor.ExposureDetailsWindow]) -> ExposureProcessor.ExposureInfo {
         
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.day], from: day.date, to: Date())
+        let dateToday = calendar.startOfDay(for: Date())
+        let components = calendar.dateComponents([.day], from: day.date, to: dateToday)
         
         let summedDurations = sumDurations(windows)
-        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: summedDurations.buckets, matchedKeyCount: -1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: Date())
+        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: summedDurations.buckets, matchedKeyCount: -1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: dateToday, exposureContactDate: day.date)
         
         info.customAttenuationDurations = summedDurations.buckets
         info.riskScoreSumFullRange = Int(day.daySummary.scoreSum)
@@ -76,7 +87,7 @@ class RiskCalculationV2 {
         return data
     }
     
-    private static func extractExposureWindowData(_ summary: ENExposureDetectionSummary, _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds, _ dayDate: Date, _ completion: @escaping  (Result<([ExposureProcessor.ExposureDetailsWindow]), Error>) -> Void) {
+    private static func extractExposureWindowData(_ summary: ENExposureDetectionSummary, _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds, _ dayDate: Date?, _ completion: @escaping  (Result<([ExposureProcessor.ExposureDetailsWindow]), Error>) -> Void) {
     
         ExposureManager.shared.manager.getExposureWindows(summary: summary) { exposureWindows, error in
       
@@ -88,11 +99,15 @@ class RiskCalculationV2 {
                 return completion(.failure(wrapError("No exposure window data available", nil)))
             }
             
-            let matchWindows = windows.filter({$0.date == dayDate})
+            var matchWindows:[ENExposureWindow] = windows
+            if (dayDate != nil) {
+                matchWindows = windows.filter({$0.date == dayDate})
+            }
+            
             let windowList: [ExposureProcessor.ExposureDetailsWindow] = matchWindows.map { window in
                 let scan = buildScanData(window.scanInstances, configuration, thresholds)
                 
-                return ExposureProcessor.ExposureDetailsWindow(date: dayDate, calibrationConfidence: window.calibrationConfidence.rawValue, diagnosisReportType: window.diagnosisReportType.rawValue, infectiousness: window.infectiousness.rawValue, scanData: scan)
+                return ExposureProcessor.ExposureDetailsWindow(date: window.date, calibrationConfidence: window.calibrationConfidence.rawValue, diagnosisReportType: window.diagnosisReportType.rawValue, infectiousness: window.infectiousness.rawValue, scanData: scan)
             }
                         
             return completion(.success(windowList))

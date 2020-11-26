@@ -11,6 +11,7 @@ public class ExposureProcessor {
         let matchedKeyCount: Int
         let maxRiskScore: Int
         let exposureDate: Date
+        let exposureContactDate: Date
         var maximumRiskScoreFullRange: Int!
         var riskScoreSumFullRange: Int!
         var customAttenuationDurations: [Int]!
@@ -278,6 +279,7 @@ public class ExposureProcessor {
            "maxRiskScore": exposure.maxRiskScore,
            "attenuationDurations": exposure.attenuationDurations,
            "exposureAlertDate": Int64(exposure.exposureDate.timeIntervalSince1970 * 1000.0),
+           "exposureDate": Int64(exposure.exposureContactDate.timeIntervalSince1970 * 1000.0),
            "maximumRiskScoreFullRange": exposure.maximumRiskScoreFullRange ?? 0,
            "riskScoreSumFullRange": exposure.riskScoreSumFullRange ?? 0,
            "customAttenuationDurations": exposure.customAttenuationDurations ?? []

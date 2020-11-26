@@ -397,6 +397,7 @@ public class Storage {
         let attenuations = exposureInfo.attenuationDurations.map { String($0) }
         let customAttenuations = exposureInfo.customAttenuationDurations.map { String($0) }
         managedObject.setValue(exposureInfo.exposureDate, forKey: "exposureDate")
+        managedObject.setValue(exposureInfo.exposureContactDate, forKey: "exposureContactDate")
         managedObject.setValue(exposureInfo.daysSinceLastExposure, forKey: "daysSinceExposure")
         managedObject.setValue(exposureInfo.matchedKeyCount, forKey: "matchedKeys")
         managedObject.setValue(exposureInfo.maxRiskScore, forKey: "riskScore")
@@ -440,8 +441,13 @@ public class Storage {
           let attenuations = attenuationData.split(separator: ",").map { Int($0) ?? 0 }
           let customAttenuationData = exposure.value(forKey: "customAttenuationDurations") as? String ?? ""
           let customAttenuations = customAttenuationData.split(separator: ",").map { Int($0) ?? 0 }
-
-          var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: exposure.value(forKey: "daysSinceExposure") as! Int, attenuationDurations: attenuations, matchedKeyCount: exposure.value(forKey: "matchedKeys") as! Int, maxRiskScore: exposure.value(forKey: "riskScore") as! Int, exposureDate: exposure.value(forKey: "exposureDate") as! Date,
+          let daysSinceLastExposure = exposure.value(forKey: "daysSinceExposure") as! Int
+          let exposureDate = exposure.value(forKey: "exposureDate") as! Date
+          let calcDate = calendar.date(byAdding: .day, value: (0 - daysSinceLastExposure), to: exposureDate)
+          let exposureContactDate = exposure.value(forKey: "exposureContactDate") as? Date ?? calcDate
+            
+          var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: daysSinceLastExposure, attenuationDurations: attenuations, matchedKeyCount: exposure.value(forKey: "matchedKeys") as! Int, maxRiskScore: exposure.value(forKey: "riskScore") as! Int,
+              exposureDate: exposureDate, exposureContactDate: exposureContactDate!,
               maximumRiskScoreFullRange: exposure.value(forKey: "maximumRiskScoreFullRange") as? Int ?? 0,
               riskScoreSumFullRange: exposure.value(forKey: "riskScoreSumFullRange") as? Int ?? 0,
               customAttenuationDurations: customAttenuations)

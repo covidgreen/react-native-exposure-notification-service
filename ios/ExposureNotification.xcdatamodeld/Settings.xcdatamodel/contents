@@ -4,6 +4,7 @@
         <attribute name="attenuations" optional="YES" attributeType="String"/>
         <attribute name="customAttenuationDurations" optional="YES" attributeType="String"/>
         <attribute name="daysSinceExposure" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="exposureContactDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="exposureDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="exposureDetails" optional="YES" attributeType="String"/>
         <attribute name="exposureWindows" optional="YES" attributeType="String"/>
@@ -14,6 +15,7 @@
     </entity>
     <entity name="Settings" representedClassName="Settings" syncable="YES" codeGenerationType="class">
         <attribute name="analyticsOptin" optional="YES" attributeType="Boolean" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="authToken" optional="YES" attributeType="String"/>
         <attribute name="checkExposureInterval" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="dailyTrace" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="datesLastRan" optional="YES" attributeType="String"/>
@@ -29,6 +31,7 @@
         <attribute name="notificationRaised" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="notificationRepeat" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="notificationTitle" optional="YES" attributeType="String"/>
+        <attribute name="refreshToken" optional="YES" attributeType="String"/>
         <attribute name="serverURL" optional="YES" attributeType="String"/>
         <attribute name="servicePaused" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="serviceStopped" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
@@ -36,7 +39,7 @@
         <attribute name="version" optional="YES" attributeType="String"/>
     </entity>
     <elements>
-        <element name="Exposures" positionX="-54" positionY="-9" width="128" height="193"/>
-        <element name="Settings" positionX="-63" positionY="-18" width="128" height="358"/>
+        <element name="Exposures" positionX="-54" positionY="-9" width="128" height="208"/>
+        <element name="Settings" positionX="-63" positionY="-18" width="128" height="388"/>
     </elements>
 </model>
