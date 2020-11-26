@@ -572,10 +572,10 @@ object Tracing {
 
                 try {
                     val apiResult = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
-                    Events.raiseEvent(Events.INFO, "isSupported - checkAvailability: $apiResult")
+                    Events.raiseEvent(Events.INFO, "isSupported - isGooglePlayServicesAvailable: $apiResult")
                     if (apiResult == ConnectionResult.SUCCESS) {
-                        val version = ExposureNotificationHelper.checkAvailability().await()
-                        Events.raiseEvent(Events.INFO, "isSupported - version: $version")
+                        val version = ExposureNotificationHelper.getDeviceENSVersion().await()
+                        Events.raiseEvent(Events.INFO, "isSupported - getDeviceENSVersion: $version")
                         doesSupportENS = true
                         promise.resolve(true)
                     } else if (apiResult == ConnectionResult.SERVICE_INVALID || apiResult == ConnectionResult.SERVICE_DISABLED || apiResult == ConnectionResult.SERVICE_MISSING) {

@@ -110,9 +110,9 @@ public class ExposureNotificationHelper implements LifecycleObserver {
         AppExecutors.getScheduledExecutor());
   }
 
-  public static ListenableFuture<Long> checkAvailability() {
+  public static ListenableFuture<Long> getDeviceENSVersion() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-            ExposureNotificationClientWrapper.get(Tracing.reactContext).deviceSupportsENS(),
+            ExposureNotificationClientWrapper.get(Tracing.reactContext).getDeviceENSVersion(),
             API_TIMEOUT.toMillis(),
             TimeUnit.MILLISECONDS,
             AppExecutors.getScheduledExecutor());

@@ -98,7 +98,7 @@ public class ExposureNotificationClientWrapper {
     return exposureNotificationClient.deviceSupportsLocationlessScanning();
   }
   
-  public Task<Long> deviceSupportsENS() {
+  public Task<Long> getDeviceENSVersion() {
     return exposureNotificationClient.getVersion();
   }
     
