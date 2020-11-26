@@ -558,6 +558,13 @@ object Tracing {
         }
 
         @JvmStatic
+        fun canSupport(promise: Promise) {
+            val apiResult = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
+            Events.raiseEvent(Events.INFO, "GMS - isAvailable: $apiResult")
+            promise.resolve(apiResult == ConnectionResult.SUCCESS)
+        }
+
+        @JvmStatic
         fun isSupported(promise: Promise) = runBlocking<Unit> {
             launch {
 

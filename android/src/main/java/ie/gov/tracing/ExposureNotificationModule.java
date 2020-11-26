@@ -205,7 +205,7 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void canSupport(Promise promise) {
-        promise.resolve(true);
+        Tracing.canSupport(promise);
     }
 
     @ReactMethod
