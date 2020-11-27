@@ -145,5 +145,10 @@ public class ExposureNotificationClientWrapper {
   public Task<List<ExposureWindow>> getExposureWindows() {
     return exposureNotificationClient.getExposureWindows(ExposureNotificationClient.TOKEN_A);
   }
+  
+  public Task<Long> getDeviceENSVersion() {
+    return exposureNotificationClient.getVersion();
+  }
+    
 
 }

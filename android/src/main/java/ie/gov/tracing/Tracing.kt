@@ -110,13 +110,36 @@ object Tracing {
     class BleStatusReceiver : BroadcastReceiver() {
 
         override fun onReceive(context: Context, intent: Intent) {
-
+            var newExposureDisabledReason = Tracing.exposureDisabledReason
+            var newStatus = Tracing.exposureStatus
             if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
-                Tracing.getExposureStatus(null)
+                if (isBluetoothAvailable()) {
+                    if (newExposureDisabledReason == "bluetooth") {
+                        newExposureDisabledReason = ""
+                    }
+                } else {
+                    newExposureDisabledReason = "bluetooth"
+                    newStatus = Tracing.EXPOSURE_STATUS_DISABLED
+                }
             }
-            Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action")
-            Tracing.setExposureStatus(Tracing.exposureStatus, Tracing.exposureDisabledReason)
+            Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action, $doesSupportENS")
+            if (doesSupportENS) {
+                Tracing.setExposureStatus(newStatus, newExposureDisabledReason)
+            }            
         }
+    }
+
+    private fun isBluetoothAvailable(): Boolean {
+        val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter();
+
+        if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
+            return false
+        }
+
+        if (isLocationEnableRequired()) {
+            return false
+        }
+        return true
     }
 
     lateinit var context: Context
@@ -140,7 +163,8 @@ object Tracing {
         var status = STATUS_STOPPED
         var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
         var exposureDisabledReason = "starting"
-
+        var doesSupportENS = false
+        
         private lateinit var exposureWrapper: ExposureNotificationClientWrapper
 
         var resolutionPromise: Promise? = null
@@ -273,6 +297,11 @@ object Tracing {
             } catch (ex: Exception) {
                 Events.raiseError("init", ex)
             }
+        }
+
+        @JvmStatic
+        fun isENSSupported(): Boolean {
+            return doesSupportENS
         }
 
         private fun setNewStatus(newStatus: String) {
@@ -530,20 +559,33 @@ object Tracing {
         }
 
         @JvmStatic
+        fun canSupport(promise: Promise) {
+            val apiResult = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
+            Events.raiseEvent(Events.INFO, "GMS - isAvailable: $apiResult")
+            promise.resolve(apiResult == ConnectionResult.SUCCESS)
+        }
+
+        @JvmStatic
         fun isSupported(promise: Promise) = runBlocking<Unit> {
             launch {
+
                 try {
-                    val apiResult = ExposureNotificationHelper.checkAvailability()
-                    Events.raiseEvent(Events.INFO, "isSupported - checkAvailability: $apiResult")
+                    val apiResult = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
+                    Events.raiseEvent(Events.INFO, "isSupported - isGooglePlayServicesAvailable: $apiResult")
                     if (apiResult == ConnectionResult.SUCCESS) {
+                        val version = ExposureNotificationHelper.getDeviceENSVersion().await()
+                        Events.raiseEvent(Events.INFO, "isSupported - getDeviceENSVersion: $version")
+                        doesSupportENS = true
                         promise.resolve(true)
                     } else if (apiResult == ConnectionResult.SERVICE_INVALID || apiResult == ConnectionResult.SERVICE_DISABLED || apiResult == ConnectionResult.SERVICE_MISSING) {
                         promise.resolve(false)
+                        doesSupportENS = false
                         base.setApiError(apiResult)
                     }
                 } catch (ex: Exception) {
                     Events.raiseError("isSupported - Exception", ex)
                     promise.resolve(false)
+                    doesSupportENS = false
                     base.setApiError(1)
                 }
             }
@@ -675,31 +717,27 @@ object Tracing {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
-            if (isPaused) {
+            if (doesSupportENS && isPaused) {
                 exposureDisabledReason = "paused"
             }
-            try {
-                // check bluetooth
-                val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter();
-                if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
-                    exposureStatus = EXPOSURE_STATUS_DISABLED
-                    exposureDisabledReason = "bluetooth";
-                }
 
-                if (isLocationEnableRequired()) {
+            try {
+                if (doesSupportENS && !isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
-                    exposureDisabledReason = "bluetooth";
-                }                
+                    exposureDisabledReason = "bluetooth"
+                } else if (exposureDisabledReason == "bluetooth") {
+                    exposureDisabledReason = ""
+                }
 
                 result.putString("state", exposureStatus)
                 typeData.pushString(exposureDisabledReason)
-                result.putArray("type", typeData)                
+                result.putArray("type", typeData)
                 promise?.resolve(result)
             } catch (ex: Exception) {
                 Events.raiseError("getExposureStatus", ex)
                 result.putString("state", EXPOSURE_STATUS_UNKNOWN)
                 typeData.pushString("error")
-                result.putArray("type", typeData)                
+                result.putArray("type", typeData)
                 promise?.resolve(result)
             }
             return result
