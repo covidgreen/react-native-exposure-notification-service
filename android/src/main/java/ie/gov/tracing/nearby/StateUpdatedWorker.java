@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.os.Build;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationCompat.Builder;
 import androidx.core.app.NotificationManagerCompat;
@@ -18,15 +19,21 @@ import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 import androidx.work.WorkerParameters;
 
+import com.google.android.gms.nearby.exposurenotification.CalibrationConfidence;
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
-import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
+import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
+import com.google.android.gms.nearby.exposurenotification.Infectiousness;
+import com.google.android.gms.nearby.exposurenotification.ReportType;
+import com.google.android.gms.nearby.exposurenotification.ScanInstance;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -35,9 +42,11 @@ import ie.gov.tracing.R;
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
+import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.TaskToFutureAdapter;
+import ie.gov.tracing.nearby.riskcalculation.RiskCalculatorV2;
+import ie.gov.tracing.nearby.riskcalculation.Thresholds;
 import ie.gov.tracing.network.Fetcher;
-import ie.gov.tracing.storage.ExposureEntity;
 import ie.gov.tracing.storage.ExposureNotificationRepository;
 import ie.gov.tracing.storage.SharedPrefs;
 
@@ -46,6 +55,7 @@ import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEO
 public class StateUpdatedWorker extends ListenableWorker {
     private static final String EXPOSURE_NOTIFICATION_CHANNEL_ID =
             "ExposureNotificationCallback.EXPOSURE_NOTIFICATION_CHANNEL_ID";
+
     public static final String ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION =
             "com.google.android.apps.exposurenotification.ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION";
 
@@ -59,142 +69,125 @@ public class StateUpdatedWorker extends ListenableWorker {
         this.repository = new ExposureNotificationRepository(context);
     }
 
-    private static double[] doubleArrayFromString(String string) {
-        try {
-            String[] strings = string.replace("[", "").replace("]", "").split(", ");
-            double[] result = new double[strings.length];
-            for (int i = 0; i < result.length; i++) {
-                result[i] = Double.parseDouble(strings[i]);
+    @NotNull
+    private List<ExposureWindow> getSimulatedExposureWindows() {
+
+        ArrayList<ExposureWindow> exposureWindows = new ArrayList<ExposureWindow>();
+
+        int defaultAttenuationDb = 30;
+
+        int[] infectiousnessTypes = {Infectiousness.STANDARD, Infectiousness.HIGH};
+
+        int[] reportTypes = {ReportType.CONFIRMED_TEST, ReportType.CONFIRMED_CLINICAL_DIAGNOSIS, ReportType.SELF_REPORT};
+        int[] calibrationConfidenceTypes = {CalibrationConfidence.LOWEST, CalibrationConfidence.LOW, CalibrationConfidence.MEDIUM, CalibrationConfidence.HIGH};
+
+        int maxMins = 5;
+        int varyDb = 4;
+
+        for (int i = 0; i < 5; i++) {
+
+            ExposureWindow.Builder exposureWindowBuilder = new ExposureWindow.Builder();
+
+            ArrayList<ScanInstance> scanInstances = new ArrayList<ScanInstance>();
+
+            for (int k = 0; k < 15; k++) {
+                ScanInstance.Builder scanInstanceBuilder = new ScanInstance.Builder();
+
+                int secondsSinceLastScan = Math.max(k % maxMins, 1) * 60;
+                int minAttenuationDb = defaultAttenuationDb;
+                int typicalAttenuationDb = defaultAttenuationDb + (i % varyDb);
+
+                scanInstanceBuilder.setMinAttenuationDb(minAttenuationDb);
+                scanInstanceBuilder.setSecondsSinceLastScan(secondsSinceLastScan);
+                scanInstanceBuilder.setTypicalAttenuationDb(typicalAttenuationDb);
+
+                scanInstances.add(scanInstanceBuilder.build());
             }
-            return result;
-        } catch (Exception ex) {
-            Events.raiseError("Cannot parse double array", ex);
+
+            exposureWindowBuilder.setScanInstances(scanInstances);
+
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.DATE, i * -1);
+            long msSinceEpoch = cal.getTimeInMillis();
+            exposureWindowBuilder.setDateMillisSinceEpoch(msSinceEpoch);
+
+            int calibrationConfidence = calibrationConfidenceTypes[i % calibrationConfidenceTypes.length];
+            exposureWindowBuilder.setCalibrationConfidence(calibrationConfidence);
+
+            int infectiousness = infectiousnessTypes[i % infectiousnessTypes.length];
+            exposureWindowBuilder.setInfectiousness(infectiousness);
+
+            int reportType = reportTypes[i % reportTypes.length];
+            exposureWindowBuilder.setReportType(reportType);
+
+            exposureWindows.add(exposureWindowBuilder.build());
+
         }
-        return null;
+
+        return exposureWindows;
     }
 
+    private void processExposureFiles(Context context, ExposureConfig config, Thresholds thresholds) {
+        ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
+        // FIXME impl differs from iOS, this is done in DiagnosisKeysWorker
+//        exposureNotificationClient.get
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
     @NonNull
     @Override
-    public ListenableFuture<Result> startWork() {
+    public ListenableFuture<Result> startWork() { // FIXME change the order
         Tracing.currentContext = getApplicationContext();
 
-        final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
         final boolean simulate = getInputData().getBoolean("simulate", false);
-        if (token == null) {
-            return Futures.immediateFuture(Result.failure());
-        } else {
-            return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                    ExposureNotificationClientWrapper.get(context).getExposureSummary(token),
-                    DEFAULT_API_TIMEOUT.toMillis(),
-                    TimeUnit.MILLISECONDS,
-                    AppExecutors.getScheduledExecutor()))
-                    .transformAsync((exposureSummary) -> {
-                        Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results" + simulate);
-                        if (simulate) {
-                            ExposureSummary.ExposureSummaryBuilder builder = new ExposureSummary.ExposureSummaryBuilder();
-                            int[] dummyAttenuations = new int[]{30, 30, 30};
-                            builder.setAttenuationDurations(dummyAttenuations);
-                            builder.setDaysSinceLastExposure(1);
-                            builder.setMatchedKeyCount(1);
-                            builder.setMaximumRiskScore(10);
-                            builder.setSummationRiskScore(10);
-                            exposureSummary = builder.build();
-                        }
 
-                        if (exposureSummary == null) {
-                            Events.raiseEvent(Events.INFO, "exposureSummary - no exposure summary, deleting token.");
-                            return repository.deleteTokenEntityAsync(token);
-                        }
+        ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
+        ExposureConfig config = exposureNotificationClient.fetchExposureConfig(); // FIXME make async
 
-                        if (exposureSummary.getMatchedKeyCount() == 0) {
-                            // No matches so we show no notification and just delete the token.
-                            Events.raiseEvent(Events.INFO, "exposureSummary - no matches, deleting token.");
-                            return repository.deleteTokenEntityAsync(token);
-                        }
+        return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                exposureNotificationClient.getDailySummaries(config),
+                DEFAULT_API_TIMEOUT.toMillis(),
+                TimeUnit.MILLISECONDS,
+                AppExecutors.getScheduledExecutor()))
+                .transformAsync(dailySummaries -> {
+                    return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                            exposureNotificationClient.getExposureWindows(),
+                            DEFAULT_API_TIMEOUT.toMillis(),
+                            TimeUnit.MILLISECONDS,
+                            AppExecutors.getScheduledExecutor()))
+                            .transformAsync((exposureWindows) -> { // FIXME if all results are sync, should switch to transform instead
+                                if (simulate) {
+                                    exposureWindows = getSimulatedExposureWindows();
+                                }
 
-                        if (exposureSummary.getMaximumRiskScore() == 0) {
-                            Events.raiseEvent(Events.INFO, "exposureSummary - maximumRiskScore: " +
-                                    exposureSummary.getMaximumRiskScore() + ", deleting token.");
-                            return repository.deleteTokenEntityAsync(token);
-                        }
+                                if (exposureWindows == null) {
+                                    Events.raiseEvent(Events.INFO, "exposureWindows - no exposure windows.");
+                                    return Futures.immediateFailedFuture(new NoExposureWindows());
+                                }
 
-                        Events.raiseEvent(Events.INFO, "exposureSummary - maximumRiskScore: " +
-                                exposureSummary.getMaximumRiskScore());
+                                if (exposureWindows.size() == 0) {
+                                    // No matches so we show no notification and just delete the token.
+                                    Events.raiseEvent(Events.INFO, "exposureSummary - empty exposure windows.");
+                                    return Futures.immediateFailedFuture(new EmptyExposureWindows());
+                                }
 
-                        int[] ad = exposureSummary.getAttenuationDurationsInMinutes();
+                                if (dailySummaries == null) {
+                                    Events.raiseEvent(Events.INFO, "exposureWindows - no dailySummaries");
+                                    return Futures.immediateFailedFuture(new NoDailySummaries());
+                                }
 
-                        double[] tw;
-                        long timeThreshold;
-                        if (simulate) {
-                            tw = doubleArrayFromString("[1, 1, 0]");
-                            timeThreshold = 15;
-                        } else {
-                            tw = doubleArrayFromString(SharedPrefs.getString("thresholdWeightings", context));
-                            timeThreshold = SharedPrefs.getLong("timeThreshold", context);
-                        }
+                                boolean shouldShowNotification = RiskCalculatorV2.INSTANCE.calculateRisk(exposureWindows, dailySummaries, config, context);
 
-                        if (tw == null || tw.length != 3 || timeThreshold <= 0) {
-                            Events.raiseEvent(Events.INFO, "exposureSummary - timeThreshold or " +
-                                    "weightingThresholds not set or invalid, deleting token and aborting.");
-                            return repository.deleteTokenEntityAsync(token);
-                        }
+                                if(shouldShowNotification) {
+                                    showNotification();
+                                }
+                                return Futures.immediateFuture(shouldShowNotification);
 
-                        Events.raiseEvent(Events.INFO, "exposureSummary - Determining if exposure durations: " +
-                                Arrays.toString(ad) + ", using " + "thresholdWeightings: " + Arrays.toString(tw) +
-                                ", exceeds the timeThreshold: " + timeThreshold);
+                            }, AppExecutors.getBackgroundExecutor());
 
-                        double totalTime = tw[0] * ad[0] + tw[1] * ad[1] + tw[2] * ad[2];
-
-                        if (totalTime < timeThreshold) {
-                            Events.raiseEvent(Events.INFO, "exposureSummary - totalTime: " + totalTime +
-                                    " is less than timeThreshold: " + timeThreshold + ", ignoring and deleting token.");
-                            return repository.deleteTokenEntityAsync(token);
-                        }
-
-                        Events.raiseEvent(Events.INFO, "exposureSummary - totalTime: " + totalTime +
-                                " exceeds timeThreshold: " + timeThreshold + ", recording successful match");
-
-                        // store field as a string (otherwise we'd need a new table)
-                        String attenuationDurations = "";
-                        if (ad.length > 0) {
-                            attenuationDurations = Integer.toString(ad[0]);
-                            for (int i = 1; i < ad.length; i++) {
-                                attenuationDurations += "," + ad[i];
-                            }
-                        }
-
-                        List<ExposureEntity> exposureEntities = new ArrayList<>();
-                        ExposureEntity exposureEntity = ExposureEntity.create(
-                                exposureSummary.getDaysSinceLastExposure(),
-                                exposureSummary.getMatchedKeyCount(),
-                                exposureSummary.getMaximumRiskScore(),
-                                exposureSummary.getSummationRiskScore(),
-                                attenuationDurations
-                        );
-                        exposureEntities.add(exposureEntity);
-
-                        // asynchronously update our summary table while we show notification
-                        repository.upsertExposureEntitiesAsync(exposureEntities);
-
-                        Events.raiseEvent(Events.ON_EXPOSURE, "exposureSummary - recording summary matches:"
-                                + exposureSummary.getMatchedKeyCount() + ", duration minutes: " + attenuationDurations);
-                        showNotification();
-
-                        HashMap<String, Object> payload = new HashMap<>();
-
-                        payload.put("matchedKeys", exposureSummary.getMatchedKeyCount());
-                        payload.put("attenuations", ad);
-                        payload.put("maxRiskScore", exposureSummary.getMaximumRiskScore());
-
-                        Fetcher.saveMetric("CONTACT_NOTIFICATION", context, payload);
-                        Fetcher.triggerCallback(exposureEntity, context, payload);
-
-                        // finish by marking token as read if we have positive matchCount for token
-                        return repository.markTokenEntityRespondedAsync(token);
-                    }, AppExecutors.getBackgroundExecutor())
-                    .transform((v) -> Result.success(), AppExecutors.getLightweightExecutor())
-                    .catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
-        }
+                }, AppExecutors.getBackgroundExecutor())
+                .transform((v) -> Result.success(), AppExecutors.getLightweightExecutor())
+                .catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
     }
 
     private Result processError(Exception ex) {
@@ -254,6 +247,7 @@ public class StateUpdatedWorker extends ListenableWorker {
         showNotification(context);
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     public static void simulateExposure(Long timeDelay) {
         Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure");
 
@@ -267,4 +261,8 @@ public class StateUpdatedWorker extends ListenableWorker {
                 .build();
         workManager.enqueueUniqueWork("SimulateWorker", ExistingWorkPolicy.REPLACE, workRequest);
     }
+
+    private static class NoExposureWindows extends Exception {}
+    private static class EmptyExposureWindows extends Exception {}
+    private static class NoDailySummaries extends Exception {}
 }

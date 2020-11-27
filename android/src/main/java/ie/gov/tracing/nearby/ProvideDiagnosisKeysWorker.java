@@ -45,6 +45,7 @@ import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
+import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.network.DiagnosisKeyDownloader;
 import ie.gov.tracing.network.Fetcher;
@@ -181,7 +182,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
               .transformAsync(isEnabled -> {
                 // Only continue if it is enabled.
                 if (isEnabled != null && isEnabled) {
-                  return diagnosisKeys.download();
+                  ExposureConfig exposureConfig = ExposureNotificationClientWrapper.get(context).fetchExposureConfig();
+                  return diagnosisKeys.download(exposureConfig.getNumFilesAndroid());
                 } else {
                   // Stop here because things aren't enabled. Will still return successful though.
                   SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);

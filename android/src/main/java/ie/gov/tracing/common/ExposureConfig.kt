@@ -15,4 +15,23 @@ data class ExposureConfig(
         val transmissionRiskWeight: Int,
         val durationAtAttenuationThresholds: IntArray?,
         val thresholdWeightings: DoubleArray?,
-        val timeThreshold: Int)
+        val timeThreshold: Int,
+        val numFilesAndroid: Int,
+        val immediateDurationWeight: Double,
+        val nearDurationWeight: Double,
+        val mediumDurationWeight: Double,
+        val otherDurationWeight: Double,
+        val infectiousnessStandardWeight: Double,
+        val infectiousnessHighWeight: Double,
+        val reportTypeConfirmedTestWeight: Double,
+        val reportTypeConfirmedClinicalDiagnosisWeight: Double,
+        val reportTypeSelfReportedWeight: Double,
+        val reportTypeRecursiveWeight: Double,
+        val daysSinceLastExposureThreshold: Int,
+        val minimumRiskScoreFullRange: Double,
+        val attenuationDurationThresholds: IntArray,
+        val contiguousMode: Boolean
+)
+
+@Keep
+data class ExposureConfigContainer(val exposureConfig: ExposureConfig)
