@@ -5,16 +5,16 @@ import androidx.annotation.Keep
 @Keep
 data class ExposureConfig(
         val minimumRiskScore: Int,
-        val attenuationLevelValues: List<Int>,
+        val attenuationLevelValues: IntArray,
         val attenuationWeight: Int,
-        val daysSinceLastExposureLevelValues: List<Int>,
+        val daysSinceLastExposureLevelValues: IntArray,
         val daysSinceLastExposureWeight: Int,
-        val durationLevelValues: List<Int>,
+        val durationLevelValues: IntArray,
         val durationWeight: Int,
-        val transmissionRiskLevelValues: List<Int>,
+        val transmissionRiskLevelValues: IntArray,
         val transmissionRiskWeight: Int,
-        val durationAtAttenuationThresholds: List<Int>?,
-        val thresholdWeightings: List<Double>?,
+        val durationAtAttenuationThresholds: IntArray?,
+        val thresholdWeightings: DoubleArray?,
         val timeThreshold: Int,
         val numFilesAndroid: Int,
         val immediateDurationWeight: Double,
@@ -27,12 +27,9 @@ data class ExposureConfig(
         val reportTypeConfirmedClinicalDiagnosisWeight: Double,
         val reportTypeSelfReportedWeight: Double,
         val reportTypeRecursiveWeight: Double,
-        // Note: iOS stores this as UInt, but it is experimental in kotlin
-        val reportTypeNoneMap: Int, // ENDiagnosisReportType(rawValue:  codableExposureConfiguration.reportTypeNoneMap) ?? ENDiagnosisReportType.confirmedTest
         val daysSinceLastExposureThreshold: Int,
         val minimumRiskScoreFullRange: Double,
-        val attenuationDurationThresholds: List<Int>,
-        val infectiousnessForDaysSinceOnsetOfSymptoms: List<Int>, // self.convertToMap(codableExposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms)
+        val attenuationDurationThresholds: IntArray,
         val contiguousMode: Boolean
 )
 

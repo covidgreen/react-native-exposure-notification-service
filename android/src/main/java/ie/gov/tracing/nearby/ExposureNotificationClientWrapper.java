@@ -1,7 +1,10 @@
 package ie.gov.tracing.nearby;
 
 import android.content.Context;
+import android.os.Build;
 
+
+import androidx.annotation.RequiresApi;
 
 import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.exposurenotification.DailySummariesConfig;
@@ -10,6 +13,8 @@ import com.google.android.gms.nearby.exposurenotification.ExposureConfiguration;
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
 import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
 import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
+import com.google.android.gms.nearby.exposurenotification.Infectiousness;
+import com.google.android.gms.nearby.exposurenotification.ReportType;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
 import com.google.android.gms.tasks.Task;
 import com.google.gson.Gson;
@@ -18,6 +23,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
@@ -80,7 +86,7 @@ public class ExposureNotificationClientWrapper {
                     .setDurationAtAttenuationThresholds(config.getDurationAtAttenuationThresholds()).build();
 
     // we use these when we receive match broadcasts from exposure API
-    SharedPrefs.setString("thresholdWeightings", config.getThresholdWeightings()!!.toString(), appContext);
+    SharedPrefs.setString("thresholdWeightings", Arrays.toString(config.getThresholdWeightings()), appContext);
     SharedPrefs.setLong("timeThreshold", config.getTimeThreshold(), appContext);
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with: " + exposureConfiguration);
@@ -96,7 +102,6 @@ public class ExposureNotificationClientWrapper {
     return container.getExposureConfig();
   }
 
-
   Task<Void> provideDiagnosisKeys(List<File> files) {
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with v1.6");
@@ -110,30 +115,23 @@ public class ExposureNotificationClientWrapper {
     return exposureNotificationClient.getExposureSummary(token);
   }
 
+  @RequiresApi(api = Build.VERSION_CODES.N)
   Task<List<DailySummary>> getDailySummaries(ExposureConfig config) {
     DailySummariesConfig.DailySummariesConfigBuilder builder = new DailySummariesConfig.DailySummariesConfigBuilder();
+    List<Double> attenuationWeightings = Arrays.asList(config.getImmediateDurationWeight() / 100.0, config.getNearDurationWeight() / 100.0, config.getMediumDurationWeight() / 100.0, config.getOtherDurationWeight() / 100.0);
+    List<Integer> attenuations = Arrays.stream(config.getAttenuationDurationThresholds()).boxed().collect(Collectors.toList());
     DailySummariesConfig dailySummaryConfig = builder
             // A map that stores a weight for each possible value of reportType.
-            .setReportTypeWeight(config.reportTypeW) //FIXME what is the good value ?
-
-            // attenuationBucketThresholdDb, attenuationBucketWeights:
-            // - attenuationBucketThresholdDb: Thresholds defining the BLE attenuation buckets edges. This list must have 3 elements: the immediate, near, and medium thresholds.
-            // - attenuationBucketWeights: Duration weights to associate with ScanInstances depending on the attenuation bucket in which their typicalAttenuation falls.
-            //     This list must have four elements, corresponding to the weights for the following buckets:
-            //        Immediate bucket: -infinity < attenuation <= immediate threshold
-            //        Near bucket: immediate threshold < attenuation <= near threshold
-            //        Medium bucket: near threshold < attenuation <= medium threshold
-            //        Other bucket: medium threshold < attenuation < +infinity
-            //     Each element must be between 0 and 2.5.
-//            .setAttenuationBuckets(attenuationBucketThresholdDb, attenuationBucketWeights ) //FIXME what is the good value ?
-
+            .setReportTypeWeight(ReportType.CONFIRMED_TEST, config.getReportTypeConfirmedTestWeight() / 100.0)
+            .setReportTypeWeight(ReportType.CONFIRMED_CLINICAL_DIAGNOSIS, config.getReportTypeConfirmedClinicalDiagnosisWeight() / 100.0)
+            .setReportTypeWeight(ReportType.SELF_REPORT, config.getReportTypeSelfReportedWeight() / 100.0)
+            .setReportTypeWeight(ReportType.RECURSIVE, config.getReportTypeRecursiveWeight() / 100.0)
+            .setAttenuationBuckets(attenuations, attenuationWeightings)
             // To return all available day summaries, set to 0, which is treated differently.
-            .setDaysSinceExposureThreshold(0) //FIXME what is the good value ?
-
-            //  A map that stores a weight for each possible value of infectiousness.
-            //    In v1.7 and higher, ExposureWindow objects with infectiousness=NONE do not contribute to the risk value. If a weight is specified for infectiousness=NONE, that weight value is disregarded.
-            //    In v1.6, if a weight is specified for infectiousness=NONE, it should be 0 because NONE indicates no risk of exposure.
-//            .setInfectiousnessWeight(config.getTransmissionRiskWeight()) //FIXME what is the good value ?
+            .setDaysSinceExposureThreshold(0)
+            .setInfectiousnessWeight(Infectiousness.STANDARD, config.getInfectiousnessStandardWeight() / 100.0)
+            .setInfectiousnessWeight(Infectiousness.HIGH, config.getInfectiousnessHighWeight() / 100.0)
+            .setMinimumWindowScore(config.getMinimumRiskScoreFullRange())
             .build();
     return exposureNotificationClient.getDailySummaries(dailySummaryConfig);
   }
@@ -143,7 +141,7 @@ public class ExposureNotificationClientWrapper {
   }
 
   public Task<List<ExposureWindow>> getExposureWindows() {
-    return exposureNotificationClient.getExposureWindows(ExposureNotificationClient.TOKEN_A);
+    return exposureNotificationClient.getExposureWindows();
   }
   
   public Task<Long> getDeviceENSVersion() {
