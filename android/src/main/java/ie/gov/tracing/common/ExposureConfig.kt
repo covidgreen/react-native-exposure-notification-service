@@ -32,6 +32,3 @@ data class ExposureConfig(
         val attenuationDurationThresholds: IntArray,
         val contiguousMode: Boolean
 )
-
-@Keep
-data class ExposureConfigContainer(val exposureConfig: ExposureConfig)

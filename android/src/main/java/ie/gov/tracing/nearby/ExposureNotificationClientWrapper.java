@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
-import ie.gov.tracing.common.ExposureConfigContainer;
 import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.SharedPrefs;
 
@@ -98,8 +97,11 @@ public class ExposureNotificationClientWrapper {
   public ExposureConfig fetchExposureConfig() {
     String settings = Fetcher.fetch("/settings/exposures", appContext);
     Gson gson = new Gson();
-    ExposureConfigContainer container = gson.fromJson(settings, ExposureConfigContainer.class);
-    return container.getExposureConfig();
+    Map map = gson.fromJson(settings, Map.class);
+    String exposureConfig = (String) map.get("exposureConfig");
+    Events.raiseEvent(Events.INFO, "Settings" + exposureConfig);
+    ExposureConfig container = gson.fromJson(exposureConfig, ExposureConfig.class);
+    return container;
   }
 
   Task<Void> provideDiagnosisKeys(List<File> files) {
