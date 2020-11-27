@@ -98,6 +98,10 @@ public class ExposureNotificationClientWrapper {
     return exposureNotificationClient.deviceSupportsLocationlessScanning();
   }
   
+  public Task<Long> getDeviceENSVersion() {
+    return exposureNotificationClient.getVersion();
+  }
+    
   /*
   Task<List<ExposureInformation>> getExposureInformation(String token) {
     return exposureNotificationClient.getExposureInformation(token);
