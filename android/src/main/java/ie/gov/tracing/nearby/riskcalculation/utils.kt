@@ -1,6 +1,6 @@
 package ie.gov.tracing.nearby.riskcalculation
 
-import ie.gov.tracing.common.Events.Companion.raiseError
+import ie.gov.tracing.common.Events.raiseError
 
 fun doubleArrayFromString(string: String): DoubleArray? {
     try {

@@ -32,14 +32,14 @@ object RiskCalculatorV2 {
         try {
             val windowsData = extractExposureWindowData(windows, config, thresholds, mostRecent.daysSinceEpoch)
 
-            if (thresholds.contiguousMode) {
+            /*if (thresholds.contiguousMode) {
                 if (windowsData.filter{ it.scanData.exceedsThreshold }.count > 0) {
                     return constructSummaryInfo(mostRecent, windowsData) // FIXME showNotification ?
                 } else {
-                    Events.raiseEvent(Events.INFO, "V2 - Running in Contiguous mode, no contiguous match);
+                    Events.raiseEvent(Events.INFO, "V2 - Running in Contiguous mode, no contiguous match");
                     return false;
                 }
-            }
+            }*/
 
             return constructSummaryInfo(mostRecent, windowsData)
 
@@ -88,7 +88,7 @@ object RiskCalculatorV2 {
         val  matchWindows = windows.filter{ Math.floor(it.dateMillisSinceEpoch.toDouble() / 24*60*60*1000).toInt() == daysSinceEpoch}
 
         matchWindows.forEach{ window ->
-                val scan = buildScanData(window.scanInstances, attenuations, thresholds);
+                val scan = buildScanData(window.scanInstances, config, thresholds);
                 val item: WindowData = items[window.dateMillisSinceEpoch] ?: createWindowDataAndUpdateItems(window, items)
                 scan.buckets.forEachIndexed { index, element ->
                     item.cumulativeScans.buckets[index] += element
