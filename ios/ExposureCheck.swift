@@ -300,7 +300,7 @@ class ExposureCheck: AsyncOperation {
           if let exposure = exposureData  {
              let existingExposures = Storage.shared.getExposures(self.configData.storeExposuresFor).reversed()
             
-             if existingExposures.count > 0, existingExposures.first!.exposureContactDate < exposure.exposureContactDate {
+             if (existingExposures.count > 0 && existingExposures.first!.exposureContactDate < exposure.exposureContactDate) || existingExposures.count == 0 {
                 os_log("Detected exposure event", log: OSLog.checkExposure, type: .info)
                 Storage.shared.saveExposureDetails(self.storageContext, exposure)
             

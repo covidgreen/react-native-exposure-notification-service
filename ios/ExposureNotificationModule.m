@@ -57,7 +57,7 @@ RCT_EXTERN_METHOD(triggerUpdate:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(simulateExposure:(NSInteger *)timeDelay
-                  numDays:(NSInteger *))
+                  :(NSInteger *)numDays)
 
 RCT_EXTERN_METHOD(bundleId:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
