@@ -268,6 +268,44 @@ Used to trigger play services update should the user be using a version older th
 
 ---
 
+#### Enabling background processing (iOS only)
+
+Enable exposure checks when the app is backgrounded / closed.
+
+##### Prerequites:
+
+Go to Signing & Capabilities -> Background Modes, tick `Background fetch` & `Background processing`.  
+
+Add a new item to the Info.plist and choose "Permitted background task scheduler identifiers"  
+Expand the array and add value `$(PRODUCT_BUNDLE_IDENTIFIER).exposure-notification`  
+
+You should see the following lines in your Info.plist:
+```plist
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+```
+```plist
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).exposure-notification</string>
+	</array>
+```
+
+Add the following header in `AppDelegate.m`
+```objective-c
+#import <react_native_exposure_notification_service-Swift.h>
+```
+Add the following lines in `application:didFinishLaunchingWithOptions:`
+```objective-c
+// Register the background task to perform exposure checks
+[ExposureNotificationModule registerBackgroundProcessing];
+```
+
+---
+
 #### Subscribing to Events
 
 Create an `emitter` object using the `ExposureNotificationModule`
