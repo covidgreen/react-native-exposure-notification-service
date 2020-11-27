@@ -202,12 +202,12 @@ public class ExposureNotificationModule: RCTEventEmitter {
         resolve(false)
     }
   
-    @objc public func simulateExposure(_ timeDelay: Int) {
+    @objc public func simulateExposure(_ timeDelay: Int, _ numDays: Int) {
         
         if #available(iOS 13.5, *) {
             os_log("Request to simulate exposure after %f", log: OSLog.setup, type: .debug, timeDelay)
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(timeDelay)) {
-                ExposureProcessor.shared.checkExposureForeground(true, true)
+                ExposureProcessor.shared.checkExposureForeground(true, true, numDays)
             }
         }
     }
@@ -222,7 +222,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
      
     @objc public func checkExposure(_ skipTimeCheck: Bool) {
         if #available(iOS 13.5, *) {
-            ExposureProcessor.shared.checkExposureForeground(skipTimeCheck, false)
+            ExposureProcessor.shared.checkExposureForeground(skipTimeCheck, false, 0)
         }
     }
      

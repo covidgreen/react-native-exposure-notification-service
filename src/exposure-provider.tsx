@@ -48,7 +48,7 @@ export interface ExposureContextValue extends State {
   pause: () => Promise<boolean>;
   configure: () => void;
   checkExposure: (skipTimeCheck: boolean) => void;
-  simulateExposure: (timeDelay: number) => void;
+  simulateExposure: (timeDelay: number, exposureDays: number) => void;
   getDiagnosisKeys: () => Promise<any[]>;
   exposureEnabled: () => Promise<boolean>;
   authoriseExposure: () => Promise<boolean>;
@@ -326,8 +326,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     ExposureNotification.checkExposure(skipTimeCheck);
   };
 
-  const simulateExposure = (timeDelay: number) => {
-    ExposureNotification.simulateExposure(timeDelay);
+  const simulateExposure = (timeDelay: number, exposureDays: number) => {
+    ExposureNotification.simulateExposure(timeDelay, exposureDays);
   };
 
   const getDiagnosisKeys = () => {

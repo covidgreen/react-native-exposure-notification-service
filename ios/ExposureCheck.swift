@@ -41,25 +41,25 @@ class ExposureCheck: AsyncOperation {
         let transmissionRiskWeight: Double
         let durationAtAttenuationThresholds: [Int]
         let thresholdWeightings: [Double]
-        let numFilesiOS: Int
         let timeThreshold: Int
-        let immediateDurationWeight: Double
-        let nearDurationWeight: Double
-        let mediumDurationWeight: Double
-        let otherDurationWeight: Double
-        let infectiousnessStandardWeight: Double
-        let infectiousnessHighWeight: Double
-        let reportTypeConfirmedTestWeight: Double
-        let reportTypeConfirmedClinicalDiagnosisWeight: Double
-        let reportTypeSelfReportedWeight: Double
-        let reportTypeRecursiveWeight: Double
-        let reportTypeNoneMap: UInt32
-        let daysSinceLastExposureThreshold: Int
-        let minimumRiskScoreFullRange: Double
-        let infectiousnessForDaysSinceOnsetOfSymptoms: [Int]
-        let attenuationDurationThresholds: [Int]
-        let v2Mode: Bool
-        let contiguousMode: Bool
+        var numFilesiOS: Int
+        var immediateDurationWeight: Double
+        var nearDurationWeight: Double
+        var mediumDurationWeight: Double
+        var otherDurationWeight: Double
+        var infectiousnessStandardWeight: Double
+        var infectiousnessHighWeight: Double
+        var reportTypeConfirmedTestWeight: Double
+        var reportTypeConfirmedClinicalDiagnosisWeight: Double
+        var reportTypeSelfReportedWeight: Double
+        var reportTypeRecursiveWeight: Double
+        var reportTypeNoneMap: UInt32
+        var daysSinceLastExposureThreshold: Int
+        var minimumRiskScoreFullRange: Double
+        var infectiousnessForDaysSinceOnsetOfSymptoms: [Int]
+        var attenuationDurationThresholds: [Int]
+        var v2Mode: Bool
+        var contiguousMode: Bool
     }
   
     private struct CodableExposureFiles: Codable {
@@ -106,14 +106,16 @@ class ExposureCheck: AsyncOperation {
     private var configData: Storage.Config!
     private var skipTimeCheck: Bool = false
     private var simulateExposureOnly: Bool = false
+    private var simulateExposureDays: Int = 2
     private let storageContext = Storage.PersistentContainer.shared.newBackgroundContext()
     private var sessionManager: Session!
     
-    init(_ skipTimeCheck: Bool, _ simulateExposureOnly: Bool) {
+    init(_ skipTimeCheck: Bool, _ simulateExposureOnly: Bool, _ simulateDays: Int) {
         super.init()
     
         self.skipTimeCheck = skipTimeCheck
         self.simulateExposureOnly = simulateExposureOnly
+        self.simulateExposureDays = simulateDays
     }
     
     override func cancel() {
@@ -161,7 +163,7 @@ class ExposureCheck: AsyncOperation {
         
        if (self.simulateExposureOnly) {
            os_log("Simulating exposure alert", log: OSLog.exposure, type: .debug)
-           simulateExposureEvent()
+           simulateExposureEvent(self.simulateExposureDays)
            return
        }
         
@@ -194,8 +196,12 @@ class ExposureCheck: AsyncOperation {
         }
     }
     
-    private func simulateExposureEvent() {
-        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: 2, attenuationDurations: [30, 30, 30], matchedKeyCount: 1,  maxRiskScore: 10, exposureDate: Date())
+    private func simulateExposureEvent(_ simulateDays: Int) {
+        let calendar = Calendar.current
+        let dateToday = calendar.startOfDay(for: Date())
+        let contactDate = calendar.date(byAdding: .day, value: (0 - simulateDays), to: dateToday)
+
+        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: simulateDays, attenuationDurations: [30, 30, 30], matchedKeyCount: 1,  maxRiskScore: 10, exposureDate: Date(), exposureContactDate: contactDate!)
       
         info.maximumRiskScoreFullRange = 10
         info.riskScoreSumFullRange = 10
@@ -292,11 +298,18 @@ class ExposureCheck: AsyncOperation {
   
         
           if let exposure = exposureData  {
-             os_log("Detected exposure event", log: OSLog.checkExposure, type: .info)
-             Storage.shared.saveExposureDetails(self.storageContext, exposure)
+             let existingExposures = Storage.shared.getExposures(self.configData.storeExposuresFor).reversed()
             
-             self.triggerUserNotification(exposure) { _ in
-               self.trackDailyMetrics()
+             if existingExposures.count > 0, existingExposures.first!.exposureContactDate < exposure.exposureContactDate {
+                os_log("Detected exposure event", log: OSLog.checkExposure, type: .info)
+                Storage.shared.saveExposureDetails(self.storageContext, exposure)
+            
+                self.triggerUserNotification(exposure) { _ in
+                    self.trackDailyMetrics()
+                }
+             } else {
+                os_log("Exposure detected but not more recent then currently recorded exposures", log: OSLog.checkExposure, type: .info)
+                self.trackDailyMetrics()
              }
           } else {
             os_log("No exposure detected", log: OSLog.checkExposure, type: .info)

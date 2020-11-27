@@ -92,7 +92,7 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
 
   checkExposure(skipTimeCheck?: boolean): void;
 
-  simulateExposure(timeDelay?: number): void;
+  simulateExposure(timeDelay: number, exposureDays: number): void;
 
   getCloseContacts(): Promise<CloseContact[]>;
 

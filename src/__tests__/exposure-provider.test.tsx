@@ -677,7 +677,7 @@ describe('useExposure', () => {
       const {result} = await renderExposureHook();
       mocked(ExposureNotificationModule.simulateExposure).mockClear();
       await act(async () => {
-        await result.current.simulateExposure(10);
+        await result.current.simulateExposure(10, 4);
       });
       expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledTimes(
         1

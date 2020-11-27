@@ -11,40 +11,39 @@ class RiskCalculationV2 {
             return completion(.success(nil))
         }
         
+        var mostRecent: ENExposureDaySummary?
+        var matchDate: Date?
+        
         if (!thresholds.contiguousMode) {
             let aboveThresholdDays = summary.daySummaries.filter({ Int(($0.daySummary.weightedDurationSum / 60.0)) > thresholds.timeThreshold}).sorted(by: { $0.date > $1.date })
-            
+            if aboveThresholdDays.count == 0 {
+                os_log("V2 - No daily summary meeting duration threshold", log: OSLog.checkExposure, type: .info)
+                return completion(.success(nil))
+            } else {
+                mostRecent = aboveThresholdDays.first
+                matchDate = mostRecent!.date
+            }
         }
         
-        guard let mostRecent = aboveThresholdDays.first else {
-            os_log("V2 - No daily summary meeting duration threshold", log: OSLog.checkExposure, type: .info)
-            return completion(.success(nil))
-        }
-        
-        extractExposureWindowData(summary, configuration, thresholds, mostRecent.date) { result in
+        extractExposureWindowData(summary, configuration, thresholds, matchDate) { result in
             switch result {
                case let .success(windows):
                 if thresholds.contiguousMode {
-                    if windows.filter({ $0.scanData.exceedsThreshold }).count > 0 {
-                        completion(.success(constructSummaryInfo(mostRecent, windows)))
+                    let filtered = windows.filter({ $0.scanData.exceedsThreshold }).sorted(by: { $0.date > $1.date })
+                    if (filtered.count > 0) {
+                        let day = summary.daySummaries.filter({ $0.date == filtered.first!.date})
+                        completion(.success(constructSummaryInfo(day.first!, windows)))
                     } else {
                         os_log("V2 - Running in Contiguous mode, no contiguos match", log: OSLog.checkExposure, type: .info)
 
                         completion(.success(nil))
                     }
                 } else {
-                    completion(.success(constructSummaryInfo(mostRecent, windows)))
+                    completion(.success(constructSummaryInfo(mostRecent!, windows)))
                 }
                case let .failure(error):
                   completion(.failure(error))
             }
-        }
-    }
-    
-    private static func findDayToProcess(_ summary: ENExposureDetectionSummary, _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds) -> ENExposureDaySummary? {
-        
- else {
-            
         }
     }
     
