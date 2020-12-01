@@ -3,11 +3,9 @@ package ie.gov.tracing.nearby;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.os.Build;
 
-import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.work.Data;
@@ -28,7 +26,6 @@ import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
-import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.io.File;
 import java.security.SecureRandom;
@@ -37,8 +34,9 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.threeten.bp.Duration;
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
 
@@ -150,8 +148,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       */
 
       updateLastRun();
-      // try save daily metric, does not affect success
-      saveDailyMetric();
 
       // validate config set before running
       final String server = SharedPrefs.getString("serverUrl", Tracing.currentContext);
@@ -173,6 +169,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       deleteOldData();
 
       final String token = generateRandomToken();
+      AtomicReference<ExposureConfig> ensConfig = new AtomicReference<>();
+
       return FluentFuture.from(TaskToFutureAdapter
               .getFutureWithTimeout(
                       ExposureNotificationClientWrapper.get(Tracing.currentContext).isEnabled(),
@@ -180,10 +178,13 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                       TimeUnit.MILLISECONDS,
                       AppExecutors.getScheduledExecutor()))
               .transformAsync(isEnabled -> {
-                // Only continue if it is enabled.
+                return saveDailyMetric(isEnabled);     // try save daily metric, does not affect success
+              },
+                      AppExecutors.getBackgroundExecutor())
+              .transformAsync(isEnabled -> {
+                        // Only continue if it is enabled.
                 if (isEnabled != null && isEnabled) {
-                  ExposureConfig exposureConfig = ExposureNotificationClientWrapper.get(context).fetchExposureConfig();
-                  return diagnosisKeys.download(exposureConfig.getNumFilesAndroid());
+                  return ExposureNotificationClientWrapper.get(context).fetchExposureConfig(Tracing.currentContext);
                 } else {
                   // Stop here because things aren't enabled. Will still return successful though.
                   SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
@@ -192,7 +193,12 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                 }
               },
                       AppExecutors.getBackgroundExecutor())
-              .transformAsync(files -> submitter.parseFiles(files, token),
+              .transformAsync(config -> {
+                  ensConfig.set(config);
+                  return diagnosisKeys.download(config.getNumFilesAndroid());
+              },
+                      AppExecutors.getBackgroundExecutor())
+              .transformAsync(files -> submitter.parseFiles(files, token, ensConfig.get()),
                       AppExecutors.getBackgroundExecutor())
               .transformAsync(done -> repository.upsertTokenEntityAsync(TokenEntity.create(token, false)),
                       AppExecutors.getBackgroundExecutor())
@@ -271,7 +277,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     }
   }
 
-  private void saveDailyMetric() {
+  private ListenableFuture<Boolean> saveDailyMetric(Boolean enabled) {
     try {
       long dailyActiveTrace = SharedPrefs.getLong("dailyActiveTrace", Tracing.currentContext);
 
@@ -287,15 +293,17 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
       if(dailyActiveTrace > 0 && sameDay) {
         Events.raiseEvent(Events.INFO, "saveDailyMetric - already sent today");
-        return;
+        return Futures.immediateFuture(enabled);
       }
 
       Events.raiseEvent(Events.INFO, "saveDailyMetric - saving DAILY_ACTIVE_TRACE metric");
       Fetcher.saveMetric("DAILY_ACTIVE_TRACE", Tracing.currentContext, null);
       SharedPrefs.setLong("dailyActiveTrace", System.currentTimeMillis(), Tracing.currentContext);
+      return Futures.immediateFuture(enabled);
 
     } catch(Exception ex) {
       Events.raiseError("saveDailyMetric - error", ex);
+      return Futures.immediateFuture(enabled);
     }
   }
 

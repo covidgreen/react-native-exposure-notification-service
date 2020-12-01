@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
+import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.storage.SharedPrefs;
 
@@ -25,7 +26,7 @@ class DiagnosisKeyFileSubmitter {
     client = ExposureNotificationClientWrapper.get(context);
   }
 
-  ListenableFuture<?> parseFiles(List<File> files, String token) {
+  ListenableFuture<?> parseFiles(List<File> files, String token, ExposureConfig config) {
     if (files == null || files.size() == 0) {
       SharedPrefs.setString("lastError", "No files available to process", Tracing.currentContext);
       Events.raiseEvent(Events.INFO, "parseFiles - No export files to process.");
@@ -35,7 +36,7 @@ class DiagnosisKeyFileSubmitter {
     Events.raiseEvent(Events.INFO, "Processing " + files.size() + " export files...");
 
     return TaskToFutureAdapter.getFutureWithTimeout(
-            client.provideDiagnosisKeys(files, token),
+            client.provideDiagnosisKeys(files, token, config),
             API_TIMEOUT.toMillis(),
             TimeUnit.MILLISECONDS,
             AppExecutors.getScheduledExecutor());

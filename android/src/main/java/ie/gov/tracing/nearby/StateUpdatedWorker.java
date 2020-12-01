@@ -140,15 +140,19 @@ public class StateUpdatedWorker extends ListenableWorker {
         Tracing.currentContext = getApplicationContext();
 
         final boolean simulate = getInputData().getBoolean("simulate", false);
+        final int simulateDays = getInputData().getInt("simulateDays", 3);
 
         ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
-        ExposureConfig config = exposureNotificationClient.fetchExposureConfig(); // FIXME make async
 
-        return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                exposureNotificationClient.getDailySummaries(config),
-                DEFAULT_API_TIMEOUT.toMillis(),
-                TimeUnit.MILLISECONDS,
-                AppExecutors.getScheduledExecutor()))
+        return FluentFuture.from(exposureNotificationClient.fetchExposureConfig(context))
+                .transform(config -> {
+                    return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                            exposureNotificationClient.getDailySummaries(config),
+                            DEFAULT_API_TIMEOUT.toMillis(),
+                            TimeUnit.MILLISECONDS,
+                            AppExecutors.getScheduledExecutor()));
+                },
+                        AppExecutors.getBackgroundExecutor())
                 .transformAsync(dailySummaries -> {
                     return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
                             exposureNotificationClient.getExposureWindows(),
@@ -176,7 +180,7 @@ public class StateUpdatedWorker extends ListenableWorker {
                                     return Futures.immediateFailedFuture(new NoDailySummaries());
                                 }
 
-                                boolean shouldShowNotification = RiskCalculatorV2.INSTANCE.calculateRisk(exposureWindows, dailySummaries, config, context);
+                                boolean shouldShowNotification = true; // RiskCalculatorV2.INSTANCE.calculateRisk(exposureWindows, dailySummaries, config, context);
 
                                 if(shouldShowNotification) {
                                     showNotification();
@@ -248,7 +252,7 @@ public class StateUpdatedWorker extends ListenableWorker {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
-    public static void simulateExposure(Long timeDelay) {
+    public static void simulateExposure(Long timeDelay, Integer numDays) {
         Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure");
 
         WorkManager workManager = WorkManager.getInstance(Tracing.context);
@@ -256,7 +260,7 @@ public class StateUpdatedWorker extends ListenableWorker {
         OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
                 .setInitialDelay(Duration.ofSeconds(timeDelay))
                 .setInputData(
-                        new Data.Builder().putBoolean("simulate", true).putString(ExposureNotificationClient.EXTRA_TOKEN, "dummy")
+                        new Data.Builder().putBoolean("simulate", true).putString(ExposureNotificationClient.EXTRA_TOKEN, "dummy").putInt("numDays", numDays)
                                 .build())
                 .build();
         workManager.enqueueUniqueWork("SimulateWorker", ExistingWorkPolicy.REPLACE, workRequest);

@@ -42,24 +42,24 @@ class ExposureCheck: AsyncOperation {
         let durationAtAttenuationThresholds: [Int]
         let thresholdWeightings: [Double]
         let timeThreshold: Int
-        var numFilesiOS: Int
-        var immediateDurationWeight: Double
-        var nearDurationWeight: Double
-        var mediumDurationWeight: Double
-        var otherDurationWeight: Double
-        var infectiousnessStandardWeight: Double
-        var infectiousnessHighWeight: Double
-        var reportTypeConfirmedTestWeight: Double
-        var reportTypeConfirmedClinicalDiagnosisWeight: Double
-        var reportTypeSelfReportedWeight: Double
-        var reportTypeRecursiveWeight: Double
-        var reportTypeNoneMap: UInt32
-        var daysSinceLastExposureThreshold: Int
-        var minimumRiskScoreFullRange: Double
-        var infectiousnessForDaysSinceOnsetOfSymptoms: [Int]
-        var attenuationDurationThresholds: [Int]
-        var v2Mode: Bool
-        var contiguousMode: Bool
+        let numFilesiOS: Int?
+        let immediateDurationWeight: Double?
+        let nearDurationWeight: Double?
+        let mediumDurationWeight: Double?
+        let otherDurationWeight: Double?
+        let infectiousnessStandardWeight: Double?
+        let infectiousnessHighWeight: Double?
+        let reportTypeConfirmedTestWeight: Double?
+        let reportTypeConfirmedClinicalDiagnosisWeight: Double?
+        let reportTypeSelfReportedWeight: Double?
+        let reportTypeRecursiveWeight: Double?
+        let reportTypeNoneMap: UInt32?
+        let daysSinceLastExposureThreshold: Int?
+        let minimumRiskScoreFullRange: Double?
+        let infectiousnessForDaysSinceOnsetOfSymptoms: [Int]?
+        let attenuationDurationThresholds: [Int]?
+        let v2Mode: Bool?
+        let contiguousMode: Bool?
     }
   
     private struct CodableExposureFiles: Codable {
@@ -624,7 +624,7 @@ class ExposureCheck: AsyncOperation {
                 let codableExposureConfiguration = try JSONDecoder().decode(CodableExposureConfiguration.self, from: exposureData.exposureConfig.data(using: .utf8)!)
                 let exposureConfiguration = ENExposureConfiguration()
                 
-                let thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS, contiguousMode: codableExposureConfiguration.contiguousMode)
+                let thresholds = Thresholds(thresholdWeightings: codableExposureConfiguration.thresholdWeightings, timeThreshold: codableExposureConfiguration.timeThreshold, numFiles: codableExposureConfiguration.numFilesiOS ?? 6, contiguousMode: codableExposureConfiguration.contiguousMode ?? false)
 
                 exposureConfiguration.minimumRiskScore = codableExposureConfiguration.minimumRiskScore
                 exposureConfiguration.attenuationLevelValues = codableExposureConfiguration.attenuationLevelValues as [NSNumber]
@@ -639,33 +639,38 @@ class ExposureCheck: AsyncOperation {
                 let meta:[AnyHashable: Any] = [AnyHashable("attenuationDurationThresholds"): codableExposureConfiguration.durationAtAttenuationThresholds as [NSNumber]]
                 exposureConfiguration.metadata = meta
                 
-                if #available(iOS 13.7, *), codableExposureConfiguration.v2Mode {                    
-                    exposureConfiguration.immediateDurationWeight =  codableExposureConfiguration.immediateDurationWeight
-                    exposureConfiguration.nearDurationWeight =  codableExposureConfiguration.nearDurationWeight
-                    exposureConfiguration.mediumDurationWeight =  codableExposureConfiguration.mediumDurationWeight
-                    exposureConfiguration.otherDurationWeight =  codableExposureConfiguration.otherDurationWeight
+                let v2Mode = codableExposureConfiguration.v2Mode ?? false
+                if #available(iOS 13.7, *), v2Mode == true {
+                    exposureConfiguration.immediateDurationWeight =  codableExposureConfiguration.immediateDurationWeight ?? 100.0
+                    exposureConfiguration.nearDurationWeight =  codableExposureConfiguration.nearDurationWeight ?? 100.0
+                    exposureConfiguration.mediumDurationWeight =  codableExposureConfiguration.mediumDurationWeight ?? 100.0
+                    exposureConfiguration.otherDurationWeight =  codableExposureConfiguration.otherDurationWeight ?? 100.0
 
-                    exposureConfiguration.infectiousnessStandardWeight =  codableExposureConfiguration.infectiousnessStandardWeight
-                    exposureConfiguration.infectiousnessHighWeight =   codableExposureConfiguration.infectiousnessHighWeight
+                    exposureConfiguration.infectiousnessStandardWeight =  codableExposureConfiguration.infectiousnessStandardWeight ?? 100.0
+                    exposureConfiguration.infectiousnessHighWeight =   codableExposureConfiguration.infectiousnessHighWeight ?? 100.0
                   
-                    exposureConfiguration.reportTypeConfirmedTestWeight =  codableExposureConfiguration.reportTypeConfirmedTestWeight
-                    exposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight =  codableExposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight
-                    exposureConfiguration.reportTypeSelfReportedWeight =  codableExposureConfiguration.reportTypeSelfReportedWeight
-                    exposureConfiguration.reportTypeRecursiveWeight =  codableExposureConfiguration.reportTypeRecursiveWeight
+                    exposureConfiguration.reportTypeConfirmedTestWeight =  codableExposureConfiguration.reportTypeConfirmedTestWeight ?? 100.0
+                    exposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight =  codableExposureConfiguration.reportTypeConfirmedClinicalDiagnosisWeight ?? 100.0
+                    exposureConfiguration.reportTypeSelfReportedWeight =  codableExposureConfiguration.reportTypeSelfReportedWeight ?? 100.0
+                    exposureConfiguration.reportTypeRecursiveWeight =  codableExposureConfiguration.reportTypeRecursiveWeight ?? 100.0
 
-                    exposureConfiguration.daysSinceLastExposureThreshold =  codableExposureConfiguration.daysSinceLastExposureThreshold
+                    exposureConfiguration.daysSinceLastExposureThreshold =  codableExposureConfiguration.daysSinceLastExposureThreshold ?? 0
 
-                    exposureConfiguration.minimumRiskScoreFullRange =  codableExposureConfiguration.minimumRiskScoreFullRange
+                    exposureConfiguration.minimumRiskScoreFullRange =  codableExposureConfiguration.minimumRiskScoreFullRange ?? 1
 
-                    exposureConfiguration.attenuationDurationThresholds =  codableExposureConfiguration.attenuationDurationThresholds as [NSNumber]
-
-                    exposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms = self.convertToMap(codableExposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms)
+                    if let data = codableExposureConfiguration.attenuationDurationThresholds {
+                        exposureConfiguration.attenuationDurationThresholds = data as [NSNumber]
+                    }
+                
+                    if let data = codableExposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms {
+                        exposureConfiguration.infectiousnessForDaysSinceOnsetOfSymptoms = self.convertToMap(data)
+                    }
                     
-                    exposureConfiguration.reportTypeNoneMap = ENDiagnosisReportType(rawValue:  codableExposureConfiguration.reportTypeNoneMap) ?? ENDiagnosisReportType.confirmedTest
+                    exposureConfiguration.reportTypeNoneMap = ENDiagnosisReportType(rawValue:  codableExposureConfiguration.reportTypeNoneMap ?? ENDiagnosisReportType.confirmedTest.rawValue) ?? ENDiagnosisReportType.confirmedTest
  
                 }
                 
-                completion(.success((exposureConfiguration, thresholds, codableExposureConfiguration.v2Mode)))
+                completion(.success((exposureConfiguration, thresholds, v2Mode)))
               } catch {
                 os_log("Unable to decode settings data, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
                 completion(.failure(error))

@@ -9,6 +9,7 @@ import androidx.annotation.RequiresApi;
 import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.exposurenotification.DailySummariesConfig;
 import com.google.android.gms.nearby.exposurenotification.DailySummary;
+import com.google.android.gms.nearby.exposurenotification.DiagnosisKeyFileProvider;
 import com.google.android.gms.nearby.exposurenotification.ExposureConfiguration;
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
 import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
@@ -17,6 +18,8 @@ import com.google.android.gms.nearby.exposurenotification.Infectiousness;
 import com.google.android.gms.nearby.exposurenotification.ReportType;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
 import com.google.android.gms.tasks.Task;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 
 import java.io.File;
@@ -66,8 +69,7 @@ public class ExposureNotificationClientWrapper {
     return exposureNotificationClient.getTemporaryExposureKeyHistory();
   }
 
-  Task<Void> provideDiagnosisKeys(List<File> files, String token) {
-    ExposureConfig config = fetchExposureConfig();
+  Task<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config) {
 
     Events.raiseEvent(Events.INFO, "mapping exposure configuration with " + config);
     // error will be thrown here if config is not complete
@@ -94,22 +96,20 @@ public class ExposureNotificationClientWrapper {
             .provideDiagnosisKeys(files, exposureConfiguration, token);
   }
 
-  public ExposureConfig fetchExposureConfig() {
-    String settings = Fetcher.fetch("/settings/exposures", appContext);
+  public ListenableFuture<ExposureConfig> fetchExposureConfig(Context context) {
+    String settings = Fetcher.fetch("/settings/exposures", context);
     Gson gson = new Gson();
-    Map map = gson.fromJson(settings, Map.class);
-    String exposureConfig = (String) map.get("exposureConfig");
-    Events.raiseEvent(Events.INFO, "Settings" + exposureConfig);
-    ExposureConfig container = gson.fromJson(exposureConfig, ExposureConfig.class);
-    return container;
+    ExposureConfig container = gson.fromJson(settings, ExposureConfig.class);
+    return Futures.immediateFuture(container);
   }
 
   Task<Void> provideDiagnosisKeys(List<File> files) {
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with v1.6");
 
+    DiagnosisKeyFileProvider provider = new DiagnosisKeyFileProvider(files);
     return exposureNotificationClient
-            .provideDiagnosisKeys(files);
+            .provideDiagnosisKeys(provider);
   }
 
   @Deprecated

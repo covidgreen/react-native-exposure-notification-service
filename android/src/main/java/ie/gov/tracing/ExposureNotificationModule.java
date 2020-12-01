@@ -120,9 +120,9 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void simulateExposure(Integer timeDelay) {
+    public void simulateExposure(Integer timeDelay, Integer numDays) {
         if(nearbyNotSupported()) return;
-        Tracing.simulateExposure(timeDelay.longValue());
+        Tracing.simulateExposure(timeDelay.longValue(), numDays);
     }
 
     @ReactMethod

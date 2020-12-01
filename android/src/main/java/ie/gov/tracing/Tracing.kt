@@ -10,6 +10,7 @@ import android.content.IntentSender.SendIntentException
 import android.content.pm.PackageInfo
 import android.location.LocationManager
 import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.location.LocationManagerCompat
@@ -420,9 +421,10 @@ object Tracing {
             ProvideDiagnosisKeysWorker.startOneTimeWorkRequest(skipTimeCheck)
         }
 
+        @RequiresApi(Build.VERSION_CODES.O)
         @JvmStatic
-        fun simulateExposure(timeDelay: Long = 0) {
-            StateUpdatedWorker.simulateExposure(timeDelay)
+        fun simulateExposure(timeDelay: Long = 0, numDays: Int = 3) {
+            StateUpdatedWorker.simulateExposure(timeDelay, numDays)
         }
 
         @JvmStatic
