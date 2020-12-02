@@ -529,7 +529,7 @@ object Tracing {
 
         @JvmStatic
         fun isAuthorised(promise: Promise) {
-            Events.raiseEvent(Events.INFO, "Checking isAuthprised");
+            Events.raiseEvent(Events.INFO, "Checking isAuthorised");
             try {
                 exposureWrapper.isEnabled
                         .addOnSuccessListener { enabled: Boolean? ->
