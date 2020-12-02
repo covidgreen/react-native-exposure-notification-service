@@ -19,38 +19,26 @@ import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 import androidx.work.WorkerParameters;
 
-import com.google.android.gms.nearby.exposurenotification.CalibrationConfidence;
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
-import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
-import com.google.android.gms.nearby.exposurenotification.Infectiousness;
-import com.google.android.gms.nearby.exposurenotification.ReportType;
-import com.google.android.gms.nearby.exposurenotification.ScanInstance;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-
-import org.jetbrains.annotations.NotNull;
+import com.google.gson.Gson;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.HashMap;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import ie.gov.tracing.R;
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
-import ie.gov.tracing.common.TaskToFutureAdapter;
-import ie.gov.tracing.nearby.riskcalculation.RiskCalculatorV2;
-import ie.gov.tracing.nearby.riskcalculation.Thresholds;
+import ie.gov.tracing.nearby.riskcalculation.RiskCalculation;
+import ie.gov.tracing.nearby.riskcalculation.RiskCalculationV1;
+import ie.gov.tracing.nearby.riskcalculation.RiskCalculationV2;
 import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.ExposureNotificationRepository;
 import ie.gov.tracing.storage.SharedPrefs;
-
-import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEOUT;
 
 public class StateUpdatedWorker extends ListenableWorker {
     private static final String EXPOSURE_NOTIFICATION_CHANNEL_ID =
@@ -69,128 +57,37 @@ public class StateUpdatedWorker extends ListenableWorker {
         this.repository = new ExposureNotificationRepository(context);
     }
 
-    @NotNull
-    private List<ExposureWindow> getSimulatedExposureWindows() {
-
-        ArrayList<ExposureWindow> exposureWindows = new ArrayList<ExposureWindow>();
-
-        int defaultAttenuationDb = 30;
-
-        int[] infectiousnessTypes = {Infectiousness.STANDARD, Infectiousness.HIGH};
-
-        int[] reportTypes = {ReportType.CONFIRMED_TEST, ReportType.CONFIRMED_CLINICAL_DIAGNOSIS, ReportType.SELF_REPORT};
-        int[] calibrationConfidenceTypes = {CalibrationConfidence.LOWEST, CalibrationConfidence.LOW, CalibrationConfidence.MEDIUM, CalibrationConfidence.HIGH};
-
-        int maxMins = 5;
-        int varyDb = 4;
-
-        for (int i = 0; i < 5; i++) {
-
-            ExposureWindow.Builder exposureWindowBuilder = new ExposureWindow.Builder();
-
-            ArrayList<ScanInstance> scanInstances = new ArrayList<ScanInstance>();
-
-            for (int k = 0; k < 15; k++) {
-                ScanInstance.Builder scanInstanceBuilder = new ScanInstance.Builder();
-
-                int secondsSinceLastScan = Math.max(k % maxMins, 1) * 60;
-                int minAttenuationDb = defaultAttenuationDb;
-                int typicalAttenuationDb = defaultAttenuationDb + (i % varyDb);
-
-                scanInstanceBuilder.setMinAttenuationDb(minAttenuationDb);
-                scanInstanceBuilder.setSecondsSinceLastScan(secondsSinceLastScan);
-                scanInstanceBuilder.setTypicalAttenuationDb(typicalAttenuationDb);
-
-                scanInstances.add(scanInstanceBuilder.build());
-            }
-
-            exposureWindowBuilder.setScanInstances(scanInstances);
-
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.DATE, i * -1);
-            long msSinceEpoch = cal.getTimeInMillis();
-            exposureWindowBuilder.setDateMillisSinceEpoch(msSinceEpoch);
-
-            int calibrationConfidence = calibrationConfidenceTypes[i % calibrationConfidenceTypes.length];
-            exposureWindowBuilder.setCalibrationConfidence(calibrationConfidence);
-
-            int infectiousness = infectiousnessTypes[i % infectiousnessTypes.length];
-            exposureWindowBuilder.setInfectiousness(infectiousness);
-
-            int reportType = reportTypes[i % reportTypes.length];
-            exposureWindowBuilder.setReportType(reportType);
-
-            exposureWindows.add(exposureWindowBuilder.build());
-
-        }
-
-        return exposureWindows;
-    }
-
-    private void processExposureFiles(Context context, ExposureConfig config, Thresholds thresholds) {
-        ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
-        // FIXME impl differs from iOS, this is done in DiagnosisKeysWorker
-//        exposureNotificationClient.get
-    }
-
     @RequiresApi(api = Build.VERSION_CODES.N)
     @NonNull
     @Override
     public ListenableFuture<Result> startWork() { // FIXME change the order
         Tracing.currentContext = getApplicationContext();
-
+        Events.raiseEvent(Events.INFO, "Beging ENS result checking");
         final boolean simulate = getInputData().getBoolean("simulate", false);
         final int simulateDays = getInputData().getInt("simulateDays", 3);
-
+        Gson gson = new Gson();
+        final ExposureConfig config = gson.fromJson(SharedPrefs.getString("exposureConfig", Tracing.currentContext), ExposureConfig.class);
         ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
+        final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
 
-        return FluentFuture.from(exposureNotificationClient.fetchExposureConfig(context))
-                .transform(config -> {
-                    return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                            exposureNotificationClient.getDailySummaries(config),
-                            DEFAULT_API_TIMEOUT.toMillis(),
-                            TimeUnit.MILLISECONDS,
-                            AppExecutors.getScheduledExecutor()));
-                },
-                        AppExecutors.getBackgroundExecutor())
-                .transformAsync(dailySummaries -> {
-                    return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                            exposureNotificationClient.getExposureWindows(),
-                            DEFAULT_API_TIMEOUT.toMillis(),
-                            TimeUnit.MILLISECONDS,
-                            AppExecutors.getScheduledExecutor()))
-                            .transformAsync((exposureWindows) -> { // FIXME if all results are sync, should switch to transform instead
-                                if (simulate) {
-                                    exposureWindows = getSimulatedExposureWindows();
-                                }
+        RiskCalculation risk;
 
-                                if (exposureWindows == null) {
-                                    Events.raiseEvent(Events.INFO, "exposureWindows - no exposure windows.");
-                                    return Futures.immediateFailedFuture(new NoExposureWindows());
-                                }
+        if (config.getV2Mode()) {
+            risk = new RiskCalculationV2(config);
+        }
+        else {
+            risk = new RiskCalculationV1(repository, token);
+        }
 
-                                if (exposureWindows.size() == 0) {
-                                    // No matches so we show no notification and just delete the token.
-                                    Events.raiseEvent(Events.INFO, "exposureSummary - empty exposure windows.");
-                                    return Futures.immediateFailedFuture(new EmptyExposureWindows());
-                                }
-
-                                if (dailySummaries == null) {
-                                    Events.raiseEvent(Events.INFO, "exposureWindows - no dailySummaries");
-                                    return Futures.immediateFailedFuture(new NoDailySummaries());
-                                }
-
-                                boolean shouldShowNotification = true; // RiskCalculatorV2.INSTANCE.calculateRisk(exposureWindows, dailySummaries, config, context);
-
-                                if(shouldShowNotification) {
-                                    showNotification();
-                                }
-                                return Futures.immediateFuture(shouldShowNotification);
-
-                            }, AppExecutors.getBackgroundExecutor());
-
-                }, AppExecutors.getBackgroundExecutor())
-                .transform((v) -> Result.success(), AppExecutors.getLightweightExecutor())
+        return FluentFuture.from(risk.processKeys(context, simulate, simulateDays))
+                .transform(showNotification -> {
+                    if (showNotification) {
+                        showNotification();
+                    }
+                    return Futures.immediateFuture(true);
+                }, AppExecutors.getLightweightExecutor())
+                .transform(done -> Result.success(), // all done, do tidy ups here
+                        AppExecutors.getLightweightExecutor())
                 .catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
     }
 
@@ -266,7 +163,4 @@ public class StateUpdatedWorker extends ListenableWorker {
         workManager.enqueueUniqueWork("SimulateWorker", ExistingWorkPolicy.REPLACE, workRequest);
     }
 
-    private static class NoExposureWindows extends Exception {}
-    private static class EmptyExposureWindows extends Exception {}
-    private static class NoDailySummaries extends Exception {}
 }

@@ -35,10 +35,20 @@ class DiagnosisKeyFileSubmitter {
 
     Events.raiseEvent(Events.INFO, "Processing " + files.size() + " export files...");
 
-    return TaskToFutureAdapter.getFutureWithTimeout(
-            client.provideDiagnosisKeys(files, token, config),
-            API_TIMEOUT.toMillis(),
-            TimeUnit.MILLISECONDS,
-            AppExecutors.getScheduledExecutor());
+    if (config.getV2Mode()) {
+      Events.raiseEvent(Events.INFO, "parseFiles - Running in V2 mode.");
+      return TaskToFutureAdapter.getFutureWithTimeout(
+              client.provideDiagnosisKeys(files),
+              API_TIMEOUT.toMillis(),
+              TimeUnit.MILLISECONDS,
+              AppExecutors.getScheduledExecutor());
+    } else {
+      Events.raiseEvent(Events.INFO, "parseFiles - Running in V1 mode.");
+      return TaskToFutureAdapter.getFutureWithTimeout(
+              client.provideDiagnosisKeys(files, token, config),
+              API_TIMEOUT.toMillis(),
+              TimeUnit.MILLISECONDS,
+              AppExecutors.getScheduledExecutor());
+    }
   }
 }

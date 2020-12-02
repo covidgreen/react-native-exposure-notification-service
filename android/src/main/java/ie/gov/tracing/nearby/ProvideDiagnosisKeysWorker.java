@@ -53,7 +53,7 @@ import ie.gov.tracing.storage.TokenEntity;
 import ie.gov.tracing.R;
 
 public class ProvideDiagnosisKeysWorker extends ListenableWorker {
-  static final Duration DEFAULT_API_TIMEOUT = Duration.ofSeconds(15);
+  public static final Duration DEFAULT_API_TIMEOUT = Duration.ofSeconds(15);
 
   private static final String WORKER_NAME = "ProvideDiagnosisKeysWorker";
   private static final BaseEncoding BASE64_LOWER = BaseEncoding.base64();

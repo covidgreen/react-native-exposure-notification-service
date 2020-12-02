@@ -102,6 +102,8 @@ public class ExposureNotificationClientWrapper {
     Map map = gson.fromJson(settings, Map.class);
     String exposureConfig = (String) map.get("exposureConfig");
     ExposureConfig config = gson.fromJson(exposureConfig, ExposureConfig.class);
+
+    SharedPrefs.setString("exposureConfig", exposureConfig, context);
     return Futures.immediateFuture(config);
   }
 
@@ -115,7 +117,7 @@ public class ExposureNotificationClientWrapper {
   }
 
   @Deprecated
-  Task<ExposureSummary> getExposureSummary(String token) {
+  public Task<ExposureSummary> getExposureSummary(String token) {
     return exposureNotificationClient.getExposureSummary(token);
   }
 
