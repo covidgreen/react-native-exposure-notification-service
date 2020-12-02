@@ -99,8 +99,10 @@ public class ExposureNotificationClientWrapper {
   public ListenableFuture<ExposureConfig> fetchExposureConfig(Context context) {
     String settings = Fetcher.fetch("/settings/exposures", context);
     Gson gson = new Gson();
-    ExposureConfig container = gson.fromJson(settings, ExposureConfig.class);
-    return Futures.immediateFuture(container);
+    Map map = gson.fromJson(settings, Map.class);
+    String exposureConfig = (String) map.get("exposureConfig");
+    ExposureConfig config = gson.fromJson(exposureConfig, ExposureConfig.class);
+    return Futures.immediateFuture(config);
   }
 
   Task<Void> provideDiagnosisKeys(List<File> files) {
