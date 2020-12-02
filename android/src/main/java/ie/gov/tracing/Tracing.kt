@@ -165,7 +165,8 @@ object Tracing {
         var exposureStatus = EXPOSURE_STATUS_UNAVAILABLE
         var exposureDisabledReason = "starting"
         var doesSupportENS = false
-        
+        var hasCheckedENS = false
+
         private lateinit var exposureWrapper: ExposureNotificationClientWrapper
 
         var resolutionPromise: Promise? = null
@@ -302,7 +303,13 @@ object Tracing {
 
         @JvmStatic
         fun isENSSupported(): Boolean {
-            return doesSupportENS
+            if (hasCheckedENS) {
+                return doesSupportENS
+            } else {
+                Events.raiseEvent(Events.INFO, "isENSSupported: triggering check")
+                isSupported(null)
+                return doesSupportENS;
+            }
         }
 
         private fun setNewStatus(newStatus: String) {
@@ -522,9 +529,11 @@ object Tracing {
 
         @JvmStatic
         fun isAuthorised(promise: Promise) {
+            Events.raiseEvent(Events.INFO, "Checking isAuthprised");
             try {
                 exposureWrapper.isEnabled
                         .addOnSuccessListener { enabled: Boolean? ->
+
                             if (enabled == true) {
                                 Events.raiseEvent(Events.INFO, "isAuthorised: granted")
                                 promise.resolve("granted")
@@ -567,7 +576,8 @@ object Tracing {
         }
 
         @JvmStatic
-        fun isSupported(promise: Promise) = runBlocking<Unit> {
+        fun isSupported(promise: Promise?) = runBlocking<Unit> {
+            Events.raiseEvent(Events.INFO, "isSupported - Checking if ENS supported")
             launch {
 
                 try {
@@ -577,16 +587,19 @@ object Tracing {
                         val version = ExposureNotificationHelper.getDeviceENSVersion().await()
                         Events.raiseEvent(Events.INFO, "isSupported - getDeviceENSVersion: $version")
                         doesSupportENS = true
-                        promise.resolve(true)
+                        hasCheckedENS = true
+                        promise?.resolve(true)
                     } else if (apiResult == ConnectionResult.SERVICE_INVALID || apiResult == ConnectionResult.SERVICE_DISABLED || apiResult == ConnectionResult.SERVICE_MISSING) {
-                        promise.resolve(false)
+                        promise?.resolve(false)
                         doesSupportENS = false
+                        hasCheckedENS = true
                         base.setApiError(apiResult)
                     }
                 } catch (ex: Exception) {
                     Events.raiseError("isSupported - Exception", ex)
-                    promise.resolve(false)
+                    promise?.resolve(false)
                     doesSupportENS = false
+                    hasCheckedENS = true
                     base.setApiError(1)
                 }
             }
