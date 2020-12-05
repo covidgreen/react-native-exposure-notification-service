@@ -2,9 +2,12 @@ package ie.gov.tracing.nearby.riskcalculation;
 
 import android.content.Context;
 import android.os.Build;
+import android.view.Window;
+
 import androidx.annotation.RequiresApi;
 
 import com.google.android.gms.nearby.exposurenotification.CalibrationConfidence;
+import com.google.android.gms.nearby.exposurenotification.DailySummary;
 import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
 import com.google.android.gms.nearby.exposurenotification.Infectiousness;
 import com.google.android.gms.nearby.exposurenotification.ReportType;
@@ -20,9 +23,15 @@ import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.nearby.ExposureNotificationClientWrapper;
+import ie.gov.tracing.storage.ExposureEntity;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -31,9 +40,9 @@ import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEO
 
 public class RiskCalculationV2 implements RiskCalculation {
 
-        ExposureConfig ensConfig;
+    ExposureConfig ensConfig;
 
-        public RiskCalculationV2(ExposureConfig config) {
+    public RiskCalculationV2(ExposureConfig config) {
             ensConfig = config;
         }
 
@@ -95,120 +104,191 @@ public class RiskCalculationV2 implements RiskCalculation {
         return exposureWindows;
     }
 
-//        fun calculateRisk(windows: List<ExposureWindow>, dailySummaries: List<DailySummary>, config: ExposureConfig, context: Context): Boolean {
-//        // we use these when we receive match broadcasts from exposure API
-//        val thresholdsWeightings = config.thresholdWeightings!!.map{it.toInt()}
-//        val thresholds =  Thresholds(thresholdsWeightings, config.timeThreshold, config.numFilesAndroid, config.contiguousMode) // FIXME check numFiles config
-//
-//        if(dailySummaries.isEmpty()) {
-//            Events.raiseEvent(Events.INFO, "V2 - No daily summaries returned, no exposures matched")
-//            return false
-//        }
-//
-//        val aboveThresholdDays = dailySummaries.filter{
-//            (it.summaryData.weightedDurationSum / 60.0).toInt() > thresholds.timeThreshold
-//        }.sortedBy { it.daysSinceEpoch }
-//
-//        if(aboveThresholdDays.isEmpty()) {
-//            Events.raiseEvent(Events.INFO, "V2 - No daily summary meeting duration threshold")
-//            return false
-//        }
-//
-//        val mostRecent = aboveThresholdDays.first()
-//
-//        try {
-//            val windowsData = extractExposureWindowData(windows, config, thresholds, mostRecent.daysSinceEpoch)
-//
-//            /*if (thresholds.contiguousMode) {
-//                if (windowsData.filter{ it.scanData.exceedsThreshold }.count > 0) {
-//                    return constructSummaryInfo(mostRecent, windowsData) // FIXME showNotification ?
-//                } else {
-//                    Events.raiseEvent(Events.INFO, "V2 - Running in Contiguous mode, no contiguous match");
-//                    return false;
-//                }
-//            }*/
-//
-//        return constructSummaryInfo(mostRecent, windowsData)
-//
-//    } catch (error: Exception) {
-//        Events.raiseError("Error while extracting window data", error)
-//        return false
-//    }
-//
-//}
-//
-//    private fun buildScanData(scanInstances: List<ScanInstance>, config: ExposureConfig, thresholds: Thresholds): ScanData {
-//        val data: ScanData = ScanData(mutableListOf(0, 0, 0, 0), false)
-//        val thresholdWeightings = listOf(config.immediateDurationWeight, config.nearDurationWeight, config.mediumDurationWeight, config.otherDurationWeight)
-//
-//        scanInstances.forEach { scan ->
-//        config.attenuationDurationThresholds.forEachIndexed{ index, attenuation ->
-//        if( scan.typicalAttenuationDb <= attenuation) {
-//        data.buckets[index] += scan.secondsSinceLastScan / 60 * (thresholdWeightings[index] / 100.0).toInt()
-//        return@forEach
-//                }
-//                        }
-//
-//                        }
-//
-//                        var contactTime = 0
-//                        data.buckets.forEachIndexed { index, bucket ->
-//                        contactTime += bucket * thresholds.thresholdWeightings[index]
-//                        }
-//
-//                        if (contactTime >= thresholds.timeThreshold) {
-//                        data.exceedsThresholds = true
-//                        }
-//
-//                        return data
-//                        }
-//
-//private fun createWindowDataAndUpdateItems(window: ExposureWindow, items: MutableMap<Long, WindowData>): WindowData {
-//        val newItem = createWindowData(window)
-//        items[window.dateMillisSinceEpoch] = newItem
-//        return newItem
-//        }
-//
-//private fun extractExposureWindowData(windows: List<ExposureWindow>, config: ExposureConfig, thresholds: Thresholds, daysSinceEpoch: Int): List<WindowData> {
-//        val items: MutableMap<Long, WindowData> = mutableMapOf()
-//
-//        val  matchWindows = windows.filter{ Math.floor(it.dateMillisSinceEpoch.toDouble() / 24 * 60 * 60 * 1000).toInt() == daysSinceEpoch}
-//
-//        matchWindows.forEach{ window ->
-//        val scan = buildScanData(window.scanInstances, config, thresholds);
-//        val item: WindowData = items[window.dateMillisSinceEpoch] ?: createWindowDataAndUpdateItems(window, items)
-//        scan.buckets.forEachIndexed { index, element ->
-//        item.cumulativeScans.buckets[index] += element
-//        }
-//        item.contiguousScans.add(scan)
-//        }
-//
-//        return items.values.toList()
-//        }
-//
-//private fun constructSummaryInfo(summary: DailySummary, windows: List<WindowData>): Boolean {
-//
-//        // FIXME impl
-//        return false // tru => notification , false => nope
-////        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: summary.daysSinceLastExposure, attenuationDurations: self.convertDurations(summary.attenuationDurations), matchedKeyCount: Int(summary.matchedKeyCount),  maxRiskScore: Int(summary.maximumRiskScore), exposureDate: Date())
-//        //        let calendar = Calendar.current
-//        //        let components = calendar.dateComponents([.day], from: day.date, to: Date())
-//        //
-//        //        let summedDurations = sumDurations(windows)
-//        //        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: summedDurations.buckets, matchedKeyCount: -1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: Date())
-//        //
-//        //        info.customAttenuationDurations = summedDurations.buckets
-//        //        info.riskScoreSumFullRange = Int(day.daySummary.scoreSum)
-//        //        info.windows = windows
-//        //
-//        //        os_log("Exposure detected", log: OSLog.checkExposure, type: .debug)
-//        //
-//        //        return info
-//        }
-//        */
-    @RequiresApi(Build.VERSION_CODES.N)
-    public ListenableFuture<Boolean>  processKeys(Context context, Boolean simulate, Integer simulateDays) {
-        AtomicReference<Boolean> showNotification = new AtomicReference<>(false);
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private List<WindowData> extractExposureWindows(List<ExposureWindow> windows, Long daysSinceEpoch, ExposureConfig config) {
+        List<ExposureWindow> matchWindows = windows;
+
+        if (daysSinceEpoch != -1) {
+            matchWindows = new ArrayList<>();
+
+            for (int i = 0; i < windows.size(); i++) {
+                ExposureWindow window = windows.get(i);
+                long millis = window.getDateMillisSinceEpoch();
+                long days = millis / (1000*60*60*24);
+                if (days == daysSinceEpoch) {
+                    matchWindows.add(window);
+                }
+            }
+        }
+
+        List<WindowData> windowList = new ArrayList<>();
+
+        for (int i = 0; i < matchWindows.size(); i++) {
+            ExposureWindow window = matchWindows.get(i);
+            ScanData scan = buildScanData(config, window.getScanInstances());
+            WindowData item = new WindowData(1, window.getCalibrationConfidence(), window.getReportType(), window.getInfectiousness(), scan);
+
+            windowList.add(item);
+        }
+
+        return windowList;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private ExposureEntity constructSummaryInfo(DailySummary summary, List<WindowData> windows) {
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        long todaySinceEpoch = LocalDate.now().toEpochDay();
+        long daysSinceExposure =  todaySinceEpoch - summary.getDaysSinceEpoch();
+        today.add(Calendar.DATE, 0 - new Long(daysSinceExposure).intValue());
+
+        ScanData summedDurations = sumDurations(windows);
+
+        // store field as a string (otherwise we'd need a new table)
+        String attenuationDurations = "";
+        if (summedDurations.getBuckets().length > 0) {
+            attenuationDurations = Integer.toString(summedDurations.getBuckets()[0]);
+            for (int i = 1; i < summedDurations.getBuckets().length; i++) {
+                attenuationDurations += "," + summedDurations.getBuckets()[i];
+            }
+        }
+
+        ExposureEntity entity = new ExposureEntity(new Long(daysSinceExposure).intValue(), -1, new Double(summary.getSummaryData().getMaximumScore()).intValue(), new Double(summary.getSummaryData().getScoreSum()).intValue(), attenuationDurations, today.getTimeInMillis());
+        entity.setWindows(windows);
+
+        return entity;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private ScanData sumDurations(List<WindowData> windows) {
+        ScanData scanData = new ScanData();
+
+        windows.forEach(window -> {
+             for (int i = 0; i < scanData.getBuckets().length; i++) {
+                 scanData.getBuckets()[i] += window.getScanData().getBuckets()[i];
+             }
+        });
+
+        return scanData;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private ScanData buildScanData(ExposureConfig config, List<ScanInstance> scanData) {
+        ScanData scanItem = new ScanData();
+
+        double[] thresholdWeightings = new double[]{config.getImmediateDurationWeight(), config.getNearDurationWeight(), config.getMediumDurationWeight(), config.getOtherDurationWeight()};
+
+        scanData.forEach(scan -> {
+            for (int i = 0; i < config.getAttenuationDurationThresholds().length; i++) {
+                if (scan.getTypicalAttenuationDb() <= config.getAttenuationDurationThresholds()[i]) {
+                    scanItem.getBuckets()[i] += scan.getSecondsSinceLastScan() / 60 * thresholdWeightings[i] / 100.0;
+                }
+            }
+        });
+
+        int totalTime = 0;
+        for (int i = 0; i < scanItem.getBuckets().length; i++) {
+            totalTime += scanItem.getBuckets()[i];
+        }
+        if (totalTime >= config.getTimeThreshold()) {
+            scanItem.setExceedsThresholds(true);
+        }
+        return scanItem;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private List<WindowData> filterForExceededWindows(List<WindowData> windows) {
+
+        List<WindowData> filtered = new ArrayList<>();
+
+        for (int i = 0; i < windows.size(); i++) {
+            if (windows.get(i).getScanData().getExceedsThresholds()) {
+                filtered.add(windows.get(i));
+            }
+        }
+        filtered.sort((o1, o2) -> {
+            if (o1.getDate() > o2.getDate()) {
+                return 1;
+            } else if (o1.getDate() > o2.getDate()) {
+                return -1;
+            }
+            return 0;
+        });
+
+        return filtered;
+    }
+
+    private DailySummary findDay(List<DailySummary> summaries, long day) {
+
+        for (int i = 0; i < summaries.size(); i++) {
+            if (summaries.get(i).getDaysSinceEpoch() == day) {
+                return summaries.get(i);
+            }
+        }
+        return null;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private ExposureEntity buildExposureEntity(List<DailySummary> dailySummaries, List<ExposureWindow> exposureWindows, ExposureConfig config) {
+
+        List<DailySummary> validDays = new ArrayList<>();
+        long matchDay = -1;
+
+        if (!config.getContiguousMode()) {
+            for (int i = 0; i < dailySummaries.size(); i++) {
+                DailySummary summary = dailySummaries.get(i);
+                if (summary.getSummaryData().getWeightedDurationSum() / 60.0 >= ensConfig.getTimeThreshold()) {
+                    validDays.add(summary);
+                }
+            };
+            if (validDays.size() == 0) {
+                Events.raiseEvent(Events.INFO, "exposureWindows - no dailySummaries that meet the threshold criteria");
+                return null;
+            }
+
+        } else {
+            validDays = dailySummaries;
+        }
+        validDays.sort((o1, o2) -> {
+            if (o1.getDaysSinceEpoch() > o2.getDaysSinceEpoch()) {
+                return 1;
+            } else if (o1.getDaysSinceEpoch() > o2.getDaysSinceEpoch()) {
+                return -1;
+            }
+            return 0;
+        });
+
+        if (!config.getContiguousMode()) {
+            matchDay = validDays.get(0).getDaysSinceEpoch();
+        }
+
+        List<WindowData> windowItems = extractExposureWindows(exposureWindows, matchDay, config);
+
+        if (config.getContiguousMode()) {
+            List<WindowData> exceeded = filterForExceededWindows(windowItems);
+            if (exceeded.size() > 0) {
+                long dayVal = Instant.ofEpochMilli(exceeded.get(0).getDate()).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay();
+
+                DailySummary day = findDay(dailySummaries,dayVal);
+                if (day != null) {
+                    return constructSummaryInfo(day, windowItems);
+                } else {
+                    Events.raiseEvent(Events.INFO, "V2 - Unable to find day to match window");
+                    return null;
+                }
+            } else {
+                Events.raiseEvent(Events.INFO, "V2 - Running in Contiguous mode, no contiguos match");
+                return null;
+            }
+        } else {
+            return constructSummaryInfo(validDays.get(0), windowItems);
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    public ListenableFuture<ExposureEntity>  processKeys(Context context, Boolean simulate, Integer simulateDays) {
 
         return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
                     ExposureNotificationClientWrapper.get(context).getDailySummaries(this.ensConfig),
@@ -241,11 +321,14 @@ public class RiskCalculationV2 implements RiskCalculation {
                             Events.raiseEvent(Events.INFO, "exposureWindows - no dailySummaries");
                             return Futures.immediateFailedFuture(new NoDailySummaries());
                         }
-                        showNotification.set(true);
-                        return Futures.immediateFuture(showNotification.get());
+
+                        ExposureEntity exposureEntity = buildExposureEntity(dailySummaries, exposureWindows, ensConfig);
+
+                        return Futures.immediateFuture(exposureEntity);
                     }, AppExecutors.getBackgroundExecutor());
                 }, AppExecutors.getBackgroundExecutor());
     }
+
 
     private static class NoExposureWindows extends Exception {}
     private static class EmptyExposureWindows extends Exception {}

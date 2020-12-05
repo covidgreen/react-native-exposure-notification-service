@@ -365,7 +365,7 @@ class ExposureCheck: AsyncOperation {
       let lastId = self.configData.lastExposureIndex ?? 0
       let version = Storage.shared.version()["display"] ?? "unknown"
       os_log("Checking for exposures against nearform server since %d, limit %d", log: OSLog.checkExposure, type: .debug, lastId, numFiles)
-      self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": numFiles, "version": version])
+        self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": numFiles, "version": version, "os": "ios"])
       .validate()
       .responseDecodable(of: [CodableExposureFiles].self) { response in
         switch response.result {
@@ -613,7 +613,7 @@ class ExposureCheck: AsyncOperation {
         return self.cancelProcessing()
       }
       let version = Storage.shared.version()["display"] ?? "unknown"
-      self.sessionManager.request(self.serverURL(.settings), parameters: ["version": version])
+        self.sessionManager.request(self.serverURL(.settings), parameters: ["version": version, "os": "ios"])
           .validate()
           .responseDecodable(of: CodableSettings.self) { response in
           
@@ -734,7 +734,9 @@ class ExposureCheck: AsyncOperation {
         "matchedKeys": exposures.matchedKeyCount,
         "attenuations": exposures.customAttenuationDurations ?? exposures.attenuationDurations,
         "maxRiskScore": exposures.maxRiskScore,
-        "daysSinceExposure": exposures.daysSinceLastExposure
+        "daysSinceExposure": exposures.daysSinceLastExposure,
+        "os": "ios",
+        "version": Storage.shared.version()["display"] ?? "unknown"
       ]
         
       if let windowData = exposures.windows {
@@ -766,7 +768,7 @@ class ExposureCheck: AsyncOperation {
       }
            
       let version = Storage.shared.version()["display"] ?? "unknown"
-      self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload, "version": version], encoding: JSONEncoding.default)
+        self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload, "version": version, "os": "ios"], encoding: JSONEncoding.default)
         .validate()
         .response() { response in
           switch response.result {

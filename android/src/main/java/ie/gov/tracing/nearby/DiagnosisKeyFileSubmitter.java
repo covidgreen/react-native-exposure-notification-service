@@ -2,6 +2,7 @@ package ie.gov.tracing.nearby;
 
 import android.content.Context;
 
+import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -36,14 +37,20 @@ class DiagnosisKeyFileSubmitter {
     Events.raiseEvent(Events.INFO, "Processing " + files.size() + " export files...");
 
     if (config.getV2Mode()) {
-      Events.raiseEvent(Events.INFO, "parseFiles - Running in V2 mode.");
-      return TaskToFutureAdapter.getFutureWithTimeout(
-              client.provideDiagnosisKeys(files),
-              API_TIMEOUT.toMillis(),
-              TimeUnit.MILLISECONDS,
-              AppExecutors.getScheduledExecutor());
+      return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                client.setDiagnosisKeysDataMapping(config),
+                API_TIMEOUT.toMillis(),
+                TimeUnit.MILLISECONDS,
+                AppExecutors.getScheduledExecutor()))
+              .transformAsync((v) -> {
+                return TaskToFutureAdapter.getFutureWithTimeout(
+                        client.provideDiagnosisKeys(files),
+                        API_TIMEOUT.toMillis(),
+                        TimeUnit.MILLISECONDS,
+                        AppExecutors.getScheduledExecutor());
+              },
+                      AppExecutors.getBackgroundExecutor());
     } else {
-      Events.raiseEvent(Events.INFO, "parseFiles - Running in V1 mode.");
       return TaskToFutureAdapter.getFutureWithTimeout(
               client.provideDiagnosisKeys(files, token, config),
               API_TIMEOUT.toMillis(),

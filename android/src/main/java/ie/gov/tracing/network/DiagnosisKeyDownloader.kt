@@ -5,6 +5,7 @@ import androidx.annotation.Keep
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.gson.Gson
+import ie.gov.tracing.Tracing
 import ie.gov.tracing.common.Events
 import ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker
 import ie.gov.tracing.storage.SharedPrefs
@@ -48,6 +49,7 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
         var since = SharedPrefs.getLong("since", context)
         val keyServerType = SharedPrefs.getString("keyServerType", context)
 
+        val version = Tracing.version(context).getString("display")
         Events.raiseEvent(Events.INFO, "download - get exports to process since: $since")
 
         // process:
@@ -55,7 +57,7 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
         // 2. download the files to process
         // 3. increment sync to largest processed index
         // 4. return the list of files to pass to the submitter
-        var endpoint = "/exposures/?since=$since&limit=$fileLimit"
+        var endpoint = "/exposures/?since=$since&limit=$fileLimit&version=$version"
         if (keyServerType == "google") {
             endpoint = "/v1/index.txt"
         } 

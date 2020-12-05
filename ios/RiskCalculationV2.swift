@@ -15,7 +15,7 @@ class RiskCalculationV2 {
         var matchDate: Date?
         
         if (!thresholds.contiguousMode) {
-            let aboveThresholdDays = summary.daySummaries.filter({ Int(($0.daySummary.weightedDurationSum / 60.0)) > thresholds.timeThreshold}).sorted(by: { $0.date > $1.date })
+            let aboveThresholdDays = summary.daySummaries.filter({ Int(($0.daySummary.weightedDurationSum / 60.0)) >= thresholds.timeThreshold}).sorted(by: { $0.date > $1.date })
             if aboveThresholdDays.count == 0 {
                 os_log("V2 - No daily summary meeting duration threshold", log: OSLog.checkExposure, type: .info)
                 return completion(.success(nil))
@@ -68,7 +68,8 @@ class RiskCalculationV2 {
         
         info.customAttenuationDurations = summedDurations.buckets
         info.riskScoreSumFullRange = Int(day.daySummary.scoreSum)
-        info.windows = windows
+        
+        info.windows = windows.filter{$0.date == day.date}
         
         os_log("Exposure detected", log: OSLog.checkExposure, type: .debug)
         

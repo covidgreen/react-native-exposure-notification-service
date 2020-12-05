@@ -4,6 +4,8 @@ import android.content.Context;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import ie.gov.tracing.storage.ExposureEntity;
+
 public interface RiskCalculation {
-    ListenableFuture<Boolean> processKeys(Context context, Boolean simulate, Integer simulateDays);
+    ListenableFuture<ExposureEntity> processKeys(Context context, Boolean simulate, Integer simulateDays);
 }

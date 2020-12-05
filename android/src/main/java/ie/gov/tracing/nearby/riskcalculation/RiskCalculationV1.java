@@ -7,10 +7,8 @@ import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.Calendar;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -18,7 +16,6 @@ import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.nearby.ExposureNotificationClientWrapper;
-import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.ExposureEntity;
 import ie.gov.tracing.storage.ExposureNotificationRepository;
 import ie.gov.tracing.storage.SharedPrefs;
@@ -47,9 +44,20 @@ public class RiskCalculationV1 implements RiskCalculation {
         return null;
     }
 
-    public ListenableFuture<Boolean> processKeys(Context context, Boolean simulate, Integer simulateDays) {
+    private ExposureSummary buildSimulateSummary(int numDays) {
+        int[] dummyAttenuations = new int[]{30, 30, 30};
+        return new ExposureSummary.ExposureSummaryBuilder()
+            .setAttenuationDurations(dummyAttenuations)
+            .setDaysSinceLastExposure(numDays)
+            .setMatchedKeyCount(1)
+            .setMaximumRiskScore(10)
+            .setSummationRiskScore(10)
+            .build();
+    }
+
+    public ListenableFuture<ExposureEntity> processKeys(Context context, Boolean simulate, Integer simulateDays) {
         Events.raiseEvent(Events.INFO, "Running v1 risk checks");
-        AtomicReference<Boolean> showNotification = new AtomicReference<>(false);
+        AtomicReference<ExposureEntity> exposureEntity = new AtomicReference<>(null);
 
         return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
                 ExposureNotificationClientWrapper.get(context).getExposureSummary(ensToken),
@@ -59,14 +67,7 @@ public class RiskCalculationV1 implements RiskCalculation {
                 .transformAsync((exposureSummary) -> {
                     Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results" + simulate);
                     if (simulate) {
-                        ExposureSummary.ExposureSummaryBuilder builder = new ExposureSummary.ExposureSummaryBuilder();
-                        int[] dummyAttenuations = new int[]{30, 30, 30};
-                        builder.setAttenuationDurations(dummyAttenuations);
-                        builder.setDaysSinceLastExposure(simulateDays);
-                        builder.setMatchedKeyCount(1);
-                        builder.setMaximumRiskScore(10);
-                        builder.setSummationRiskScore(10);
-                        exposureSummary = builder.build();
+                        exposureSummary = buildSimulateSummary(simulateDays);
                     }
 
                     if (exposureSummary == null) {
@@ -118,7 +119,7 @@ public class RiskCalculationV1 implements RiskCalculation {
                                 " is less than timeThreshold: " + timeThreshold + ", ignoring and deleting token.");
                         return repository.deleteTokenEntityAsync(ensToken);
                     }
-                    showNotification.set(true);
+
                     Events.raiseEvent(Events.INFO, "exposureSummary - totalTime: " + totalTime +
                             " exceeds timeThreshold: " + timeThreshold + ", recording successful match");
 
@@ -131,40 +132,27 @@ public class RiskCalculationV1 implements RiskCalculation {
                         }
                     }
 
-                    List<ExposureEntity> exposureEntities = new ArrayList<>();
-                    ExposureEntity exposureEntity = ExposureEntity.create(
+                    Calendar today = Calendar.getInstance();
+                    today.set(Calendar.HOUR_OF_DAY, 0);
+                    today.set(Calendar.MINUTE, 0);
+                    today.set(Calendar.SECOND, 0);
+                    today.add(Calendar.DATE, 0 - exposureSummary.getDaysSinceLastExposure());
+
+                    exposureEntity.set(ExposureEntity.create(
                             exposureSummary.getDaysSinceLastExposure(),
                             exposureSummary.getMatchedKeyCount(),
                             exposureSummary.getMaximumRiskScore(),
                             exposureSummary.getSummationRiskScore(),
-                            attenuationDurations
-                    );
-                    exposureEntities.add(exposureEntity);
-
-                    // asynchronously update our summary table while we show notification
-                    repository.upsertExposureEntitiesAsync(exposureEntities);
-
-                    Events.raiseEvent(Events.ON_EXPOSURE, "exposureSummary - recording summary matches:"
-                            + exposureSummary.getMatchedKeyCount() + ", duration minutes: " + attenuationDurations);
-
-                    HashMap<String, Object> payload = new HashMap<>();
-
-                    payload.put("matchedKeys", exposureSummary.getMatchedKeyCount());
-                    payload.put("attenuations", ad);
-                    payload.put("maxRiskScore", exposureSummary.getMaximumRiskScore());
-
-                    Fetcher.saveMetric("CONTACT_NOTIFICATION", context, payload);
-                    Fetcher.triggerCallback(exposureEntity, context, payload);
+                            attenuationDurations, today.getTimeInMillis()
+                    ));
 
                     // finish by marking token as read if we have positive matchCount for token
                     return repository.markTokenEntityRespondedAsync(ensToken);
 
                 }, AppExecutors.getBackgroundExecutor())
                 .transformAsync((v) -> {
-                    return Futures.immediateFuture(showNotification.get());
+                    return Futures.immediateFuture(exposureEntity.get());
                 }, AppExecutors.getBackgroundExecutor());
-                //.transform((v) -> ListenableWorker.Result.success(), AppExecutors.getLightweightExecutor())
-                //.catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
 
     }
 

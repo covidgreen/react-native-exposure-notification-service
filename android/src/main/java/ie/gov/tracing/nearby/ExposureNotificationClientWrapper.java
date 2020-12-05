@@ -4,12 +4,15 @@ import android.content.Context;
 import android.os.Build;
 
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.exposurenotification.DailySummariesConfig;
 import com.google.android.gms.nearby.exposurenotification.DailySummary;
 import com.google.android.gms.nearby.exposurenotification.DiagnosisKeyFileProvider;
+import com.google.android.gms.nearby.exposurenotification.DiagnosisKeysDataMapping;
 import com.google.android.gms.nearby.exposurenotification.ExposureConfiguration;
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
 import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
@@ -24,10 +27,14 @@ import com.google.gson.Gson;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.network.Fetcher;
@@ -97,7 +104,8 @@ public class ExposureNotificationClientWrapper {
   }
 
   public ListenableFuture<ExposureConfig> fetchExposureConfig(Context context) {
-    String settings = Fetcher.fetch("/settings/exposures", context);
+    String version = Tracing.version(context).getString("display");
+    String settings = Fetcher.fetch("/settings/exposures?version=" + version, context);
     Gson gson = new Gson();
     Map map = gson.fromJson(settings, Map.class);
     String exposureConfig = (String) map.get("exposureConfig");
@@ -122,7 +130,7 @@ public class ExposureNotificationClientWrapper {
   }
 
   @RequiresApi(api = Build.VERSION_CODES.N)
-  Task<List<DailySummary>> getDailySummaries(ExposureConfig config) {
+  public Task<List<DailySummary>> getDailySummaries(ExposureConfig config) {
     DailySummariesConfig.DailySummariesConfigBuilder builder = new DailySummariesConfig.DailySummariesConfigBuilder();
     List<Double> attenuationWeightings = Arrays.asList(config.getImmediateDurationWeight() / 100.0, config.getNearDurationWeight() / 100.0, config.getMediumDurationWeight() / 100.0, config.getOtherDurationWeight() / 100.0);
     List<Integer> attenuations = Arrays.stream(config.getAttenuationDurationThresholds()).boxed().collect(Collectors.toList());
@@ -140,6 +148,30 @@ public class ExposureNotificationClientWrapper {
             .setMinimumWindowScore(config.getMinimumRiskScoreFullRange())
             .build();
     return exposureNotificationClient.getDailySummaries(dailySummaryConfig);
+  }
+
+  public Task<Void> setDiagnosisKeysDataMapping(ExposureConfig config) {
+    DiagnosisKeysDataMapping.DiagnosisKeysDataMappingBuilder builder = new DiagnosisKeysDataMapping.DiagnosisKeysDataMappingBuilder();
+    Map<Integer, Integer> infectedDays = new HashMap<Integer, Integer>();
+    int counter = 0;
+    int[] onsetType = config.getInfectiousnessForDaysSinceOnsetOfSymptoms();
+
+    for (Integer i = -14; i <= 14; i++) {
+      if (counter < onsetType.length) {
+        infectedDays.put(i, onsetType[counter]);
+      } else {
+        infectedDays.put(i, Infectiousness.NONE);
+      }
+      counter += 1;
+    }
+
+    DiagnosisKeysDataMapping mappings = builder
+            .setInfectiousnessWhenDaysSinceOnsetMissing(Infectiousness.STANDARD)
+            .setReportTypeWhenMissing(ReportType.CONFIRMED_TEST)
+            .setDaysSinceOnsetToInfectiousness(infectedDays)
+            .build();
+
+    return exposureNotificationClient.setDiagnosisKeysDataMapping(mappings);
   }
 
   public boolean deviceSupportsLocationlessScanning() {

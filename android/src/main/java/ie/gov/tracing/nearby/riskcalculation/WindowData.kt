@@ -7,8 +7,7 @@ data class WindowData (
         var calibrationConfidence: Int,
         var diagnosisReportType: Int,
         var infectiousness: Int,
-        var cumulativeScans: ScanData,
-        var contiguousScans: MutableList<ScanData>
+        var scanData: ScanData
 )
 
 fun createWindowData (window: ExposureWindow): WindowData {
@@ -16,6 +15,5 @@ fun createWindowData (window: ExposureWindow): WindowData {
             window.calibrationConfidence,
             window.reportType,
             window.infectiousness,
-            ScanData( mutableListOf(0,0,0,0), false),
-            mutableListOf())
+            ScanData())
 }

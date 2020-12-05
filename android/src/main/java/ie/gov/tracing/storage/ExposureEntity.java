@@ -1,8 +1,15 @@
 package ie.gov.tracing.storage;
 
+import android.view.Window;
+
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import ie.gov.tracing.nearby.riskcalculation.WindowData;
 
 @Entity
 public class ExposureEntity {
@@ -28,9 +35,15 @@ public class ExposureEntity {
   @ColumnInfo(name = "attenuation_durations")
   private String attenuationDurations;
 
-  ExposureEntity(int daysSinceLastExposure, int matchedKeyCount,
+  @ColumnInfo(name = "exposure_contact_date")
+  private long exposureContactDate;
+
+  @ColumnInfo(name = "window_data")
+  private String windowData;
+
+  public ExposureEntity(int daysSinceLastExposure, int matchedKeyCount,
                  int maximumRiskScore, int summationRiskScore,
-                 String attenuationDurations) {
+                 String attenuationDurations, long exposureContactDate) {
     this.createdTimestampMs = System.currentTimeMillis();
 
     this.daysSinceLastExposure = daysSinceLastExposure;
@@ -38,13 +51,15 @@ public class ExposureEntity {
     this.maximumRiskScore = maximumRiskScore;
     this.summationRiskScore = summationRiskScore;
     this.attenuationDurations = attenuationDurations;
+    this.exposureContactDate = exposureContactDate;
+
   }
 
   public static ExposureEntity create(int daysSinceLastExposure, int matchedKeyCount,
                                       int maximumRiskScore, int summationRiskScore,
-                                      String attenuationDurations) {
+                                      String attenuationDurations, long exposureContactDate) {
     return new ExposureEntity(daysSinceLastExposure, matchedKeyCount,
-            maximumRiskScore, summationRiskScore, attenuationDurations);
+            maximumRiskScore, summationRiskScore, attenuationDurations, exposureContactDate);
   }
 
   public long getId() {
@@ -75,12 +90,20 @@ public class ExposureEntity {
     return summationRiskScore;
   }
 
+  public long getExposureContactDate() {
+    return exposureContactDate;
+  }
+
   public String attenuationDurations() {
     return this.attenuationDurations;
   }
 
   public void setMatchedKeyCount(int matchedKeyCount) {
     this.matchedKeyCount = matchedKeyCount;
+  }
+
+  public void setWindows(List<WindowData> windows) {
+    this.windowData = convertWindowsToJson(windows);
   }
 
   public void setDaysSinceLastExposure(int daysSinceLastExposure) {
@@ -98,4 +121,27 @@ public class ExposureEntity {
   public void setAttenuationDurations(String attenuationDurations) {
     this.attenuationDurations = attenuationDurations;
   }
+
+  private String convertWindowsToJson(List<WindowData> windows) {
+    return "";
+  }
+
+  public String windowData() {
+    return windowData;
+  }
+
+  public void setWindowData(String windows) {
+    this.windowData = windows;
+  }
+
+  public List<WindowData> getWindowAsObjects() {
+    List<WindowData> windowData = new ArrayList<>();
+
+    if (this.windowData.isEmpty()) {
+      return windowData;
+    }
+
+    return windowData;
+  }
+
 }

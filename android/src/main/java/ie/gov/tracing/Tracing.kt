@@ -692,6 +692,7 @@ object Tracing {
 
                         val exp: WritableMap = Arguments.createMap()
                         exp.putDouble("exposureAlertDate", exposure.createdTimestampMs.toDouble())
+                        exp.putDouble("exposureDate", exposure.exposureContactDate.toDouble())
                         exp.putArray("attenuationDurations", attenuationDurations)
                         exp.putInt("daysSinceLastExposure", exposure.daysSinceLastExposure())
                         exp.putInt("matchedKeyCount", exposure.matchedKeyCount())
