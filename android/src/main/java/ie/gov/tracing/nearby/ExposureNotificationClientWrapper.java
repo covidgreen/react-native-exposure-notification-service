@@ -4,8 +4,6 @@ import android.content.Context;
 import android.os.Build;
 
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.google.android.gms.nearby.Nearby;
@@ -21,17 +19,16 @@ import com.google.android.gms.nearby.exposurenotification.Infectiousness;
 import com.google.android.gms.nearby.exposurenotification.ReportType;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import ie.gov.tracing.Tracing;
@@ -150,7 +147,7 @@ public class ExposureNotificationClientWrapper {
     return exposureNotificationClient.getDailySummaries(dailySummaryConfig);
   }
 
-  public Task<Void> setDiagnosisKeysDataMapping(ExposureConfig config) {
+  public void setDiagnosisKeysDataMapping(ExposureConfig config) {
     DiagnosisKeysDataMapping.DiagnosisKeysDataMappingBuilder builder = new DiagnosisKeysDataMapping.DiagnosisKeysDataMappingBuilder();
     Map<Integer, Integer> infectedDays = new HashMap<Integer, Integer>();
     int counter = 0;
@@ -171,7 +168,23 @@ public class ExposureNotificationClientWrapper {
             .setDaysSinceOnsetToInfectiousness(infectedDays)
             .build();
 
-    return exposureNotificationClient.setDiagnosisKeysDataMapping(mappings);
+    DiagnosisKeysDataMapping currentMap = null;
+    try {
+      currentMap = Tasks.await(exposureNotificationClient.getDiagnosisKeysDataMapping());
+    } catch (Exception e) {
+      // ignore
+      Events.raiseError("getDiagnosisKeysDataMapping", e);
+    }
+    if (!currentMap.equals(mappings)) {
+      try {
+        Tasks.await(exposureNotificationClient.setDiagnosisKeysDataMapping(mappings));
+        Events.raiseEvent(Events.INFO, "Setting DiagnosisKeysDataMapping");
+      } catch (Exception e) {
+        // ignore
+        Events.raiseError("setDiagnosisKeysDataMapping", e);
+      }
+    }
+    return;
   }
 
   public boolean deviceSupportsLocationlessScanning() {

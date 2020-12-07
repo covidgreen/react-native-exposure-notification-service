@@ -37,19 +37,12 @@ class DiagnosisKeyFileSubmitter {
     Events.raiseEvent(Events.INFO, "Processing " + files.size() + " export files...");
 
     if (config.getV2Mode()) {
-      return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                client.setDiagnosisKeysDataMapping(config),
-                API_TIMEOUT.toMillis(),
-                TimeUnit.MILLISECONDS,
-                AppExecutors.getScheduledExecutor()))
-              .transformAsync((v) -> {
-                return TaskToFutureAdapter.getFutureWithTimeout(
-                        client.provideDiagnosisKeys(files),
-                        API_TIMEOUT.toMillis(),
-                        TimeUnit.MILLISECONDS,
-                        AppExecutors.getScheduledExecutor());
-              },
-                      AppExecutors.getBackgroundExecutor());
+      client.setDiagnosisKeysDataMapping(config);
+      return TaskToFutureAdapter.getFutureWithTimeout(
+                  client.provideDiagnosisKeys(files),
+                  API_TIMEOUT.toMillis(),
+                  TimeUnit.MILLISECONDS,
+                  AppExecutors.getScheduledExecutor());
     } else {
       return TaskToFutureAdapter.getFutureWithTimeout(
               client.provideDiagnosisKeys(files, token, config),
