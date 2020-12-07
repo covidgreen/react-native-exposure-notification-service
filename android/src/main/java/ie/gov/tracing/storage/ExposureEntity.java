@@ -6,6 +6,10 @@ import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -123,7 +127,8 @@ public class ExposureEntity {
   }
 
   private String convertWindowsToJson(List<WindowData> windows) {
-    return "";
+    Gson gson = new Gson();
+    return gson.toJson(windows);
   }
 
   public String windowData() {
@@ -135,13 +140,15 @@ public class ExposureEntity {
   }
 
   public List<WindowData> getWindowAsObjects() {
-    List<WindowData> windowData = new ArrayList<>();
+    Gson gson = new Gson();
+
+    Type windowType = new TypeToken<ArrayList<WindowData>>(){}.getType();
 
     if (this.windowData.isEmpty()) {
-      return windowData;
+      return new ArrayList<WindowData>();
+    } else {
+      return gson.fromJson(this.windowData, windowType);
     }
-
-    return windowData;
   }
 
 }

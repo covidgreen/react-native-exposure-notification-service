@@ -78,7 +78,9 @@ public abstract class ExposureNotificationDatabase extends RoomDatabase {
   static final Migration MIGRATION_1_2 = new Migration(1, 2) {
     @Override
     public void migrate(SupportSQLiteDatabase database) {
+      database.execSQL("ALTER TABLE ExposureEntity ADD COLUMN exposure_contact_date INTEGER NOT NULL DEFAULT 'null'");
       database.execSQL("ALTER TABLE ExposureEntity ADD COLUMN window_data TEXT NOT NULL DEFAULT ''");
+      database.execSQL("UPDATE ExposureEntity SET exposure_contact_date = created_timestamp_ms - (days_since_last_exposure * 86400000)");
     }
   };
 

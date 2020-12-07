@@ -699,6 +699,25 @@ object Tracing {
                         exp.putInt("maxRiskScore", exposure.maximumRiskScore())
                         exp.putInt("summationRiskScore", exposure.summationRiskScore())
 
+                        if (exposure.windowData.size > 0) {
+                            val windows: WritableArray = Arguments.createArray()
+                            exposure.windowData.forEach {
+                                val win: WritableMap = Arguments.createMap()
+                                win.putDouble("date", it.date.toDouble())
+                                win.putInt("calibrationConfidence", it.calibrationConfidence)
+                                win.putInt("diagnosisReportType", it.diagnosisReportType)
+                                win.putInt("infectiousness", it.infectiousness)
+                                val buckets: WritableArray = Arguments.createArray()
+                                it.scanData.buckets.forEach {
+                                    buckets.pushInt(it)
+                                }
+                                win.putArray("buckets", buckets)
+                                win.putBoolean("exceedsThreshold", it.scanData.exceedsThresholds)
+                                windows.pushMap(win)
+                            }
+                            exp.putArray("windows", windows)
+                        }
+
                         result.pushMap(exp)
                     }
 

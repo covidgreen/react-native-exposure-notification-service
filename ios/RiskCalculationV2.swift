@@ -62,14 +62,15 @@ class RiskCalculationV2 {
         let calendar = Calendar.current
         let dateToday = calendar.startOfDay(for: Date())
         let components = calendar.dateComponents([.day], from: day.date, to: dateToday)
+        let filteredWindows = windows.filter{$0.date == day.date}
         
-        let summedDurations = sumDurations(windows)
+        let summedDurations = sumDurations(filteredWindows)
         var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: summedDurations.buckets, matchedKeyCount: -1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: dateToday, exposureContactDate: day.date)
         
         info.customAttenuationDurations = summedDurations.buckets
         info.riskScoreSumFullRange = Int(day.daySummary.scoreSum)
         
-        info.windows = windows.filter{$0.date == day.date}
+        info.windows = filteredWindows
         
         os_log("Exposure detected", log: OSLog.checkExposure, type: .debug)
         

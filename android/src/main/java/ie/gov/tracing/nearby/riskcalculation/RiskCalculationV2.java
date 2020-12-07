@@ -126,7 +126,7 @@ public class RiskCalculationV2 implements RiskCalculation {
         for (int i = 0; i < matchWindows.size(); i++) {
             ExposureWindow window = matchWindows.get(i);
             ScanData scan = buildScanData(config, window.getScanInstances());
-            WindowData item = new WindowData(1, window.getCalibrationConfidence(), window.getReportType(), window.getInfectiousness(), scan);
+            WindowData item = new WindowData(window.getDateMillisSinceEpoch(), window.getCalibrationConfidence(), window.getReportType(), window.getInfectiousness(), scan);
 
             windowList.add(item);
         }
@@ -144,7 +144,14 @@ public class RiskCalculationV2 implements RiskCalculation {
         long daysSinceExposure =  todaySinceEpoch - summary.getDaysSinceEpoch();
         today.add(Calendar.DATE, 0 - new Long(daysSinceExposure).intValue());
 
-        ScanData summedDurations = sumDurations(windows);
+        List<WindowData> filteredWindows = new ArrayList<>();
+        for (int i = 0; i < windows.size(); i++) {
+            long dayVal = Instant.ofEpochMilli(windows.get(i).getDate()).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay();
+            if (dayVal == summary.getDaysSinceEpoch()) {
+                filteredWindows.add(windows.get(i));
+            }
+        }
+        ScanData summedDurations = sumDurations(filteredWindows);
 
         // store field as a string (otherwise we'd need a new table)
         String attenuationDurations = "";
@@ -154,9 +161,8 @@ public class RiskCalculationV2 implements RiskCalculation {
                 attenuationDurations += "," + summedDurations.getBuckets()[i];
             }
         }
-
         ExposureEntity entity = new ExposureEntity(new Long(daysSinceExposure).intValue(), -1, new Double(summary.getSummaryData().getMaximumScore()).intValue(), new Double(summary.getSummaryData().getScoreSum()).intValue(), attenuationDurations, today.getTimeInMillis());
-        entity.setWindows(windows);
+        entity.setWindows(filteredWindows);
 
         return entity;
     }
@@ -209,7 +215,7 @@ public class RiskCalculationV2 implements RiskCalculation {
             }
         }
         filtered.sort((o1, o2) -> {
-            if (o1.getDate() > o2.getDate()) {
+            if (o1.getDate() < o2.getDate()) {
                 return 1;
             } else if (o1.getDate() > o2.getDate()) {
                 return -1;
@@ -252,7 +258,7 @@ public class RiskCalculationV2 implements RiskCalculation {
             validDays = dailySummaries;
         }
         validDays.sort((o1, o2) -> {
-            if (o1.getDaysSinceEpoch() > o2.getDaysSinceEpoch()) {
+            if (o1.getDaysSinceEpoch() < o2.getDaysSinceEpoch()) {
                 return 1;
             } else if (o1.getDaysSinceEpoch() > o2.getDaysSinceEpoch()) {
                 return -1;
