@@ -39,7 +39,7 @@ public class ExposureEntity {
   private long exposureContactDate;
 
   @ColumnInfo(name = "window_data")
-  private String windowData;
+  private String windowData = "";
 
   public ExposureEntity(int daysSinceLastExposure, int matchedKeyCount,
                  int maximumRiskScore, int summationRiskScore,

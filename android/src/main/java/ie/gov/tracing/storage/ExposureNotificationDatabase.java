@@ -81,4 +81,5 @@ public abstract class ExposureNotificationDatabase extends RoomDatabase {
       database.execSQL("ALTER TABLE ExposureEntity ADD COLUMN window_data TEXT NOT NULL DEFAULT ''");
     }
   };
+
 }

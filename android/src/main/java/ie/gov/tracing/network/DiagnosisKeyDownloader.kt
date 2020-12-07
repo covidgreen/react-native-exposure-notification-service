@@ -57,7 +57,7 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
         // 2. download the files to process
         // 3. increment sync to largest processed index
         // 4. return the list of files to pass to the submitter
-        var endpoint = "/exposures/?since=$since&limit=$fileLimit&version=$version"
+        var endpoint = "/exposures/?since=$since&limit=$fileLimit&os=android&version=$version"
         if (keyServerType == "google") {
             endpoint = "/v1/index.txt"
         } 

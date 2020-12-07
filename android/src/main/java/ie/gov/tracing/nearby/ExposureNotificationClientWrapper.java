@@ -164,7 +164,7 @@ public class ExposureNotificationClientWrapper {
       }
       counter += 1;
     }
-
+    Events.raiseEvent(Events.INFO, "Setting diagnosis key mapping");
     DiagnosisKeysDataMapping mappings = builder
             .setInfectiousnessWhenDaysSinceOnsetMissing(Infectiousness.STANDARD)
             .setReportTypeWhenMissing(ReportType.CONFIRMED_TEST)

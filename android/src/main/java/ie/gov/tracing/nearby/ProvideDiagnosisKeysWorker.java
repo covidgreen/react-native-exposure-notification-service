@@ -287,11 +287,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
       cal1.setTime(new Date(dailyActiveTrace));
 
       Calendar cal2 = Calendar.getInstance(); // now
+      long diffInMillies = Math.abs(cal1.getTimeInMillis() - cal2.getTimeInMillis());
+      long dayDiff = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
 
-      boolean sameDay = cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR) &&
-              cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR);
-
-      if(dailyActiveTrace > 0 && sameDay) {
+      if(dayDiff == 0) {
         Events.raiseEvent(Events.INFO, "saveDailyMetric - already sent today");
         return Futures.immediateFuture(enabled);
       }

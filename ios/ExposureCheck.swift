@@ -735,6 +735,7 @@ class ExposureCheck: AsyncOperation {
         "attenuations": exposures.customAttenuationDurations ?? exposures.attenuationDurations,
         "maxRiskScore": exposures.maxRiskScore,
         "daysSinceExposure": exposures.daysSinceLastExposure,
+        "simulate": simulateExposureOnly,
         "os": "ios",
         "version": Storage.shared.version()["display"] ?? "unknown"
       ]

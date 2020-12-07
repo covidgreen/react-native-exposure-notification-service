@@ -1,530 +1,240 @@
-package ie.gov.tracing.network
+package ie.gov.tracing.nearby;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
 
-import android.annotation.SuppressLint
-import android.content.Context
-import androidx.annotation.Keep
-import com.google.common.io.BaseEncoding
-import com.google.gson.Gson
-import ie.gov.tracing.Tracing
-import ie.gov.tracing.common.Events
-import ie.gov.tracing.common.ExposureConfig
-import ie.gov.tracing.storage.ExpoSecureStoreInterop
-import ie.gov.tracing.storage.ExposureEntity
-import ie.gov.tracing.storage.SharedPrefs
-import io.reactivex.Single
-import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.schedulers.Schedulers
-import okhttp3.*
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.logging.HttpLoggingInterceptor
-import org.apache.commons.io.FileUtils
-import java.io.BufferedInputStream
-import java.io.File
-import java.io.InputStream
-import java.net.URL
-import java.security.KeyStore
-import java.security.SecureRandom
-import java.security.cert.Certificate
-import java.security.cert.CertificateFactory
-import java.util.*
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.TrustManagerFactory
-import javax.net.ssl.X509TrustManager
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationCompat.Builder;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.work.Data;
+import androidx.work.ExistingWorkPolicy;
+import androidx.work.ListenableWorker;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
+import androidx.work.WorkerParameters;
 
-@Keep
-data class Token(val token: String)
+import com.facebook.react.bridge.WritableMap;
+import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient;
+import com.google.common.util.concurrent.FluentFuture;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.gson.Gson;
 
-@Keep
-data class Callback(val mobile: String, val closeContactDate: Long, val daysSinceExposure: Int, val payload: Map<String, Any>)
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-@Keep
-data class Metric(val os: String, val event: String, val version: String, val payload: Map<String, Any>?)
+import ie.gov.tracing.R;
+import ie.gov.tracing.Tracing;
+import ie.gov.tracing.common.AppExecutors;
+import ie.gov.tracing.common.Events;
+import ie.gov.tracing.common.ExposureConfig;
+import ie.gov.tracing.nearby.riskcalculation.RiskCalculation;
+import ie.gov.tracing.nearby.riskcalculation.RiskCalculationV1;
+import ie.gov.tracing.nearby.riskcalculation.RiskCalculationV2;
+import ie.gov.tracing.network.Fetcher;
+import ie.gov.tracing.storage.ExposureEntity;
+import ie.gov.tracing.storage.ExposureNotificationRepository;
+import ie.gov.tracing.storage.SharedPrefs;
 
-@Keep
-data class CallbackRecovery(val mobile: String, val code: String, val iso: String, val number: String)
+public class StateUpdatedWorker extends ListenableWorker {
+    private static final String EXPOSURE_NOTIFICATION_CHANNEL_ID =
+            "ExposureNotificationCallback.EXPOSURE_NOTIFICATION_CHANNEL_ID";
 
-private const val FILE_PATTERN = "/diag_keys/diagnosis_key_file_%s.zip"
-private const val REFRESH = "/refresh"
+    public static final String ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION =
+            "com.google.android.apps.exposurenotification.ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION";
 
-object Fetcher {
+    private final Context context;
+    private final ExposureNotificationRepository repository;
 
-    fun token(): String {
-        val bytes = ByteArray(32)
-        SecureRandom().nextBytes(bytes)
-        return BaseEncoding.base64().encode(bytes)
+    public StateUpdatedWorker(
+            @NonNull Context context, @NonNull WorkerParameters workerParams) {
+        super(context, workerParams);
+        this.context = context;
+        this.repository = new ExposureNotificationRepository(context);
     }
 
-    private fun uniq(): String? {
-        val bytes = ByteArray(4)
-        SecureRandom().nextBytes(bytes)
-        return BaseEncoding.base32().lowerCase().omitPadding().encode(bytes)
-    }
+    private boolean isMoreRecentExposure(ExposureEntity entity) {
 
-    private fun getURL(endpoint: String, context: Context): URL {
-
-        val serverUrl = SharedPrefs.getString("serverUrl", context)
-
-        Events.raiseEvent(Events.INFO, "getURL serverUrl $serverUrl")
-        Events.raiseEvent(Events.INFO, "getURL endpoint  $endpoint")
-
-        return URL("${serverUrl}${endpoint}")
-    }
-
-    private fun getBearerAuthenticator(context: Context): BearerAuthenticator {
-
-        return BearerAuthenticator(context)
-    }
-
-    private fun getAuthorizationInterceptor(context: Context): AuthorizationInterceptor {
-
-        return AuthorizationInterceptor(context)
-    }
-
-    // based on https://github.com/MaxToyberman/react-native-ssl-pinning/blob/master/android/src/main/java/com/toyberman/Utils/OkHttpUtils.java#L160
-    private fun getTrustManager(certs: Array<String>): X509TrustManager {
-        var trustManager: X509TrustManager?
-
-        val cf: CertificateFactory = CertificateFactory.getInstance("X.509")
-        val keyStoreType: String = KeyStore.getDefaultType()
-        val keyStore: KeyStore = KeyStore.getInstance(keyStoreType)
-        keyStore.load(null, null)
-        for (i in certs.indices) {
-            val filename = certs[i]
-            val caInput: InputStream = BufferedInputStream(Fetcher::class.java.getClassLoader()?.getResourceAsStream("assets/$filename.cer"))
-            var ca: Certificate
-            ca = caInput.use { cf.generateCertificate(it) }
-            keyStore.setCertificateEntry(filename, ca)
-        }
-        val tmfAlgorithm: String = TrustManagerFactory.getDefaultAlgorithm()
-        val tmf: TrustManagerFactory = TrustManagerFactory.getInstance(tmfAlgorithm)
-        tmf.init(keyStore)
-        val trustManagers: Array<TrustManager> = tmf.getTrustManagers()
-        check(!(trustManagers.size != 1 || trustManagers[0] !is X509TrustManager)) { "Unexpected default trust managers:" + Arrays.toString(trustManagers) }
-        trustManager = trustManagers[0] as X509TrustManager
-        return trustManager
-
-    }
-
-    @JvmStatic
-    fun refreshAuthToken(context: Context): String? {
+        ListenableFuture<List<ExposureEntity>> future = new ExposureNotificationRepository(context).getAllExposureEntitiesAsync();
         try {
+            List<ExposureEntity> exposures = future.get();
+            if (exposures.size() == 0) {
+                return true;
+            }
+            ExposureEntity lastEntity = exposures.get(0);
+            Calendar cal1 = Calendar.getInstance();
+            cal1.setTime(new Date(lastEntity.getExposureContactDate()));
+            Calendar cal2 = Calendar.getInstance();
+            cal2.setTime(new Date(entity.getExposureContactDate()));
+            long diffInMillies = Math.abs(cal2.getTimeInMillis() - cal1.getTimeInMillis());
+            long dayDiff = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
 
-            val url = getURL(REFRESH, context)
-
-            var pin = true
-            var authenticate = true
-
-            val client = getOkClient(pin, authenticate, context)
-            val request = Request.Builder()
-                    .url(url)
-                    .post("".toRequestBody())
-                    .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
-
-                val data = response.body!!.string()
-
-                if (data.isEmpty()) {
-                    return null
-                }
-
-                val tokenClass = Gson().fromJson(data, Token::class.java)
-                if (tokenClass != null) {
-                    SharedPrefs.setString("authToken", tokenClass.token, context)
-                }
-                return tokenClass.token
+            if (dayDiff > 0) {
+                return true;
+            } else {
+                return false;
             }
 
-        } catch (ex: Exception) {
-            Events.raiseError("refresh token error", ex)
+        } catch (Exception e) {
+            return true;
         }
-        return null
-    }
-
-    fun getOkClient(pin: Boolean = true, authenticate: Boolean = true, context: Context): OkHttpClient {
-
-        val authorizationInterceptor = getAuthorizationInterceptor(context)
-        val bearerAuthenticator = getBearerAuthenticator(context)
-        val builder = OkHttpClient.Builder()
-        var usePinning = pin;
-
-        val disableSSLPinning = SharedPrefs.getBoolean("disableSSLPinning", context);
-
-        if (disableSSLPinning) {
-            usePinning = false;
-        }
-
-        val enableOKHTTPLogging = SharedPrefs.getBoolean("enableOKHTTPLogging", context);
-
-        if (enableOKHTTPLogging) {
-
-            builder.addNetworkInterceptor { chain ->
-                chain.proceed(
-                        chain.request()
-                                .newBuilder()
-                                .header("User-Agent", "CovidGreenAndroid")
-                                .build()
-                )
-            }
-
-            val logging = HttpLoggingInterceptor()
-            logging.apply { logging.level = HttpLoggingInterceptor.Level.BODY }
-            builder.addInterceptor(logging)
-        }
-
-        if (authenticate) {
-            builder.authenticator(bearerAuthenticator).addInterceptor(authorizationInterceptor)
-        }
-
-        if (usePinning) {
-            var certList = SharedPrefs.getString("certList", context)
-            val sslContext = SSLContext.getInstance("TLS")
-            if (certList.isNullOrEmpty()) {
-                certList = "cert1,cert2,cert3,cert4,cert5"
-            }
-            val certs = certList.split(",").toTypedArray()
-            val trustManager = getTrustManager(certs);
-            sslContext.init(null, arrayOf<TrustManager?>(trustManager), null)
-            builder.sslSocketFactory(sslContext.getSocketFactory(), trustManager)
-        }
-
-        val okHttpClient: OkHttpClient = builder.build()
-        return okHttpClient
-    }
-
-    @JvmStatic
-    fun downloadFile(filename: String, context: Context): File? {
-        try {
-
-            var pin = true
-            var authenticate = true
-
-            var keyServerUrl = SharedPrefs.getString("keyServerUrl", context)
-            val serverUrl = SharedPrefs.getString("serverUrl", context)
-            if (keyServerUrl.isEmpty()) {
-                keyServerUrl = serverUrl
-            }
-            var keyServerType = SharedPrefs.getString("keyServerType", context)
-            if (keyServerType.isEmpty()) {
-                keyServerType = "nearform"
-            }
-            var fileUrl = "${keyServerUrl}/data/$filename"
-            if (keyServerType == "google") {
-                fileUrl = "${keyServerUrl}/$filename"
-                authenticate = false
-                pin = false
-            }
-
-            val url = URL(fileUrl)
-
-            Events.raiseEvent(Events.INFO, "downloadFile - $url")
-
-            val client = Fetcher.getOkClient(pin, authenticate, context)
-            val request = Request.Builder()
-                    .url(url)
-                    .addHeader("Accept", "application/zip")
-                    .get()
-                    .build()
-
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    Events.raiseEvent(Events.INFO, "downloadFile - success: ${response.code}")
-                    val keyFile = File(context.filesDir, String.format(FILE_PATTERN, uniq()))
-                    if (response.body == null) {
-                        return null
-                    }
-                    FileUtils.copyInputStreamToFile(response.body?.byteStream(), keyFile)
-                    Events.raiseEvent(Events.INFO, "downloadFile save - success: $url")
-                    return keyFile
-
-                } else {
-                    Events.raiseEvent(Events.ERROR, "fetch - HTTP error: ${response.code}")
-                    return null
-                }
-
-            }
-
-        } catch (ex: Exception) {
-            Events.raiseError("download file error", ex)
-        }
-        return null
 
     }
 
-    private fun getRefreshToken(context: Context): String {
-        var token = SharedPrefs.getString("refreshToken", context)
-        if (token.isEmpty()) {
-            try {
-                val store = ExpoSecureStoreInterop(context)
-                token = store.getItemImpl("refreshToken")
-            } catch (exExpo: Exception) {
-                Events.raiseError("ExpoSecureStoreInterop  refreshToken", exExpo)
-            }
-        }
-        return token
-    }
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    @NonNull
+    @Override
+    public ListenableFuture<Result> startWork() { // FIXME change the order
+        Tracing.currentContext = getApplicationContext();
 
-    private fun getAuthToken(context: Context): String {
-        var token = SharedPrefs.getString("authToken", context)
-        if (token.isEmpty()) {
-            try {
-                val store = ExpoSecureStoreInterop(context)
-                token = store.getItemImpl("token")
-            } catch (exExpo: Exception) {
-                Events.raiseError("ExpoSecureStoreInterop  refreshToken", exExpo)
-            }
-        }
-        return token
-    }
+        final boolean simulate = getInputData().getBoolean("simulate", false);
+        final int simulateDays = getInputData().getInt("simulateDays", 3);
+        final String action = getInputData().getString("action");
+        Gson gson = new Gson();
+        final ExposureConfig config = gson.fromJson(SharedPrefs.getString("exposureConfig", Tracing.currentContext), ExposureConfig.class);
+        ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
+        final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
+        Events.raiseEvent(Events.INFO, "Beginning ENS result checking, v2 mode: " + config.getV2Mode());
+        RiskCalculation risk;
 
-    @JvmStatic
-    fun getToken(originalRequest: Request, context: Context): String {
-        var token: String
-        if (originalRequest.url.toString().endsWith(REFRESH)) {
-
-            token = getRefreshToken(context)
-//                 Events.raiseEvent(Events.INFO, "getToken - Is Refresh: $token")
+        if (ExposureNotificationClient.ACTION_EXPOSURE_NOT_FOUND.equals(action)) {
+            Events.raiseEvent(Events.INFO, "No keys matched, ending processing");
+            return Futures.immediateFuture(Result.success());
         } else {
-            // Events.raiseEvent(Events.INFO, "getToken - Not Refresh: $token")
-            token = getAuthToken(context)
-
-        }
-        return token
-    }
-
-    @JvmStatic
-    fun post(endpoint: String, body: String, context: Context): Boolean {
-
-        try {
-            var pin = true
-            var authenticate = true
-            val url = getURL(endpoint, context)
-            val client = getOkClient(pin, authenticate, context)
-            val request = Request.Builder()
-                    .url(url)
-                    .post(body.toRequestBody())
-                    .addHeader("Accept", "application/json")
-                    .addHeader("Content-Type", "application/json; charset=UTF-8")
-                    .build()
-
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    Events.raiseEvent(Events.INFO, "post - HTTP success: ${response.code}")
-                    return true
-                } else {
-                    Events.raiseEvent(Events.ERROR, "post - HTTP error: ${response.code}")
-                    return false
-                }
-
+            if (config.getV2Mode()) {
+                risk = new RiskCalculationV2(config);
+            } else {
+                risk = new RiskCalculationV1(repository, token);
             }
-
-        } catch (ex: Exception) {
-            Events.raiseError("post error", ex)
-        }
-        return false
-    }
-
-    @JvmStatic
-    public fun fetch(endpoint: String, context: Context): String? {
-
-        val url = getURL(endpoint, context)
-
-        Events.raiseEvent(Events.INFO, "fetch - fetching from: $url")
-
-        val pin = true
-        val authenticate = true
-        return Fetcher.fetchInternal(url, pin, authenticate, context)
-
-    }
-
-    @JvmStatic
-    fun fetchKeyFile(endpoint: String, context: Context): String? {
-
-        var pin = true
-        var authenticate = true
-
-        var serverUrl = SharedPrefs.getString("serverUrl", context)
-        val keyServerUrl = SharedPrefs.getString("keyServerUrl", context)
-        if (keyServerUrl.isNotEmpty()) {
-            serverUrl = keyServerUrl
-        }
-        var keyServerType = SharedPrefs.getString("keyServerType", context)
-        if (keyServerType.isEmpty()) {
-            keyServerType = "nearform"
         }
 
-        if (keyServerType == "google") {
-            authenticate = false
-            pin = false
-        }
+        return FluentFuture.from(risk.processKeys(context, simulate, simulateDays))
+                .transform(exposureEntity -> {
 
-        val url = URL("${serverUrl}$endpoint")
-        return Fetcher.fetchInternal(url, pin, authenticate, context)
-    }
-
-    @JvmStatic
-    public fun fetchInternal(url: URL, pin: Boolean = true, authenticate: Boolean = true, context: Context): String? {
-        try {
-
-            Events.raiseEvent(Events.INFO, "fetch - fetching from: $url")
-
-            val client = Fetcher.getOkClient(pin, authenticate, context)
-            val request = Request.Builder()
-                    .url(url)
-                    .addHeader("Accept", "application/json")
-                    .get()
-                    .build()
-
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    Events.raiseEvent(Events.INFO, "fetch - success: ${response.code}")
-
-                    return response.body?.string()
-
-                } else {
-                    Events.raiseEvent(Events.ERROR, "fetch - HTTP error: ${response.code}")
-                    return null
-                }
-
-            }
-
-        } catch (ex: Exception) {
-            Events.raiseError("fetch error", ex)
-        }
-        return null
-    }
-
-
-    @JvmStatic
-    fun triggerCallback(exposureEntity: ExposureEntity, context: Context, payload: Map<String, Any>) {
-        try {
-            var callbackNum = SharedPrefs.getString("callbackNumber", context)
-
-            if (callbackNum.isEmpty()) {
-
-                try {
-                    val store = ExpoSecureStoreInterop(context)
-                    val jsonStr = store.getItemImpl("cti.callBack")
-                    val callBackData = Gson().fromJson(jsonStr, CallbackRecovery::class.java)
-
-                    if (callBackData == null || callBackData.code.isEmpty() || callBackData.number.isEmpty()) {
-                        Events.raiseEvent(Events.INFO, "triggerCallback - no callback recovery")
-                        return;
+                    if (exposureEntity == null) {
+                        Events.raiseEvent(Events.INFO, "No exposure returned, ending");
+                        return Futures.immediateFuture(true);
                     }
-                    callbackNum = callBackData.code + callBackData.number
+                    if (!isMoreRecentExposure(exposureEntity)) {
+                        Events.raiseEvent(Events.INFO, "Contact event is older than previously reported events");
+                        return Futures.immediateFuture(true);
+                    }
+                    List<ExposureEntity> exposureEntities = new ArrayList<>();
 
+                    exposureEntities.add(exposureEntity);
 
-                } catch (exExpo: Exception) {
-                    Events.raiseError("ExpoSecureStoreInterop", exExpo)
-                }
+                    // asynchronously update our summary table while we show notification
+                    repository.upsertExposureEntitiesAsync(exposureEntities);
 
-                if (callbackNum.isEmpty()) {
+                    Events.raiseEvent(Events.ON_EXPOSURE, "exposureSummary - recording summary matches:"
+                            + exposureEntity.matchedKeyCount() + ", duration minutes: " + exposureEntity.attenuationDurations());
 
-                    Events.raiseEvent(Events.INFO, "triggerCallback - no callback number " +
-                            "set, not sending callback")
-                    return
-                }
-            }
+                    HashMap<String, Object> payload = new HashMap<>();
 
-            val calendar = Calendar.getInstance()
-            calendar.add(Calendar.DAY_OF_YEAR, 0 - exposureEntity.daysSinceLastExposure())
-            calendar.set(Calendar.HOUR_OF_DAY, 0)
-            calendar.set(Calendar.MINUTE, 0)
-            calendar.set(Calendar.SECOND, 0)
-            calendar.set(Calendar.MILLISECOND, 0)
-            val daysSinceExposure = calendar.time.time
+                    payload.put("matchedKeys", exposureEntity.matchedKeyCount());
+                    payload.put("attenuations", exposureEntity.attenuationDurations());
+                    payload.put("maxRiskScore", exposureEntity.maximumRiskScore());
+                    payload.put("daysSinceExposure", exposureEntity.daysSinceLastExposure());
+                    payload.put("windows", exposureEntity.windowData());
+                    payload.put("simulated", simulate);
+                    payload.put("os", "android");
+                    WritableMap version = Tracing.version(context);
+                    payload.put("version", version.getString("display"));
 
-            Events.raiseEvent(Events.INFO, "triggerCallback - sending: ${daysSinceExposure} ${Date(daysSinceExposure)}")
-            val callbackParams = Callback(callbackNum, daysSinceExposure, exposureEntity.daysSinceLastExposure(), payload)
-            val success = post("/callback", Gson().toJson(callbackParams), context)
+                    Fetcher.saveMetric("CONTACT_NOTIFICATION", context, payload);
+                    Fetcher.triggerCallback(exposureEntity, context, payload);
 
-            if (!success) {
-                Events.raiseEvent(Events.ERROR, "triggerCallback - failed")
-                return
-            }
-            Events.raiseEvent(Events.INFO, "triggerCallback - success")
+                    showNotification();
+                    return Futures.immediateFuture(true);
 
-            saveMetric("CALLBACK_REQUEST", context)
-        } catch (ex: Exception) {
-            Events.raiseError("triggerCallback - error", ex)
+                }, AppExecutors.getLightweightExecutor())
+                .transform(done -> Result.success(), // all done, do tidy ups here
+                        AppExecutors.getLightweightExecutor())
+                .catching(Exception.class, this::processError, AppExecutors.getLightweightExecutor());
+    }
+
+    private Result processError(Exception ex) {
+        HashMap<String, Object> payload = new HashMap<>();
+        payload.put("description", "error receiving notification: " + ex);
+        Fetcher.saveMetric("LOG_ERROR", context, payload);
+
+        Events.raiseError("error receiving notification", ex);
+        return Result.failure();
+    }
+
+    static void createNotificationChannel(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel =
+                    new NotificationChannel(EXPOSURE_NOTIFICATION_CHANNEL_ID,
+                            context.getString(R.string.notification_channel_name),
+                            NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription(context.getString(R.string.notification_channel_description));
+            NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
         }
     }
 
-    @SuppressLint("CheckResult")
-    @JvmStatic
-    fun saveMetric(event: String, context: Context, payload: Map<String, Any>? = null) {
-        try {
-            val analytics = SharedPrefs.getBoolean("analyticsOptin", context)
-            val version = Tracing.version(context).getString("display").toString()
+    public static NotificationCompat.Builder buildNotification(Context context) {
+        Events.raiseEvent(Events.INFO, "show notification");
+        createNotificationChannel(context);
+        String packageName = context.getApplicationContext().getPackageName();
+        Intent intent = context.getPackageManager().getLaunchIntentForPackage(packageName);
+        intent.putExtra("exposureNotificationClicked", true);
 
-            if (!analytics) {
-                Events.raiseEvent(Events.INFO, "saveMetric - not saving, no opt in")
-                return
-            }
-
-            val metric = Metric("android", event, version, payload)
-
-            Single.fromCallable {
-                return@fromCallable Fetcher.post("/metrics", Gson().toJson(metric), context)
-            }
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe({ success ->
-                        Events.raiseEvent(if (success) Events.INFO else Events.ERROR, "saveMetric - ${if (success) "success" else "failed"}")
-                    }, {
-                        Events.raiseError("saveMetric - error - background", java.lang.Exception(it))
-                    })
-
-        } catch (ex: Exception) {
-            Events.raiseError("saveMetric - error", ex)
-        }
+        intent.setAction(ACTION_LAUNCH_FROM_EXPOSURE_NOTIFICATION);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, RequestCodes.CLOSE_CONTACT, intent, 0);
+        return
+                new Builder(context, EXPOSURE_NOTIFICATION_CHANNEL_ID)
+                        .setSmallIcon(R.mipmap.ic_notification)
+                        .setContentTitle(SharedPrefs.getString("notificationTitle", context))
+                        .setContentText(SharedPrefs.getString("notificationDesc", context))
+                        .setStyle(new NotificationCompat.BigTextStyle()
+                                .bigText(SharedPrefs.getString("notificationDesc", context)))
+                        .setPriority(NotificationCompat.PRIORITY_MAX)
+                        .setContentIntent(pendingIntent)
+//                .setOnlyAlertOnce(true)
+                        .setAutoCancel(true);
     }
-}
 
+    public static void showNotification(Context context) {
+        NotificationCompat.Builder builder = buildNotification(context);
+        NotificationManagerCompat notificationManager = NotificationManagerCompat
+                .from(context);
+        notificationManager.notify(RequestCodes.CLOSE_CONTACT, builder.build());
 
-class BearerAuthenticator(
-        private val context: Context,
-
-        ) : Authenticator {
-
-    override fun authenticate(route: Route?, response: Response): Request? {
-        val originalRequest = response.request;
-        if (originalRequest.url.toString().endsWith(REFRESH)) {
-            // it's a 401 on a refresh token
-            return null
-        }
-
-        if (response.priorResponse != null) {
-            return null // avoid looping
-        } else {
-
-            Fetcher.refreshAuthToken(context)
-
-            var newToken = Fetcher.getToken(originalRequest, context)
-            return originalRequest.newBuilder()
-                    .header("Authorization", "Bearer ${newToken}")
-                    .build()
-        }
+        ExposureNotificationRepeater.setup(context);
     }
-}
 
-class AuthorizationInterceptor(
-        private val context: Context,
-) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
+    public void showNotification() {
+        showNotification(context);
+    }
 
-        val originalRequest = chain.request()
-        // Events.raiseEvent(Events.INFO, "intercept - called ${originalRequest.url.toString()}")
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public static void simulateExposure(Long timeDelay, Integer numDays) {
+        Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure");
 
-        var token = Fetcher.getToken(originalRequest, context)
+        WorkManager workManager = WorkManager.getInstance(Tracing.context);
 
-        val requestWithAuth = originalRequest.newBuilder()
-                .header("Authorization", "Bearer ${token}")
-                .build()
-        return chain.proceed(requestWithAuth)
+        OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
+                .setInitialDelay(Duration.ofSeconds(timeDelay))
+                .setInputData(
+                        new Data.Builder().putBoolean("simulate", true).putString(ExposureNotificationClient.EXTRA_TOKEN, "dummy").putInt("numDays", numDays)
+                                .build())
+                .build();
+        workManager.enqueueUniqueWork("SimulateWorker", ExistingWorkPolicy.REPLACE, workRequest);
     }
 
 }

@@ -65,7 +65,7 @@ public class RiskCalculationV1 implements RiskCalculation {
                 TimeUnit.MILLISECONDS,
                 AppExecutors.getScheduledExecutor()))
                 .transformAsync((exposureSummary) -> {
-                    Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results" + simulate);
+                    Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results, simulate: " + simulate);
                     if (simulate) {
                         exposureSummary = buildSimulateSummary(simulateDays);
                     }
