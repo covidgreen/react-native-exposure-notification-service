@@ -229,8 +229,11 @@ public class StateUpdatedWorker extends ListenableWorker {
         OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
                 .setInitialDelay(Duration.ofSeconds(timeDelay))
                 .setInputData(
-                        new Data.Builder().putBoolean("simulate", true).putString(ExposureNotificationClient.EXTRA_TOKEN, "dummy").putInt("numDays", numDays)
-                                .build())
+                        new Data.Builder().putBoolean("simulate", true)
+                            .putString(ExposureNotificationClient.EXTRA_TOKEN, "dummy")
+                            .putInt("simulateDays", numDays)
+                            .putString("action", ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED)
+                            .build())
                 .build();
         workManager.enqueueUniqueWork("SimulateWorker", ExistingWorkPolicy.REPLACE, workRequest);
     }
