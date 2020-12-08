@@ -20,6 +20,7 @@ public class ExposureProcessor {
     public struct ExposureScanData: Codable {
         var buckets: [Int]
         var exceedsThreshold: Bool
+        var numScans: Int
     }
     public struct ExposureDetailsWindow: Codable {
         let date: Date

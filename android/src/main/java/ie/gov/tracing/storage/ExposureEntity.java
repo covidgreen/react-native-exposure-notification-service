@@ -1,7 +1,6 @@
 package ie.gov.tracing.storage;
 
-import android.view.Window;
-
+import androidx.annotation.NonNull;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
@@ -42,7 +41,8 @@ public class ExposureEntity {
   @ColumnInfo(name = "exposure_contact_date")
   private long exposureContactDate;
 
-  @ColumnInfo(name = "window_data")
+  @ColumnInfo(name = "window_data", defaultValue = "")
+  @NonNull
   private String windowData = "";
 
   public ExposureEntity(int daysSinceLastExposure, int matchedKeyCount,
@@ -139,7 +139,7 @@ public class ExposureEntity {
     this.windowData = windows;
   }
 
-  public List<WindowData> getWindowAsObjects() {
+  public List<WindowData> getWindowData() {
     Gson gson = new Gson();
 
     Type windowType = new TypeToken<ArrayList<WindowData>>(){}.getType();

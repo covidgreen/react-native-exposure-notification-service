@@ -176,14 +176,14 @@ public class RiskCalculationV2 implements RiskCalculation {
                  scanData.getBuckets()[i] += window.getScanData().getBuckets()[i];
              }
         });
-
+        scanData.setNumScans(windows.size());
         return scanData;
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     private ScanData buildScanData(ExposureConfig config, List<ScanInstance> scanData) {
         ScanData scanItem = new ScanData();
-
+        scanItem.setNumScans(scanData.size());
         double[] thresholdWeightings = new double[]{config.getImmediateDurationWeight(), config.getNearDurationWeight(), config.getMediumDurationWeight(), config.getOtherDurationWeight()};
 
         scanData.forEach(scan -> {

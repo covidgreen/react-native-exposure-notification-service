@@ -78,7 +78,7 @@ class RiskCalculationV2 {
     }
         
     private static func sumDurations(_ windows: [ExposureProcessor.ExposureDetailsWindow]) -> ExposureProcessor.ExposureScanData {
-        var data: ExposureProcessor.ExposureScanData = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], exceedsThreshold: false)
+        var data: ExposureProcessor.ExposureScanData = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], exceedsThreshold: false, numScans: windows.count)
         
         for window in windows {
             for (index, element) in window.scanData.buckets.enumerated() {
@@ -118,7 +118,7 @@ class RiskCalculationV2 {
     
     private static func buildScanData(_ scanInstances: [ENScanInstance], _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds) -> ExposureProcessor.ExposureScanData {
         
-        var data = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], exceedsThreshold: false)
+        var data = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], exceedsThreshold: false, numScans: scanInstances.count)
         let thresholdWeightings = [configuration.immediateDurationWeight, configuration.nearDurationWeight, configuration.mediumDurationWeight, configuration.otherDurationWeight]
         
         for scan in scanInstances {

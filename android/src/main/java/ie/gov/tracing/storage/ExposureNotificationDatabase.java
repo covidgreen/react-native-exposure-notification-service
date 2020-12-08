@@ -56,7 +56,8 @@ public abstract class ExposureNotificationDatabase extends RoomDatabase {
       SupportFactory sqlcipherFactory = new SupportFactory(password.getBytes());
       return Room.databaseBuilder(
               context.getApplicationContext(), ExposureNotificationDatabase.class, DATABASE_NAME).openHelperFactory(sqlcipherFactory)
-              .addMigrations(MIGRATION_1_2).build();
+              .addMigrations(MIGRATION_1_2)
+              .build();
     }
     catch (Exception ex) {
       Events.raiseError("buildDatabase", ex);
