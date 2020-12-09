@@ -239,24 +239,7 @@ public class RiskCalculationV2 implements RiskCalculation {
     @RequiresApi(api = Build.VERSION_CODES.O)
     private ExposureEntity buildExposureEntity(List<DailySummary> dailySummaries, List<ExposureWindow> exposureWindows, ExposureConfig config) {
 
-        List<DailySummary> validDays = new ArrayList<>();
-
-        if (!config.getContiguousMode()) {
-            for (int i = 0; i < dailySummaries.size(); i++) {
-                DailySummary summary = dailySummaries.get(i);
-                if (summary.getSummaryData().getWeightedDurationSum() / 60.0 >= ensConfig.getTimeThreshold()) {
-                    validDays.add(summary);
-                }
-            };
-            if (validDays.size() == 0) {
-                Events.raiseEvent(Events.INFO, "exposureWindows - no dailySummaries that meet the threshold criteria");
-                return null;
-            }
-
-        } else {
-            validDays = dailySummaries;
-        }
-        validDays.sort((o1, o2) -> {
+        dailySummaries.sort((o1, o2) -> {
             if (o1.getDaysSinceEpoch() < o2.getDaysSinceEpoch()) {
                 return 1;
             } else if (o1.getDaysSinceEpoch() > o2.getDaysSinceEpoch()) {
@@ -265,7 +248,7 @@ public class RiskCalculationV2 implements RiskCalculation {
             return 0;
         });
 
-        long matchDay = validDays.get(0).getDaysSinceEpoch();
+        long matchDay = dailySummaries.get(0).getDaysSinceEpoch();
 
         List<WindowData> windowItems = extractExposureWindows(exposureWindows, matchDay, config);
 
@@ -286,7 +269,7 @@ public class RiskCalculationV2 implements RiskCalculation {
                 return null;
             }
         } else {
-            return constructSummaryInfo(validDays.get(0), windowItems);
+            return constructSummaryInfo(dailySummaries.get(0), windowItems);
         }
     }
 

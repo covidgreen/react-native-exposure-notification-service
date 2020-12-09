@@ -15,14 +15,9 @@ class RiskCalculationV2 {
         var matchDate: Date?
         
         if (!thresholds.contiguousMode) {
-            let aboveThresholdDays = summary.daySummaries.filter({ Int(($0.daySummary.weightedDurationSum / 60.0)) >= thresholds.timeThreshold}).sorted(by: { $0.date > $1.date })
-            if aboveThresholdDays.count == 0 {
-                os_log("V2 - No daily summary meeting duration threshold", log: OSLog.checkExposure, type: .info)
-                return completion(.success(nil))
-            } else {
-                mostRecent = aboveThresholdDays.first
-                matchDate = mostRecent!.date
-            }
+            let aboveThresholdDays = summary.daySummaries.sorted(by: { $0.date > $1.date })
+            mostRecent = aboveThresholdDays.first
+            matchDate = mostRecent!.date
         }
         
         extractExposureWindowData(summary, configuration, thresholds, matchDate) { result in
