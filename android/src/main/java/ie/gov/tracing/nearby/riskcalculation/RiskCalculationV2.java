@@ -108,7 +108,7 @@ public class RiskCalculationV2 implements RiskCalculation {
     private List<WindowData> extractExposureWindows(List<ExposureWindow> windows, Long daysSinceEpoch, ExposureConfig config) {
         List<ExposureWindow> matchWindows = windows;
 
-        if (daysSinceEpoch != -1) {
+        if (!config.getContiguousMode()) {
             matchWindows = new ArrayList<>();
 
             for (int i = 0; i < windows.size(); i++) {
@@ -240,7 +240,6 @@ public class RiskCalculationV2 implements RiskCalculation {
     private ExposureEntity buildExposureEntity(List<DailySummary> dailySummaries, List<ExposureWindow> exposureWindows, ExposureConfig config) {
 
         List<DailySummary> validDays = new ArrayList<>();
-        long matchDay = -1;
 
         if (!config.getContiguousMode()) {
             for (int i = 0; i < dailySummaries.size(); i++) {
@@ -266,9 +265,7 @@ public class RiskCalculationV2 implements RiskCalculation {
             return 0;
         });
 
-        if (!config.getContiguousMode()) {
-            matchDay = validDays.get(0).getDaysSinceEpoch();
-        }
+        long matchDay = validDays.get(0).getDaysSinceEpoch();
 
         List<WindowData> windowItems = extractExposureWindows(exposureWindows, matchDay, config);
 
