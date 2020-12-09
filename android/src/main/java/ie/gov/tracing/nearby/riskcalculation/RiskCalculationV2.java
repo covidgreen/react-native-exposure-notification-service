@@ -46,62 +46,27 @@ public class RiskCalculationV2 implements RiskCalculation {
             ensConfig = config;
         }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @NotNull
-    private List<ExposureWindow> getSimulatedExposureWindows() {
+    private ExposureEntity buildSimulatedExposureEntity(int simulateDays) {
 
-        ArrayList<ExposureWindow> exposureWindows = new ArrayList<ExposureWindow>();
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        long todaySinceEpoch = LocalDate.now().toEpochDay();
+        long daysSinceExposure = simulateDays;
+        today.add(Calendar.DATE, 0 - new Long(daysSinceExposure).intValue());
 
-        int defaultAttenuationDb = 30;
+        int[] dummyScans = {30, 30, 15, 5};
+        ScanData s = new ScanData(dummyScans, true, 1);
+        WindowData w = new WindowData(today.getTimeInMillis(), 1, 1, 1, s);
+        ExposureEntity entity = new ExposureEntity(new Long(daysSinceExposure).intValue(), -1, 100, 100, "30,30,15,5", today.getTimeInMillis());
+        List<WindowData> windows = new ArrayList<>();
+        windows.add(w);
+        entity.setWindows(windows);
 
-        int[] infectiousnessTypes = {Infectiousness.STANDARD, Infectiousness.HIGH};
-
-        int[] reportTypes = {ReportType.CONFIRMED_TEST, ReportType.CONFIRMED_CLINICAL_DIAGNOSIS, ReportType.SELF_REPORT};
-        int[] calibrationConfidenceTypes = {CalibrationConfidence.LOWEST, CalibrationConfidence.LOW, CalibrationConfidence.MEDIUM, CalibrationConfidence.HIGH};
-
-        int maxMins = 5;
-        int varyDb = 4;
-
-        for (int i = 0; i < 5; i++) {
-
-            ExposureWindow.Builder exposureWindowBuilder = new ExposureWindow.Builder();
-
-            ArrayList<ScanInstance> scanInstances = new ArrayList<ScanInstance>();
-
-            for (int k = 0; k < 15; k++) {
-                ScanInstance.Builder scanInstanceBuilder = new ScanInstance.Builder();
-
-                int secondsSinceLastScan = Math.max(k % maxMins, 1) * 60;
-                int minAttenuationDb = defaultAttenuationDb;
-                int typicalAttenuationDb = defaultAttenuationDb + (i % varyDb);
-
-                scanInstanceBuilder.setMinAttenuationDb(minAttenuationDb);
-                scanInstanceBuilder.setSecondsSinceLastScan(secondsSinceLastScan);
-                scanInstanceBuilder.setTypicalAttenuationDb(typicalAttenuationDb);
-
-                scanInstances.add(scanInstanceBuilder.build());
-            }
-
-            exposureWindowBuilder.setScanInstances(scanInstances);
-
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.DATE, i * -1);
-            long msSinceEpoch = cal.getTimeInMillis();
-            exposureWindowBuilder.setDateMillisSinceEpoch(msSinceEpoch);
-
-            int calibrationConfidence = calibrationConfidenceTypes[i % calibrationConfidenceTypes.length];
-            exposureWindowBuilder.setCalibrationConfidence(calibrationConfidence);
-
-            int infectiousness = infectiousnessTypes[i % infectiousnessTypes.length];
-            exposureWindowBuilder.setInfectiousness(infectiousness);
-
-            int reportType = reportTypes[i % reportTypes.length];
-            exposureWindowBuilder.setReportType(reportType);
-
-            exposureWindows.add(exposureWindowBuilder.build());
-
-        }
-
-        return exposureWindows;
+        return entity;
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -274,7 +239,7 @@ public class RiskCalculationV2 implements RiskCalculation {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    public ListenableFuture<ExposureEntity>  processKeys(Context context, Boolean simulate, Integer simulateDays) {
+    public ListenableFuture<ExposureEntity> processKeys(Context context, Boolean simulate, Integer simulateDays) {
 
         return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
                     ExposureNotificationClientWrapper.get(context).getDailySummaries(this.ensConfig),
@@ -289,7 +254,8 @@ public class RiskCalculationV2 implements RiskCalculation {
                         AppExecutors.getScheduledExecutor()))
                     .transformAsync(exposureWindows -> {
                         if (simulate) {
-                            exposureWindows = getSimulatedExposureWindows();
+                            ExposureEntity exposureEntity = buildSimulatedExposureEntity(simulateDays);
+                            return Futures.immediateFuture(exposureEntity);
                         }
 
                         if (exposureWindows == null) {

@@ -117,6 +117,7 @@ object Tracing {
                 if (isBluetoothAvailable()) {
                     if (newExposureDisabledReason == "bluetooth") {
                         newExposureDisabledReason = ""
+                        newStatus = Tracing.EXPOSURE_STATUS_ACTIVE
                     }
                 } else {
                     newExposureDisabledReason = "bluetooth"
@@ -411,9 +412,9 @@ object Tracing {
         @JvmStatic
         fun configure(params: ReadableMap) {
             try {
-                val oldCheckFrequency = getLong("exposureCheckFrequency", context)
+                val oldCheckFrequency = getLong("exposureCheckFrequency", context, 120)
                 Config.configure(params)
-                val newCheckFrequency = getLong("exposureCheckFrequency", context)
+                val newCheckFrequency = getLong("exposureCheckFrequency", context, 120)
                 Events.raiseEvent(Events.INFO, "old: $oldCheckFrequency, new: $newCheckFrequency")
                 if(newCheckFrequency != oldCheckFrequency) {
                     scheduleCheckExposure()
@@ -748,6 +749,7 @@ object Tracing {
             val typeData: WritableArray = Arguments.createArray()
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
             if (doesSupportENS && isPaused) {
+                exposureStatus = EXPOSURE_STATUS_DISABLED
                 exposureDisabledReason = "paused"
             }
 
@@ -755,7 +757,8 @@ object Tracing {
                 if (doesSupportENS && !isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
                     exposureDisabledReason = "bluetooth"
-                } else if (exposureDisabledReason == "bluetooth") {
+                } else if (doesSupportENS && exposureDisabledReason == "bluetooth") {
+                    exposureStatus = EXPOSURE_STATUS_ACTIVE
                     exposureDisabledReason = ""
                 }
 
