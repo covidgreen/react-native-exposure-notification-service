@@ -45,8 +45,7 @@ RCT_EXTERN_METHOD(getCloseContacts:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(getLogData:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(checkExposure:(BOOL *)readExposureDetails
-                  :(BOOL *)skipTimeCheck)
+RCT_EXTERN_METHOD(checkExposure:(BOOL *)skipTimeCheck)
 
 RCT_EXTERN_METHOD(deleteAllData:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
@@ -57,7 +56,8 @@ RCT_EXTERN_METHOD(deleteExposureData:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(triggerUpdate:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(simulateExposure:(NSInteger *)timeDelay)
+RCT_EXTERN_METHOD(simulateExposure:(NSInteger *)timeDelay
+                  :(NSInteger *)numDays)
 
 RCT_EXTERN_METHOD(bundleId:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

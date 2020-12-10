@@ -32,10 +32,11 @@ class SharedPrefs {
         }
 
         @JvmStatic
-        fun getLong(key: String, context: Context): Long {
+        @JvmOverloads
+        fun getLong(key: String, context: Context, default: Long = 0): Long {
             try {
                 val preferences = getEncryptedSharedPrefs(context)
-                return preferences!!.getLong(key, 0)
+                return preferences!!.getLong(key, default)
             } catch(ex: Exception) {
                 Events.raiseError("SharedPrefs.getLong", ex)
             }

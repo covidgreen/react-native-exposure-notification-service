@@ -102,9 +102,7 @@ const mockConfig = {
   refreshToken: 'testRefreshToken',
   traceConfiguration: {
     exposureCheckInterval: 180,
-    storeExposuresFor: 14,
-    fileLimit: 1,
-    fileLimitiOS: 3
+    storeExposuresFor: 14
   },
   notificationTitle: 'testNotificationTitle',
   notificationDescription: 'testNotificationDescription',
@@ -215,7 +213,6 @@ describe('<ExposureProvider />', () => {
       callbackNumber: mockConfig.callbackNumber,
       exposureCheckFrequency:
         mockConfig.traceConfiguration.exposureCheckInterval,
-      fileLimit: mockConfig.traceConfiguration.fileLimitiOS,
       notificationDesc: mockConfig.notificationDescription,
       notificationTitle: mockConfig.notificationTitle,
       refreshToken: mockConfig.refreshToken,
@@ -395,7 +392,6 @@ describe('useExposure', () => {
         callbackNumber: mockConfig.callbackNumber,
         exposureCheckFrequency:
           mockConfig.traceConfiguration.exposureCheckInterval,
-        fileLimit: mockConfig.traceConfiguration.fileLimitiOS,
         notificationDesc: mockConfig.notificationDescription,
         notificationTitle: mockConfig.notificationTitle,
         refreshToken: mockConfig.refreshToken,
@@ -422,11 +418,10 @@ describe('useExposure', () => {
       const {result} = await renderExposureHook();
       mocked(ExposureNotificationModule.checkExposure).mockClear();
       await act(async () => {
-        await result.current.checkExposure(true, true);
+        await result.current.checkExposure(true);
       });
       expect(ExposureNotificationModule.checkExposure).toHaveBeenCalledTimes(1);
       expect(ExposureNotificationModule.checkExposure).toHaveBeenCalledWith(
-        true,
         true
       );
     });
@@ -495,12 +490,14 @@ describe('useExposure', () => {
       const {result} = await renderExposureHook();
       const mockCloseContacts = [
         {
-          exposureAlertDate: 'exposureAlertDate',
+          exposureAlertDate: 1234567,
+          exposureDate: 1234567,
           attenuationDurations: [1, 2, 3],
           daysSinceLastExposure: 1,
           matchedKeyCount: 1,
           maxRiskScore: 1,
-          summationRiskScore: 1
+          riskScoreSumFullRange: 1,
+          maxRiskScoreFullRange: 1
         }
       ];
       mocked(ExposureNotificationModule.getCloseContacts).mockClear();
@@ -519,12 +516,14 @@ describe('useExposure', () => {
     it('does load close contacts regardless if permissions granted or not', async () => {
       const mockCloseContacts = [
         {
-          exposureAlertDate: 'exposureAlertDate',
+          exposureAlertDate: 1234567,
+          exposureDate: 1234567,
           attenuationDurations: [1, 2, 3],
           daysSinceLastExposure: 1,
           matchedKeyCount: 1,
           maxRiskScore: 1,
-          summationRiskScore: 1
+          riskScoreSumFullRange: 1,
+          maxRiskScoreFullRange: 1
         }
       ];
       mocked(getPermissions).mockResolvedValueOnce({
@@ -682,13 +681,13 @@ describe('useExposure', () => {
       const {result} = await renderExposureHook();
       mocked(ExposureNotificationModule.simulateExposure).mockClear();
       await act(async () => {
-        await result.current.simulateExposure(10);
+        await result.current.simulateExposure(10, 4);
       });
       expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledTimes(
         1
       );
       expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledWith(
-        10
+        10, 4
       );
     });
   });

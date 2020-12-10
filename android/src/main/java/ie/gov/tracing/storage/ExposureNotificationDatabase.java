@@ -6,6 +6,8 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 import androidx.room.TypeConverters;
+import androidx.room.migration.Migration;
+import androidx.sqlite.db.SupportSQLiteDatabase;
 
 import net.sqlcipher.database.SupportFactory;
 
@@ -19,7 +21,7 @@ import ie.gov.tracing.common.Events;
       ExposureEntity.class,
       TokenEntity.class
     },
-    version = 1,
+    version = 2,
     exportSchema = false)
 @TypeConverters({ZonedDateTimeTypeConverter.class})
 public abstract class ExposureNotificationDatabase extends RoomDatabase {
@@ -54,6 +56,7 @@ public abstract class ExposureNotificationDatabase extends RoomDatabase {
       SupportFactory sqlcipherFactory = new SupportFactory(password.getBytes());
       return Room.databaseBuilder(
               context.getApplicationContext(), ExposureNotificationDatabase.class, DATABASE_NAME).openHelperFactory(sqlcipherFactory)
+              .addMigrations(MIGRATION_1_2)
               .build();
     }
     catch (Exception ex) {
@@ -72,4 +75,14 @@ public abstract class ExposureNotificationDatabase extends RoomDatabase {
       Events.raiseError("Error nuking database", e);
     }
   }
+
+  static final Migration MIGRATION_1_2 = new Migration(1, 2) {
+    @Override
+    public void migrate(SupportSQLiteDatabase database) {
+      database.execSQL("ALTER TABLE ExposureEntity ADD COLUMN exposure_contact_date INTEGER NOT NULL DEFAULT 'null'");
+      database.execSQL("ALTER TABLE ExposureEntity ADD COLUMN window_data TEXT NOT NULL DEFAULT ''");
+      database.execSQL("UPDATE ExposureEntity SET exposure_contact_date = created_timestamp_ms - (days_since_last_exposure * 86400000)");
+    }
+  };
+
 }

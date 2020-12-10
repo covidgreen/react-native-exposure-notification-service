@@ -129,8 +129,6 @@ Use to configure the module. This method is synchronous, and should be called be
 - `authToken`: a string representing the current authorization token
 - `refreshToken`: a string representing a token used to refresh the authorization token
 - `storeExposuresFor`: a number representing the number of days to store data for
-- `fileLimit`: a number representing the file limit
-- `version`: a string representing the app version number
 - `notificationTitle`: a string representing the title for positive exposure notifications popup,
 - `notificationDesc`: a string representing the description for positive exposure notifications popup,
 - `callbackNumber`: a string representing the phone number of a user if opted into automatic callback on positive exposure notification,
@@ -370,8 +368,6 @@ function Root() {
       traceConfiguration={{
         exposureCheckInterval: 180,
         storeExposuresFor: 14,
-        fileLimit: 1,
-        fileLimitiOS: 2
       }
       serverUrl="https://your.exposure.api/api"
       keyServerUrl="https://your.exposure.api/api"
@@ -401,8 +397,6 @@ function Root() {
 {
   exposureCheckInterval: number;
   storeExposuresFor: number;
-  fileLimit: number;
-  fileLimitiOS: number;
 }
 ```
 
@@ -530,7 +524,7 @@ Calls `ExposureNotificationModule.configure()`
 
 ##### `checkExposure()`
 
-`(readDetails: boolean, skipTimeCheck: boolean) => void`
+`(skipTimeCheck: boolean) => void`
 
 Calls `ExposureNotificationModule.checkExposure()`
 

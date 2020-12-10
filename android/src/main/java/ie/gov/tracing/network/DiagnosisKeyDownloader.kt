@@ -5,6 +5,7 @@ import androidx.annotation.Keep
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.gson.Gson
+import ie.gov.tracing.Tracing
 import ie.gov.tracing.common.Events
 import ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker
 import ie.gov.tracing.storage.SharedPrefs
@@ -16,9 +17,8 @@ import kotlin.math.min
 data class ServerFile(val id: Long, val path: String)
 
 internal class DiagnosisKeyDownloader(private val context: Context) {
-    private fun processGoogleList(fileList: List<String>): Array<ServerFile> {
+    private fun processGoogleList(fileList: List<String>, fileLimit: Int): Array<ServerFile> {
         var since = SharedPrefs.getLong("since", context)
-        var fileLimit = SharedPrefs.getLong("fileLimit", context)
         val files = mutableListOf<ServerFile>()
 
         fileList.forEach { serverFile ->
@@ -35,22 +35,21 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
             return files.toTypedArray()
         }        
         if (since <= 0) {
-            val startIndex = max(0, files.size - fileLimit.toInt())
-            val endIndex = min(files.size, startIndex + fileLimit.toInt())
+            val startIndex = max(0, files.size - fileLimit)
+            val endIndex = min(files.size, startIndex + fileLimit)
             return files.subList(startIndex, endIndex).toTypedArray()
         } else {
-            val endIndex = min(files.size, fileLimit.toInt())
+            val endIndex = min(files.size, fileLimit)
             return files.subList(0, endIndex).toTypedArray()
         }
     }
 
-    fun download(): ListenableFuture<List<File>> {
+    fun download(fileLimit: Int): ListenableFuture<List<File>> {
         ProvideDiagnosisKeysWorker.nextSince = 0 // this will be greater than 0 on success
-
         var since = SharedPrefs.getLong("since", context)
-        var fileLimit = SharedPrefs.getLong("fileLimit", context)
         val keyServerType = SharedPrefs.getString("keyServerType", context)
 
+        val version = Tracing.version(context).getString("display")
         Events.raiseEvent(Events.INFO, "download - get exports to process since: $since")
 
         // process:
@@ -58,7 +57,7 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
         // 2. download the files to process
         // 3. increment sync to largest processed index
         // 4. return the list of files to pass to the submitter
-        var endpoint = "/exposures/?since=$since&limit=$fileLimit"
+        var endpoint = "/exposures/?since=$since&limit=$fileLimit&os=android&version=$version"
         if (keyServerType == "google") {
             endpoint = "/v1/index.txt"
         } 
@@ -69,7 +68,7 @@ internal class DiagnosisKeyDownloader(private val context: Context) {
             var serverFiles: Array<ServerFile>
             if (keyServerType == "google") {
                 val fileList = data.split("\n")
-                serverFiles = processGoogleList(fileList)
+                serverFiles = processGoogleList(fileList, fileLimit)
             } else {
                 serverFiles = Gson().fromJson(data, Array<ServerFile>::class.java)
                 Events.raiseEvent(Events.INFO, "download - success, processing files: ${serverFiles.size}")

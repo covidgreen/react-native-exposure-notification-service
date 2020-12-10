@@ -16,7 +16,6 @@ public class Storage {
         let notificationTitle: String
         let notificationDesc: String
         var authToken: String
-        var fileLimit: Int
         var notificationRepeat: Int
         var datesLastRan: String!
         var lastExposureIndex: Int!
@@ -105,7 +104,6 @@ public class Storage {
               notificationTitle: data[0].value(forKey: "notificationTitle") as! String,
               notificationDesc: data[0].value(forKey: "notificationDesc") as! String,
               authToken: authToken,
-              fileLimit: data[0].value(forKey: "fileLimit") as! Int,
               notificationRepeat: data[0].value(forKey: "notificationRepeat") as? Int ?? 0,
               datesLastRan: data[0].value(forKey: "datesLastRan") as? String ?? "",
               lastExposureIndex: data[0].value(forKey: "lastIndex") as? Int,
@@ -320,7 +318,6 @@ public class Storage {
          managedObject.setValue(config.notificationTitle, forKey: "notificationTitle")
          managedObject.setValue(config.notificationDesc, forKey: "notificationDesc")
          managedObject.setValue(config.analyticsOptin, forKey: "analyticsOptin")
-         managedObject.setValue(config.fileLimit, forKey: "fileLimit")
          managedObject.setValue(config.notificationRepeat, forKey: "notificationRepeat")
         
          managedObject.setValue(lastKeyError, forKey: "lastKeyError")
@@ -400,6 +397,7 @@ public class Storage {
         let attenuations = exposureInfo.attenuationDurations.map { String($0) }
         let customAttenuations = exposureInfo.customAttenuationDurations.map { String($0) }
         managedObject.setValue(exposureInfo.exposureDate, forKey: "exposureDate")
+        managedObject.setValue(exposureInfo.exposureContactDate, forKey: "exposureContactDate")
         managedObject.setValue(exposureInfo.daysSinceLastExposure, forKey: "daysSinceExposure")
         managedObject.setValue(exposureInfo.matchedKeyCount, forKey: "matchedKeys")
         managedObject.setValue(exposureInfo.maxRiskScore, forKey: "riskScore")
@@ -409,11 +407,10 @@ public class Storage {
         managedObject.setValue(attenuations.joined(separator: ","), forKey: "attenuations")
         
         let encoder = JSONEncoder()
-        
-        if exposureInfo.details != nil {
-          if let jsonData = try? encoder.encode(exposureInfo.details) {
+        if exposureInfo.windows != nil {
+          if let jsonData = try? encoder.encode(exposureInfo.windows) {
             let coded = String(data: jsonData, encoding: .utf8)
-            managedObject.setValue(coded, forKey: "exposureDetails")
+            managedObject.setValue(coded, forKey: "exposureWindows")
           }
         }
         try context.save()
@@ -444,18 +441,24 @@ public class Storage {
           let attenuations = attenuationData.split(separator: ",").map { Int($0) ?? 0 }
           let customAttenuationData = exposure.value(forKey: "customAttenuationDurations") as? String ?? ""
           let customAttenuations = customAttenuationData.split(separator: ",").map { Int($0) ?? 0 }
-
-          var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: exposure.value(forKey: "daysSinceExposure") as! Int, attenuationDurations: attenuations, matchedKeyCount: exposure.value(forKey: "matchedKeys") as! Int, maxRiskScore: exposure.value(forKey: "riskScore") as! Int, exposureDate: exposure.value(forKey: "exposureDate") as! Date,
+          let daysSinceLastExposure = exposure.value(forKey: "daysSinceExposure") as! Int
+          let exposureDate = exposure.value(forKey: "exposureDate") as! Date
+          let calcDate = calendar.date(byAdding: .day, value: (0 - daysSinceLastExposure), to: exposureDate)
+          let exposureContactDate = exposure.value(forKey: "exposureContactDate") as? Date ?? calcDate
+            
+          var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: daysSinceLastExposure, attenuationDurations: attenuations, matchedKeyCount: exposure.value(forKey: "matchedKeys") as! Int, maxRiskScore: exposure.value(forKey: "riskScore") as! Int,
+              exposureDate: exposureDate, exposureContactDate: exposureContactDate!,
               maximumRiskScoreFullRange: exposure.value(forKey: "maximumRiskScoreFullRange") as? Int ?? 0,
               riskScoreSumFullRange: exposure.value(forKey: "riskScoreSumFullRange") as? Int ?? 0,
               customAttenuationDurations: customAttenuations)
-          
-          if exposure.value(forKey: "exposureDetails") != nil {
-            let details = exposure.value(forKey: "exposureDetails") as! String
-            let decoder = JSONDecoder()
-            let data = try? decoder.decode([ExposureProcessor.ExposureDetails].self, from: details.data(using: .utf8)!)
-            info.details = data
+            
+          if exposure.value(forKey: "exposureWindows") != nil {
+              let details = exposure.value(forKey: "exposureWindows") as! String
+              let decoder = JSONDecoder()
+              let data = try? decoder.decode([ExposureProcessor.ExposureDetailsWindow].self, from: details.data(using: .utf8)!)
+              info.windows = data
           }
+          
           return info
         }
       } catch  {

@@ -4,8 +4,10 @@
         <attribute name="attenuations" optional="YES" attributeType="String"/>
         <attribute name="customAttenuationDurations" optional="YES" attributeType="String"/>
         <attribute name="daysSinceExposure" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="exposureContactDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="exposureDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="exposureDetails" optional="YES" attributeType="String"/>
+        <attribute name="exposureWindows" optional="YES" attributeType="String"/>
         <attribute name="matchedKeys" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="maximumRiskScoreFullRange" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="riskScore" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
@@ -37,7 +39,7 @@
         <attribute name="version" optional="YES" attributeType="String"/>
     </entity>
     <elements>
-        <element name="Exposures" positionX="-54" positionY="-9" width="128" height="178"/>
+        <element name="Exposures" positionX="-54" positionY="-9" width="128" height="208"/>
         <element name="Settings" positionX="-63" positionY="-18" width="128" height="388"/>
     </elements>
 </model>

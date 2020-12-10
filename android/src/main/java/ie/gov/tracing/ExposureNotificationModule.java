@@ -114,15 +114,15 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void checkExposure(Boolean readExposureDetails, Boolean skipTimeCheck) {
+    public void checkExposure(Boolean skipTimeCheck) {
         if(nearbyNotSupported()) return;
-        Tracing.checkExposure(readExposureDetails, skipTimeCheck);
+        Tracing.checkExposure(skipTimeCheck);
     }
 
     @ReactMethod
-    public void simulateExposure(Integer timeDelay) {
+    public void simulateExposure(Integer timeDelay, Integer numDays) {
         if(nearbyNotSupported()) return;
-        Tracing.simulateExposure(timeDelay.longValue());
+        Tracing.simulateExposure(timeDelay.longValue(), numDays);
     }
 
     @ReactMethod

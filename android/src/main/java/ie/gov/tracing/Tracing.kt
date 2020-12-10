@@ -10,6 +10,7 @@ import android.content.IntentSender.SendIntentException
 import android.content.pm.PackageInfo
 import android.location.LocationManager
 import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.location.LocationManagerCompat
@@ -36,7 +37,6 @@ import ie.gov.tracing.storage.SharedPrefs
 import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-
 
 object Tracing {
     class Listener: ActivityEventListener {
@@ -117,6 +117,7 @@ object Tracing {
                 if (isBluetoothAvailable()) {
                     if (newExposureDisabledReason == "bluetooth") {
                         newExposureDisabledReason = ""
+                        newStatus = Tracing.EXPOSURE_STATUS_ACTIVE
                     }
                 } else {
                     newExposureDisabledReason = "bluetooth"
@@ -171,8 +172,6 @@ object Tracing {
 
         var resolutionPromise: Promise? = null
         var startPromise: Promise? = null
-
-        private var extraDetails = false
 
         @JvmStatic
         fun setExposureStatus(status: String, reason: String = "") {
@@ -413,9 +412,9 @@ object Tracing {
         @JvmStatic
         fun configure(params: ReadableMap) {
             try {
-                val oldCheckFrequency = getLong("exposureCheckFrequency", context)
+                val oldCheckFrequency = getLong("exposureCheckFrequency", context, 180)
                 Config.configure(params)
-                val newCheckFrequency = getLong("exposureCheckFrequency", context)
+                val newCheckFrequency = getLong("exposureCheckFrequency", context, 180)
                 Events.raiseEvent(Events.INFO, "old: $oldCheckFrequency, new: $newCheckFrequency")
                 if(newCheckFrequency != oldCheckFrequency) {
                     scheduleCheckExposure()
@@ -426,16 +425,14 @@ object Tracing {
         }
 
         @JvmStatic
-        fun checkExposure(readExposureDetails: Boolean = false, skipTimeCheck: Boolean = false) {
-            extraDetails = readExposureDetails
+        fun checkExposure(skipTimeCheck: Boolean = false) {
             ProvideDiagnosisKeysWorker.startOneTimeWorkRequest(skipTimeCheck)
         }
 
+        @RequiresApi(Build.VERSION_CODES.O)
         @JvmStatic
-        fun simulateExposure(timeDelay: Long = 0) {
-            extraDetails = false
-            StateUpdatedWorker.simulateExposure(timeDelay)
-
+        fun simulateExposure(timeDelay: Long = 0, numDays: Int = 3) {
+            StateUpdatedWorker.simulateExposure(timeDelay, numDays)
         }
 
         @JvmStatic
@@ -696,11 +693,33 @@ object Tracing {
 
                         val exp: WritableMap = Arguments.createMap()
                         exp.putDouble("exposureAlertDate", exposure.createdTimestampMs.toDouble())
+                        exp.putDouble("exposureDate", exposure.exposureContactDate.toDouble())
                         exp.putArray("attenuationDurations", attenuationDurations)
                         exp.putInt("daysSinceLastExposure", exposure.daysSinceLastExposure())
                         exp.putInt("matchedKeyCount", exposure.matchedKeyCount())
                         exp.putInt("maxRiskScore", exposure.maximumRiskScore())
-                        exp.putInt("summationRiskScore", exposure.summationRiskScore())
+                        exp.putInt("maxRiskScoreFullRange", exposure.maximumRiskScore())
+                        exp.putInt("riskScoreSumFullRange", exposure.summationRiskScore())
+
+                        if (exposure.windowData.size > 0) {
+                            val windows: WritableArray = Arguments.createArray()
+                            exposure.windowData.forEach {
+                                val win: WritableMap = Arguments.createMap()
+                                win.putDouble("date", it.date.toDouble())
+                                win.putInt("calibrationConfidence", it.calibrationConfidence)
+                                win.putInt("diagnosisReportType", it.diagnosisReportType)
+                                win.putInt("infectiousness", it.infectiousness)
+                                val buckets: WritableArray = Arguments.createArray()
+                                it.scanData.buckets.forEach {
+                                    buckets.pushInt(it)
+                                }
+                                win.putArray("buckets", buckets)
+                                win.putInt("numScans", it.scanData.numScans)
+                                win.putBoolean("exceedsThreshold", it.scanData.exceedsThresholds)
+                                windows.pushMap(win)
+                            }
+                            exp.putArray("windows", windows)
+                        }
 
                         result.pushMap(exp)
                     }
@@ -732,6 +751,7 @@ object Tracing {
             val typeData: WritableArray = Arguments.createArray()
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
             if (doesSupportENS && isPaused) {
+                exposureStatus = EXPOSURE_STATUS_DISABLED
                 exposureDisabledReason = "paused"
             }
 
@@ -739,7 +759,8 @@ object Tracing {
                 if (doesSupportENS && !isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
                     exposureDisabledReason = "bluetooth"
-                } else if (exposureDisabledReason == "bluetooth") {
+                } else if (doesSupportENS && exposureDisabledReason == "bluetooth") {
+                    exposureStatus = EXPOSURE_STATUS_ACTIVE
                     exposureDisabledReason = ""
                 }
 
@@ -783,7 +804,6 @@ object Tracing {
             map.putString("serverUrl", SharedPrefs.getString("serverUrl", context))
             map.putBoolean("analyticsOptin", SharedPrefs.getBoolean("analyticsOptin", context))
             map.putInt("lastExposureIndex", SharedPrefs.getLong("since", context).toInt())
-            map.putInt("fileLimit", SharedPrefs.getLong("fileLimit", context).toInt())
             map.putString("lastUpdated", SharedPrefs.getString("lastUpdated", context))
             
             promise.resolve(map)

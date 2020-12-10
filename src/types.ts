@@ -1,8 +1,6 @@
 export interface TraceConfiguration {
   exposureCheckInterval: number;
   storeExposuresFor: number;
-  fileLimit: number;
-  fileLimitiOS: number;
 }
 
 export enum PermissionStatus {

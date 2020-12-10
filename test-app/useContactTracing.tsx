@@ -84,13 +84,10 @@ export default function useContactTracing() {
                 authToken: 'your-token',
                 refreshToken: 'your-token',
                 storeExposuresFor: 14,
-                fileLimit: 100,
-                version: 'x.y.z',
                 notificationTitle: 'Title',
                 notificationDesc: 'Description',
                 callbackNumber: '',
-                analyticsOptin: false,
-                debug: true
+                analyticsOptin: false
             })
             setResult(`exposureEnabled: called`)
         } catch(e) {
@@ -101,7 +98,7 @@ export default function useContactTracing() {
     const checkExposure = async () => {
         loading()
         try {
-            ExposureNotificationModule.checkExposure(false, true)
+            ExposureNotificationModule.checkExposure(true)
             setResult(`checkExposure: called`)
         } catch(e) {
             setResult(`checkExposure - Error: ${e}`)

@@ -11,21 +11,25 @@ public class ExposureProcessor {
         let matchedKeyCount: Int
         let maxRiskScore: Int
         let exposureDate: Date
+        let exposureContactDate: Date
         var maximumRiskScoreFullRange: Int!
         var riskScoreSumFullRange: Int!
         var customAttenuationDurations: [Int]!
-        var details: [ExposureDetails]!
+        var windows: [ExposureDetailsWindow]!
     }
-    public struct ExposureDetails: Codable {
+    public struct ExposureScanData: Codable {
+        var buckets: [Int]
+        var exceedsThreshold: Bool
+        var numScans: Int
+    }
+    public struct ExposureDetailsWindow: Codable {
         let date: Date
-        let duration: TimeInterval
-        let totalRiskScore: ENRiskScore
-        let transmissionRiskLevel: ENRiskLevel
-        let attenuationDurations: [Int]
-        let attenuationValue: ENAttenuation
-        //metadata
+        let calibrationConfidence: UInt8
+        let diagnosisReportType: UInt32
+        let infectiousness: UInt32
+        var scanData: ExposureScanData
     }
-  
+    
     private let backgroundName = Bundle.main.bundleIdentifier! + ".exposure-notification"
     
     static public let shared = ExposureProcessor()
@@ -238,7 +242,6 @@ public class ExposureProcessor {
       data["keyServerURL"] = config.keyServerUrl
       data["serverType"] = config.keyServerType.rawValue
       data["analyticsOptin"] = config.analyticsOptin
-      data["fileLimit"] = config.fileLimit
       data["keychainGetError"] = config.lastKeyChainGetError
       data["keychainSetError"] = config.lastKeyChainSetError
       data["lastExposureIndex"] = config.lastExposureIndex
@@ -277,21 +280,22 @@ public class ExposureProcessor {
            "maxRiskScore": exposure.maxRiskScore,
            "attenuationDurations": exposure.attenuationDurations,
            "exposureAlertDate": Int64(exposure.exposureDate.timeIntervalSince1970 * 1000.0),
-           "maximumRiskScoreFullRange": exposure.maximumRiskScoreFullRange ?? 0,
+           "exposureDate": Int64(exposure.exposureContactDate.timeIntervalSince1970 * 1000.0),
+           "maxRiskScoreFullRange": exposure.maximumRiskScoreFullRange ?? 0,
            "riskScoreSumFullRange": exposure.riskScoreSumFullRange ?? 0,
-           "customAttenuationDurations": exposure.customAttenuationDurations ?? []
          ]
-         if let details = exposure.details {
-           let extraInfo = details.compactMap { detail -> [String: Any]? in
-            return ["date": Int64(detail.date.timeIntervalSince1970 * 1000.0),
-                     "duration": detail.duration,
-                     "totalRiskScore": detail.totalRiskScore,
-                     "attenuationValue": detail.attenuationValue,
-                     "attenuationDurations": detail.attenuationDurations,
-                     "transmissionRiskLevel": detail.transmissionRiskLevel
+         if let windows = exposure.windows {
+           let windowInfo = windows.compactMap { window -> [String: Any]? in
+            return ["date": Int64(window.date.timeIntervalSince1970 * 1000.0),
+                    "calibrationConfidence": window.calibrationConfidence,
+                    "diagnosisReportType": window.diagnosisReportType,
+                    "infectiousness": window.infectiousness,
+                    "buckets": window.scanData.buckets,
+                    "numScans": window.scanData.numScans,
+                    "exceedsThreshold": window.scanData.exceedsThreshold
              ]
            }
-           item["details"] = extraInfo
+           item["windows"] = windowInfo
          }
          return item
        }
@@ -326,7 +330,7 @@ public class ExposureProcessor {
        os_log("Running exposure check in background", log: OSLog.exposure, type: .debug)
        let queue = OperationQueue()
        queue.maxConcurrentOperationCount = 1
-       queue.addOperation(ExposureCheck(false, false, false))
+       queue.addOperation(ExposureCheck(false, false, 0))
 
        task.expirationHandler = {
           os_log("Background task expiring", log: OSLog.checkExposure, type: .debug)
@@ -342,11 +346,11 @@ public class ExposureProcessor {
        }
     }
     
-    public func checkExposureForeground(_ exposureDetails: Bool, _ skipTimeCheck: Bool, _ simulateExposure: Bool) {
+    public func checkExposureForeground(_ skipTimeCheck: Bool, _ simulateExposure: Bool, _ simulateDays: Int) {
        os_log("Running exposure check in foreground", log: OSLog.exposure, type: .debug)
        let queue = OperationQueue()
        queue.maxConcurrentOperationCount = 1
-       queue.addOperation(ExposureCheck(skipTimeCheck, exposureDetails, simulateExposure))
+       queue.addOperation(ExposureCheck(skipTimeCheck, simulateExposure, simulateDays))
 
        let lastOperation = queue.operations.last
        lastOperation?.completionBlock = {
