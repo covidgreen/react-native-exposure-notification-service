@@ -28,6 +28,7 @@ import java.security.SecureRandom
 import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
 import java.util.*
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
@@ -190,7 +191,8 @@ object Fetcher {
             sslContext.init(null, arrayOf<TrustManager?>(trustManager), null)
             builder.sslSocketFactory(sslContext.getSocketFactory(), trustManager)
         }
-
+        builder.readTimeout(60, TimeUnit.SECONDS)
+        builder.connectTimeout(60, TimeUnit.SECONDS)
         val okHttpClient: OkHttpClient = builder.build()
         return okHttpClient
     }
