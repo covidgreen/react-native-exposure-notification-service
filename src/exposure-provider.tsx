@@ -213,6 +213,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
           )
         ) {
           start();
+        }
       }
     }
     checkSupportAndStart();

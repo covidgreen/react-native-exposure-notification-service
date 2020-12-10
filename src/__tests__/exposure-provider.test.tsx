@@ -490,12 +490,14 @@ describe('useExposure', () => {
       const {result} = await renderExposureHook();
       const mockCloseContacts = [
         {
-          exposureAlertDate: 'exposureAlertDate',
+          exposureAlertDate: 1234567,
+          exposureDate: 1234567,
           attenuationDurations: [1, 2, 3],
           daysSinceLastExposure: 1,
           matchedKeyCount: 1,
           maxRiskScore: 1,
-          summationRiskScore: 1
+          riskScoreSumFullRange: 1,
+          maxRiskScoreFullRange: 1
         }
       ];
       mocked(ExposureNotificationModule.getCloseContacts).mockClear();
@@ -514,12 +516,14 @@ describe('useExposure', () => {
     it('does load close contacts regardless if permissions granted or not', async () => {
       const mockCloseContacts = [
         {
-          exposureAlertDate: 'exposureAlertDate',
+          exposureAlertDate: 1234567,
+          exposureDate: 1234567,
           attenuationDurations: [1, 2, 3],
           daysSinceLastExposure: 1,
           matchedKeyCount: 1,
           maxRiskScore: 1,
-          summationRiskScore: 1
+          riskScoreSumFullRange: 1,
+          maxRiskScoreFullRange: 1
         }
       ];
       mocked(getPermissions).mockResolvedValueOnce({
