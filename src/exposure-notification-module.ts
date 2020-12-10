@@ -34,13 +34,25 @@ export interface DiagnosisKey {
   keyData: string;
 }
 
+export interface WindowData {
+  date: number;
+  calibrationConfidence: number;
+  diagnosisReportType: number;
+  infectiousness: number;
+  buckets: number[];
+  numScans: number;
+  exceedsThreshold: boolean;
+}
+
 export interface CloseContact {
-  exposureAlertDate: string;
+  exposureAlertDate: number;
+  exposureDate: number;
   attenuationDurations: number[];
   daysSinceLastExposure: number;
   matchedKeyCount: number;
   maxRiskScore: number;
   summationRiskScore: number;
+  windows?: WindowData[];
 }
 
 export enum StatusState {

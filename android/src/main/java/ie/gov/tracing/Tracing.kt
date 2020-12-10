@@ -713,6 +713,7 @@ object Tracing {
                                     buckets.pushInt(it)
                                 }
                                 win.putArray("buckets", buckets)
+                                win.putInt("numScans", it.scanData.numScans)
                                 win.putBoolean("exceedsThreshold", it.scanData.exceedsThresholds)
                                 windows.pushMap(win)
                             }

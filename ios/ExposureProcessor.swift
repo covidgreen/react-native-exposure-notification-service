@@ -292,6 +292,7 @@ public class ExposureProcessor {
                     "diagnosisReportType": window.diagnosisReportType,
                     "infectiousness": window.infectiousness,
                     "buckets": window.scanData.buckets,
+                    "numScans": window.scanData.numScans,
                     "exceedsThreshold": window.scanData.exceedsThreshold
              ]
            }
