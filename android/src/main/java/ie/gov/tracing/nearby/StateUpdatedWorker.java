@@ -103,17 +103,19 @@ public class StateUpdatedWorker extends ListenableWorker {
         final boolean simulate = getInputData().getBoolean("simulate", false);
         final int simulateDays = getInputData().getInt("simulateDays", 3);
         final String action = getInputData().getString("action");
+        boolean inV2Mode = false;
+        ExposureConfig config = null;
+
         Gson gson = new Gson();
-        final ExposureConfig config = gson.fromJson(SharedPrefs.getString("exposureConfig", Tracing.currentContext), ExposureConfig.class);
+        String configData = SharedPrefs.getString("exposureConfig", Tracing.currentContext);
+        if (!configData.isEmpty()) {
+            config = gson.fromJson(configData, ExposureConfig.class);
+            inV2Mode = config.getV2Mode();
+        }
+
         ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
         final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
 
-        final boolean inV2Mode;
-        if (simulate) {
-            inV2Mode = false;
-        } else {
-            inV2Mode = config.getV2Mode();
-        }
         Events.raiseEvent(Events.INFO, "Beginning ENS result checking, v2 mode: " + inV2Mode);
         RiskCalculation risk;
 
