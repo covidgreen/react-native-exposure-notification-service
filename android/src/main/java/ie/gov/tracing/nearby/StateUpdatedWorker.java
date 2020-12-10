@@ -96,7 +96,8 @@ public class StateUpdatedWorker extends ListenableWorker {
     @RequiresApi(api = Build.VERSION_CODES.N)
     @NonNull
     @Override
-    public ListenableFuture<Result> startWork() { // FIXME change the order
+    public ListenableFuture<Result> startWork() {
+        Events.raiseEvent(Events.INFO, "StatueUpdatedWorker - startWork");
         Tracing.currentContext = getApplicationContext();
 
         final boolean simulate = getInputData().getBoolean("simulate", false);
@@ -106,12 +107,19 @@ public class StateUpdatedWorker extends ListenableWorker {
         final ExposureConfig config = gson.fromJson(SharedPrefs.getString("exposureConfig", Tracing.currentContext), ExposureConfig.class);
         ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
         final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
-        Events.raiseEvent(Events.INFO, "Beginning ENS result checking, v2 mode: " + config.getV2Mode());
+
+        final boolean inV2Mode;
+        if (simulate) {
+            inV2Mode = false;
+        } else {
+            inV2Mode = config.getV2Mode();
+        }
+        Events.raiseEvent(Events.INFO, "Beginning ENS result checking, v2 mode: " + inV2Mode);
         RiskCalculation risk;
 
-        if (config.getV2Mode()) {
+        if (inV2Mode) {
             risk = new RiskCalculationV2(config);
-        } else if (!config.getV2Mode() && ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED.equals(action)) {
+        } else if (!inV2Mode && ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED.equals(action)) {
             risk = new RiskCalculationV1(repository, token);
         } else {
             Events.raiseEvent(Events.INFO, "No keys matched, ending processing");
@@ -222,7 +230,7 @@ public class StateUpdatedWorker extends ListenableWorker {
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public static void simulateExposure(Long timeDelay, Integer numDays) {
-        Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure");
+        Events.raiseEvent(Events.INFO, "StateUpdatedWorker.simulateExposure, " + timeDelay + ", " + numDays);
 
         WorkManager workManager = WorkManager.getInstance(Tracing.context);
 

@@ -12,7 +12,6 @@ object Config {
             Events.raiseEvent(Events.INFO, "Saving configuration...")
             SharedPrefs.setLong("exposureCheckFrequency", params.getInt("exposureCheckFrequency").toLong(), Tracing.context)
             SharedPrefs.setLong("storeExposuresFor", params.getInt("storeExposuresFor").toLong(), Tracing.context)
-//            SharedPrefs.setLong("fileLimit", params.getInt("fileLimit").toLong(), Tracing.context) // FIXME: check but removed in iOS PR
             SharedPrefs.setBoolean("analyticsOptin", params.getBoolean("analyticsOptin"), Tracing.context)
             SharedPrefs.setString("serverUrl", params.getString("serverURL")!!, Tracing.context)
             var keyServer = params.getString("keyServerUrl")!!

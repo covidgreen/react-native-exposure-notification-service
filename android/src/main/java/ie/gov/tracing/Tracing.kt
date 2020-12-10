@@ -412,9 +412,9 @@ object Tracing {
         @JvmStatic
         fun configure(params: ReadableMap) {
             try {
-                val oldCheckFrequency = getLong("exposureCheckFrequency", context, 120)
+                val oldCheckFrequency = getLong("exposureCheckFrequency", context, 180)
                 Config.configure(params)
-                val newCheckFrequency = getLong("exposureCheckFrequency", context, 120)
+                val newCheckFrequency = getLong("exposureCheckFrequency", context, 180)
                 Events.raiseEvent(Events.INFO, "old: $oldCheckFrequency, new: $newCheckFrequency")
                 if(newCheckFrequency != oldCheckFrequency) {
                     scheduleCheckExposure()
@@ -804,7 +804,6 @@ object Tracing {
             map.putString("serverUrl", SharedPrefs.getString("serverUrl", context))
             map.putBoolean("analyticsOptin", SharedPrefs.getBoolean("analyticsOptin", context))
             map.putInt("lastExposureIndex", SharedPrefs.getLong("since", context).toInt())
-            map.putInt("fileLimit", SharedPrefs.getLong("fileLimit", context).toInt())
             map.putString("lastUpdated", SharedPrefs.getString("lastUpdated", context))
             
             promise.resolve(map)
