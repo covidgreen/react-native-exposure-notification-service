@@ -281,9 +281,8 @@ public class ExposureProcessor {
            "attenuationDurations": exposure.attenuationDurations,
            "exposureAlertDate": Int64(exposure.exposureDate.timeIntervalSince1970 * 1000.0),
            "exposureDate": Int64(exposure.exposureContactDate.timeIntervalSince1970 * 1000.0),
-           "maximumRiskScoreFullRange": exposure.maximumRiskScoreFullRange ?? 0,
+           "maxRiskScoreFullRange": exposure.maximumRiskScoreFullRange ?? 0,
            "riskScoreSumFullRange": exposure.riskScoreSumFullRange ?? 0,
-           "customAttenuationDurations": exposure.customAttenuationDurations ?? []
          ]
          if let windows = exposure.windows {
            let windowInfo = windows.compactMap { window -> [String: Any]? in

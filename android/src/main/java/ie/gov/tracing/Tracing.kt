@@ -698,7 +698,8 @@ object Tracing {
                         exp.putInt("daysSinceLastExposure", exposure.daysSinceLastExposure())
                         exp.putInt("matchedKeyCount", exposure.matchedKeyCount())
                         exp.putInt("maxRiskScore", exposure.maximumRiskScore())
-                        exp.putInt("summationRiskScore", exposure.summationRiskScore())
+                        exp.putInt("maxRiskScoreFullRange", exposure.maximumRiskScore())
+                        exp.putInt("riskScoreSumFullRange", exposure.summationRiskScore())
 
                         if (exposure.windowData.size > 0) {
                             val windows: WritableArray = Arguments.createArray()

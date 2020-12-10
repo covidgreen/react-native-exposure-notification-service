@@ -51,7 +51,8 @@ export interface CloseContact {
   daysSinceLastExposure: number;
   matchedKeyCount: number;
   maxRiskScore: number;
-  summationRiskScore: number;
+  riskScoreSumFullRange: number;
+  maxRiskScoreFullRange: number;
   windows?: WindowData[];
 }
 
