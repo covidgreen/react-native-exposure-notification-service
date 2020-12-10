@@ -19,7 +19,8 @@ public class ExposureNotificationBroadcastReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Tracing.currentContext = context;
         String action = intent.getAction();
-        Log.d("RN_ENBroadcastReceiver", "onReceive $action");
+
+        Log.d("RN_ENService", "onReceive $action");
         WorkManager workManager = WorkManager.getInstance(context);
         String token = intent.getStringExtra(ExposureNotificationClient.EXTRA_TOKEN);
         workManager.enqueue(
