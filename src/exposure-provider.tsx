@@ -54,7 +54,7 @@ export interface ExposureContextValue extends State {
   authoriseExposure: () => Promise<boolean>;
   deleteAllData: () => Promise<void>;
   supportsExposureApi: () => Promise<void>;
-  getCloseContacts: () => Promise<CloseContact[] | null>;
+  getCloseContacts: () => Promise<CloseContact[]>;
   getLogData: () => Promise<{[key: string]: any}>;
   triggerUpdate: () => Promise<string | undefined>;
   deleteExposureData: () => Promise<void>;
@@ -213,7 +213,6 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
           )
         ) {
           start();
-        }
       }
     }
     checkSupportAndStart();
