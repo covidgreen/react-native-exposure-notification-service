@@ -260,18 +260,22 @@ public class RiskCalculationV2 implements RiskCalculation {
 
                         if (exposureWindows == null) {
                             Events.raiseEvent(Events.INFO, "exposureWindows - no exposure windows.");
-                            return Futures.immediateFailedFuture(new NoExposureWindows());
+                            return Futures.immediateFuture(null);
                         }
 
                         if (exposureWindows.size() == 0) {
                             // No matches so we show no notification and just delete the token.
                             Events.raiseEvent(Events.INFO, "exposureSummary - empty exposure windows.");
-                            return Futures.immediateFailedFuture(new EmptyExposureWindows());
+                            return Futures.immediateFuture(null);
                         }
 
                         if (dailySummaries == null) {
                             Events.raiseEvent(Events.INFO, "exposureWindows - no dailySummaries");
-                            return Futures.immediateFailedFuture(new NoDailySummaries());
+                            return Futures.immediateFuture(null);
+                        }
+                        if (dailySummaries.size() == 0) {
+                            Events.raiseEvent(Events.INFO, "exposureWindows - empty dailySummaries");
+                            return Futures.immediateFuture(null);
                         }
 
                         ExposureEntity exposureEntity = buildExposureEntity(dailySummaries, exposureWindows, ensConfig);
@@ -280,9 +284,4 @@ public class RiskCalculationV2 implements RiskCalculation {
                     }, AppExecutors.getBackgroundExecutor());
                 }, AppExecutors.getBackgroundExecutor());
     }
-
-
-    private static class NoExposureWindows extends Exception {}
-    private static class EmptyExposureWindows extends Exception {}
-    private static class NoDailySummaries extends Exception {}
 }
