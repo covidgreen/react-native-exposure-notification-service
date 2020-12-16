@@ -382,7 +382,7 @@ public class Storage {
         os_log("Old exposure details cleared", log: OSLog.storage, type: .info)
     }
 
-    @available(iOS 13.5, *)
+    @available(iOS 12.5, *)
     public func saveExposureDetails(_ context: NSManagedObjectContext, _ exposureInfo: ExposureProcessor.ExposureInfo) {
       var managedObject: NSManagedObject
       
@@ -421,7 +421,7 @@ public class Storage {
 
     }
   
-    @available(iOS 13.5, *)
+    @available(iOS 12.5, *)
     public func getExposures(_ storeExposuresFor: Int) -> [ExposureProcessor.ExposureInfo] {
       let context = PersistentContainer.shared.newBackgroundContext()
       

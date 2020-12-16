@@ -2,7 +2,7 @@ import Foundation
 import ExposureNotification
 import os.log
 
-@available(iOS 13.5, *)
+@available(iOS 12.5, *)
 class ExposureManager {
   static let shared = ExposureManager()
   let manager = ENManager()
@@ -50,6 +50,19 @@ class ExposureManager {
      }
       
      return config.stopped
+  }
+
+  public func launchBackgroundiOS12() {
+     self.manager.setLaunchActivityHandler { (activityFlags) in
+        // ENManager gives apps that register an activity handler
+        // in iOS 12.5 up to 3.5 minutes of background time at
+        // least once per day. In iOS 13 and later, registering an
+        // activity handler does nothing.
+        if activityFlags.contains(.periodicRun) {
+            os_log("Scheduling background exposure check ios 12.5", log: OSLog.setup, type: .debug)
+            ExposureProcessor.shared.checkExposureForeground(false, false, 0)
+        }
+     }
   }
     
   deinit {

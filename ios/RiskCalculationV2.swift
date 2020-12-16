@@ -1,7 +1,7 @@
 import Foundation
 import ExposureNotification
 
-@available(iOS 13.7, *)
+@available(iOS 12.5, *)
 class RiskCalculationV2 {
     
     public static func calculateRisk(_ summary: ENExposureDetectionSummary, _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds, _ completion: @escaping  (Result<(ExposureProcessor.ExposureInfo?), Error>) -> Void)
@@ -60,9 +60,9 @@ class RiskCalculationV2 {
         let filteredWindows = windows.filter{$0.date == day.date}
         
         let summedDurations = sumDurations(filteredWindows)
-        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: summedDurations.buckets, matchedKeyCount: -1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: dateToday, exposureContactDate: day.date)
+        var info = ExposureProcessor.ExposureInfo(daysSinceLastExposure: components.day!, attenuationDurations: summedDurations.weightedBuckets, matchedKeyCount: -1,  maxRiskScore: Int(day.daySummary.maximumScore), exposureDate: dateToday, exposureContactDate: day.date)
         
-        info.customAttenuationDurations = summedDurations.buckets
+        info.customAttenuationDurations = summedDurations.weightedBuckets
         info.riskScoreSumFullRange = Int(day.daySummary.scoreSum)
         
         info.windows = filteredWindows
@@ -73,12 +73,16 @@ class RiskCalculationV2 {
     }
         
     private static func sumDurations(_ windows: [ExposureProcessor.ExposureDetailsWindow]) -> ExposureProcessor.ExposureScanData {
-        var data: ExposureProcessor.ExposureScanData = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], exceedsThreshold: false, numScans: windows.count)
+        var data: ExposureProcessor.ExposureScanData = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], weightedBuckets: [0, 0, 0, 0], exceedsThreshold: false, numScans: windows.count)
         
         for window in windows {
             for (index, element) in window.scanData.buckets.enumerated() {
                 data.buckets[index] += element
             }
+            for (index, element) in window.scanData.weightedBuckets.enumerated() {
+                data.weightedBuckets[index] += element
+            }
+
         }
         return data
     }
@@ -113,18 +117,19 @@ class RiskCalculationV2 {
     
     private static func buildScanData(_ scanInstances: [ENScanInstance], _ configuration: ENExposureConfiguration, _ thresholds: ExposureCheck.Thresholds) -> ExposureProcessor.ExposureScanData {
         
-        var data = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], exceedsThreshold: false, numScans: scanInstances.count)
+        var data = ExposureProcessor.ExposureScanData(buckets: [0, 0, 0, 0], weightedBuckets: [0, 0, 0, 0], exceedsThreshold: false, numScans: scanInstances.count)
         let thresholdWeightings = [configuration.immediateDurationWeight, configuration.nearDurationWeight, configuration.mediumDurationWeight, configuration.otherDurationWeight]
         
         for scan in scanInstances {
             for (index, element) in configuration.attenuationDurationThresholds.enumerated() {
                 if scan.typicalAttenuation <= Int(truncating: element) {
-                    data.buckets[index] += scan.secondsSinceLastScan / 60 * Int(thresholdWeightings[index] / 100.0)
+                    data.weightedBuckets[index] += scan.secondsSinceLastScan / 60 * Int(thresholdWeightings[index] / 100.0)
+                    data.buckets[index] += scan.secondsSinceLastScan / 60
                     break
                 }
             }
         }
-        let contactTime = data.buckets.reduce(0, +)
+        let contactTime = data.weightedBuckets.reduce(0, +)
         if Int(contactTime) >= thresholds.timeThreshold {
             data.exceedsThreshold = true
         }

@@ -3,7 +3,7 @@ import ExposureNotification
 import os.log
 import BackgroundTasks
 
-@available(iOS 13.5, *)
+@available(iOS 12.5, *)
 public class ExposureProcessor {  
     public struct ExposureInfo: Codable {
         let daysSinceLastExposure: Int
@@ -19,6 +19,7 @@ public class ExposureProcessor {
     }
     public struct ExposureScanData: Codable {
         var buckets: [Int]
+        var weightedBuckets: [Int]!
         var exceedsThreshold: Bool
         var numScans: Int
     }
@@ -30,6 +31,12 @@ public class ExposureProcessor {
         var scanData: ExposureScanData
     }
     
+    public enum SupportedENAPIVersion {
+        case version2
+        case version1
+        case unsupported
+    }
+
     private let backgroundName = Bundle.main.bundleIdentifier! + ".exposure-notification"
     
     static public let shared = ExposureProcessor()
@@ -42,8 +49,19 @@ public class ExposureProcessor {
     deinit {
         self.keyValueObservers.removeAll()
     }
+
+    public func getSupportedExposureNotificationsVersion() -> SupportedENAPIVersion {
+        if #available(iOS 13.7, *) {
+            return .version2
+        } else if #available(iOS 13.5, *) {
+            return .version1
+        } else if ExposureNotificationModule.ENManagerIsAvailable() {
+            return .version2
+        } else {
+            return .unsupported
+        }
+    }
     
-  
     public func authoriseExposure(_ resolve: @escaping RCTPromiseResolveBlock,
                                   rejecter reject: @escaping RCTPromiseRejectBlock) {
         ExposureManager.shared.manager.setExposureNotificationEnabled(true) { error in
@@ -291,6 +309,7 @@ public class ExposureProcessor {
                     "diagnosisReportType": window.diagnosisReportType,
                     "infectiousness": window.infectiousness,
                     "buckets": window.scanData.buckets,
+                    "weightedBuckets": window.scanData.weightedBuckets,
                     "numScans": window.scanData.numScans,
                     "exceedsThreshold": window.scanData.exceedsThreshold
              ]
@@ -316,16 +335,18 @@ public class ExposureProcessor {
     }
   
     public func registerBackgroundProcessing() {
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: self.backgroundName,
-            using: .main) { task in
-                ExposureProcessor.shared.checkExposureBackground(task as! BGProcessingTask)
+        if #available(iOS 13.5, *) {
+            BGTaskScheduler.shared.register(
+                forTaskWithIdentifier: self.backgroundName,
+                using: .main) { task in
+                    ExposureProcessor.shared.checkExposureBackground(task as! BGProcessingTask)
+            }
+            os_log("Registering background task", log: OSLog.exposure, type: .debug)
         }
-        os_log("Registering background task", log: OSLog.exposure, type: .debug)
-        
         self.scheduleCheckExposure()
     }
     
+    @available(iOS 13.5, *)
     private func checkExposureBackground(_ task: BGTask) {
        os_log("Running exposure check in background", log: OSLog.exposure, type: .debug)
        let queue = OperationQueue()
@@ -361,14 +382,18 @@ public class ExposureProcessor {
     private func scheduleCheckExposure() {
       let context = Storage.PersistentContainer.shared.newBackgroundContext()
       
-      do {
-          let request = BGProcessingTaskRequest(identifier: self.backgroundName)
-          request.requiresNetworkConnectivity = true
-          try BGTaskScheduler.shared.submit(request)
-          os_log("Scheduling background exposure check", log: OSLog.setup, type: .debug)
-      } catch {
-          os_log("An error occurred scheduling background task, %@", log: OSLog.setup, type: .error, error.localizedDescription)
-          Storage.shared.updateRunData(context, "An error occurred scheduling the background task, \(error.localizedDescription)")
+      if #available(iOS 13.5, *) {
+          do {
+              let request = BGProcessingTaskRequest(identifier: self.backgroundName)
+              request.requiresNetworkConnectivity = true
+              try BGTaskScheduler.shared.submit(request)
+              os_log("Scheduling background exposure check", log: OSLog.setup, type: .debug)
+          } catch {
+              os_log("An error occurred scheduling background task, %@", log: OSLog.setup, type: .error, error.localizedDescription)
+              Storage.shared.updateRunData(context, "An error occurred scheduling the background task, \(error.localizedDescription)")
+          }
+      } else if ExposureNotificationModule.ENManagerIsAvailable() {
+        ExposureManager.shared.launchBackgroundiOS12()
       }
     }
     

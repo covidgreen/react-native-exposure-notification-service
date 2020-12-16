@@ -714,6 +714,11 @@ object Tracing {
                                     buckets.pushInt(it)
                                 }
                                 win.putArray("buckets", buckets)
+                                val weightedBuckets: WritableArray = Arguments.createArray()
+                                it.scanData.weightedBuckets.forEach {
+                                    weightedBuckets.pushInt(it)
+                                }
+                                win.putArray("weightedBuckets", weightedBuckets)
                                 win.putInt("numScans", it.scanData.numScans)
                                 win.putBoolean("exceedsThreshold", it.scanData.exceedsThresholds)
                                 windows.pushMap(win)
