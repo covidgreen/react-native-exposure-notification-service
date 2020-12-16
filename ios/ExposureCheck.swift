@@ -258,7 +258,7 @@ class ExposureCheck: AsyncOperation {
                             self.finishProcessing((.failure(error)))
                     }
                  }
-           } else if #available(iOS 13.5, *), ExposureProcessor.shared.getSupportedExposureNotificationsVersion() == .version1 {
+           } else if #available(iOS 13.5, *) {
                  RiskCalculationV1.calculateRisk(summaryData, thresholds) { result in
                     switch result {
                         case let .success(exposureInfo):
@@ -268,7 +268,10 @@ class ExposureCheck: AsyncOperation {
                     }
 
                  }
-            }
+           } else {
+               os_log("Config not set for v2, iOS12 only supports V2", log: OSLog.checkExposure, type: .info)
+               return self.finishProcessing(.success((nil, lastIndex)))
+           }
         }
     }
 
