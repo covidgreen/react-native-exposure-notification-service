@@ -121,12 +121,19 @@ class RiskCalculationV2 {
         let thresholdWeightings = [configuration.immediateDurationWeight, configuration.nearDurationWeight, configuration.mediumDurationWeight, configuration.otherDurationWeight]
         
         for scan in scanInstances {
+            var added = false
             for (index, element) in configuration.attenuationDurationThresholds.enumerated() {
                 if scan.typicalAttenuation <= Int(truncating: element) {
                     data.weightedBuckets[index] += scan.secondsSinceLastScan / 60 * Int(thresholdWeightings[index] / 100.0)
                     data.buckets[index] += scan.secondsSinceLastScan / 60
+                    added = true
                     break
                 }
+            }
+            if (!added) {
+                let index = data.weightedBuckets.count - 1
+                data.weightedBuckets[index] += scan.secondsSinceLastScan / 60 * Int(thresholdWeightings[index] / 100.0)
+                data.buckets[index] += scan.secondsSinceLastScan / 60
             }
         }
         let contactTime = data.weightedBuckets.reduce(0, +)

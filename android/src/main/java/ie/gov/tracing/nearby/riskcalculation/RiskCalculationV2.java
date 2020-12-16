@@ -153,11 +153,19 @@ public class RiskCalculationV2 implements RiskCalculation {
         double[] thresholdWeightings = new double[]{config.getImmediateDurationWeight(), config.getNearDurationWeight(), config.getMediumDurationWeight(), config.getOtherDurationWeight()};
 
         scanData.forEach(scan -> {
+            Boolean added = false;
             for (int i = 0; i < config.getAttenuationDurationThresholds().length; i++) {
                 if (scan.getTypicalAttenuationDb() <= config.getAttenuationDurationThresholds()[i]) {
                     scanItem.getWeightedBuckets()[i] += scan.getSecondsSinceLastScan() / 60 * thresholdWeightings[i] / 100.0;
                     scanItem.getBuckets()[i] += scan.getSecondsSinceLastScan() / 60;
+                    added = true;
+                    break;
                 }
+            }
+            if (!added) {
+                int lastBucket = scanItem.getBuckets().length - 1;
+                scanItem.getWeightedBuckets()[lastBucket] += scan.getSecondsSinceLastScan() / 60 * thresholdWeightings[lastBucket] / 100.0;
+                scanItem.getBuckets()[lastBucket] += scan.getSecondsSinceLastScan() / 60;
             }
         });
 
