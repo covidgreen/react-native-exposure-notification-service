@@ -216,7 +216,7 @@ public class RiskCalculationV2 implements RiskCalculation {
         });
 
         List<DailySummary> valid = new ArrayList<>();
-        for (int i = 0; i > dailySummaries.size(); i++) {
+        for (int i = 0; i < dailySummaries.size(); i++) {
             if (dailySummaries.get(i).getSummaryData().getMaximumScore() >= config.getMinimumRiskScoreFullRange()) {
                 valid.add(dailySummaries.get(i));
             }
