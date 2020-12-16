@@ -23,12 +23,14 @@ public class ExposureNotificationBroadcastReceiver extends BroadcastReceiver {
         Log.d("RN_ENService", "onReceive $action");
         WorkManager workManager = WorkManager.getInstance(context);
         String token = intent.getStringExtra(ExposureNotificationClient.EXTRA_TOKEN);
-        workManager.enqueue(
-                new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
-                        .setInputData(
-                                new Data.Builder().putString(ExposureNotificationClient.EXTRA_TOKEN, token)
-                                        .putString("action", action)
-                                        .build())
-                        .build());
+        if (action.equals(ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED) || action.equals(ExposureNotificationClient.ACTION_EXPOSURE_NOT_FOUND)) {
+            workManager.enqueue(
+                    new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
+                            .setInputData(
+                                    new Data.Builder().putString(ExposureNotificationClient.EXTRA_TOKEN, token)
+                                            .putString("action", action)
+                                            .build())
+                            .build());
+        }
     }
 }

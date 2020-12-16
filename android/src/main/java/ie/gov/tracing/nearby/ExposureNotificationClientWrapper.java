@@ -102,7 +102,7 @@ public class ExposureNotificationClientWrapper {
 
   public ListenableFuture<ExposureConfig> fetchExposureConfig(Context context) {
     String version = Tracing.version(context).getString("display");
-    String settings = Fetcher.fetch("/settings/exposures?version=" + version, context);
+    String settings = Fetcher.fetch("/settings/exposures?os=android&version=" + version, context);
     Gson gson = new Gson();
     Map map = gson.fromJson(settings, Map.class);
     String exposureConfig = (String) map.get("exposureConfig");

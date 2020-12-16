@@ -59,7 +59,7 @@ public class RiskCalculationV2 implements RiskCalculation {
         today.add(Calendar.DATE, 0 - new Long(daysSinceExposure).intValue());
 
         int[] dummyScans = {30, 30, 15, 5};
-        ScanData s = new ScanData(dummyScans, true, 1);
+        ScanData s = new ScanData(dummyScans, dummyScans, true, 1);
         WindowData w = new WindowData(today.getTimeInMillis(), 1, 1, 1, s);
         ExposureEntity entity = new ExposureEntity(new Long(daysSinceExposure).intValue(), -1, 100, 100, "30,30,15,5", today.getTimeInMillis());
         List<WindowData> windows = new ArrayList<>();
@@ -120,10 +120,10 @@ public class RiskCalculationV2 implements RiskCalculation {
 
         // store field as a string (otherwise we'd need a new table)
         String attenuationDurations = "";
-        if (summedDurations.getBuckets().length > 0) {
-            attenuationDurations = Integer.toString(summedDurations.getBuckets()[0]);
-            for (int i = 1; i < summedDurations.getBuckets().length; i++) {
-                attenuationDurations += "," + summedDurations.getBuckets()[i];
+        if (summedDurations.getWeightedBuckets().length > 0) {
+            attenuationDurations = Integer.toString(summedDurations.getWeightedBuckets()[0]);
+            for (int i = 1; i < summedDurations.getWeightedBuckets().length; i++) {
+                attenuationDurations += "," + summedDurations.getWeightedBuckets()[i];
             }
         }
         ExposureEntity entity = new ExposureEntity(new Long(daysSinceExposure).intValue(), -1, new Double(summary.getSummaryData().getMaximumScore()).intValue(), new Double(summary.getSummaryData().getScoreSum()).intValue(), attenuationDurations, today.getTimeInMillis());
@@ -137,8 +137,9 @@ public class RiskCalculationV2 implements RiskCalculation {
         ScanData scanData = new ScanData();
 
         windows.forEach(window -> {
-             for (int i = 0; i < scanData.getBuckets().length; i++) {
+             for (int i = 0; i < scanData.getWeightedBuckets().length; i++) {
                  scanData.getBuckets()[i] += window.getScanData().getBuckets()[i];
+                 scanData.getWeightedBuckets()[i] += window.getScanData().getWeightedBuckets()[i];
              }
         });
         scanData.setNumScans(windows.size());
@@ -152,16 +153,25 @@ public class RiskCalculationV2 implements RiskCalculation {
         double[] thresholdWeightings = new double[]{config.getImmediateDurationWeight(), config.getNearDurationWeight(), config.getMediumDurationWeight(), config.getOtherDurationWeight()};
 
         scanData.forEach(scan -> {
+            Boolean added = false;
             for (int i = 0; i < config.getAttenuationDurationThresholds().length; i++) {
                 if (scan.getTypicalAttenuationDb() <= config.getAttenuationDurationThresholds()[i]) {
-                    scanItem.getBuckets()[i] += scan.getSecondsSinceLastScan() / 60 * thresholdWeightings[i] / 100.0;
+                    scanItem.getWeightedBuckets()[i] += scan.getSecondsSinceLastScan() / 60 * thresholdWeightings[i] / 100.0;
+                    scanItem.getBuckets()[i] += scan.getSecondsSinceLastScan() / 60;
+                    added = true;
+                    break;
                 }
+            }
+            if (!added) {
+                int lastBucket = scanItem.getBuckets().length - 1;
+                scanItem.getWeightedBuckets()[lastBucket] += scan.getSecondsSinceLastScan() / 60 * thresholdWeightings[lastBucket] / 100.0;
+                scanItem.getBuckets()[lastBucket] += scan.getSecondsSinceLastScan() / 60;
             }
         });
 
         int totalTime = 0;
-        for (int i = 0; i < scanItem.getBuckets().length; i++) {
-            totalTime += scanItem.getBuckets()[i];
+        for (int i = 0; i < scanItem.getWeightedBuckets().length; i++) {
+            totalTime += scanItem.getWeightedBuckets()[i];
         }
         if (totalTime >= config.getTimeThreshold()) {
             scanItem.setExceedsThresholds(true);
@@ -213,7 +223,19 @@ public class RiskCalculationV2 implements RiskCalculation {
             return 0;
         });
 
-        long matchDay = dailySummaries.get(0).getDaysSinceEpoch();
+        List<DailySummary> valid = new ArrayList<>();
+        for (int i = 0; i < dailySummaries.size(); i++) {
+            if (dailySummaries.get(i).getSummaryData().getMaximumScore() >= config.getMinimumRiskScoreFullRange()) {
+                valid.add(dailySummaries.get(i));
+            }
+        }
+
+        if (valid.size() == 0) {
+            Events.raiseEvent(Events.INFO, "V2 - No valid daily summaries");
+            return null;
+        }
+
+        long matchDay = valid.get(0).getDaysSinceEpoch();
 
         List<WindowData> windowItems = extractExposureWindows(exposureWindows, matchDay, config);
 
@@ -222,7 +244,7 @@ public class RiskCalculationV2 implements RiskCalculation {
             if (exceeded.size() > 0) {
                 long dayVal = Instant.ofEpochMilli(exceeded.get(0).getDate()).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay();
 
-                DailySummary day = findDay(dailySummaries,dayVal);
+                DailySummary day = findDay(valid, dayVal);
                 if (day != null) {
                     return constructSummaryInfo(day, windowItems);
                 } else {
@@ -234,7 +256,7 @@ public class RiskCalculationV2 implements RiskCalculation {
                 return null;
             }
         } else {
-            return constructSummaryInfo(dailySummaries.get(0), windowItems);
+            return constructSummaryInfo(valid.get(0), windowItems);
         }
     }
 
@@ -260,18 +282,22 @@ public class RiskCalculationV2 implements RiskCalculation {
 
                         if (exposureWindows == null) {
                             Events.raiseEvent(Events.INFO, "exposureWindows - no exposure windows.");
-                            return Futures.immediateFailedFuture(new NoExposureWindows());
+                            return Futures.immediateFuture(null);
                         }
 
                         if (exposureWindows.size() == 0) {
                             // No matches so we show no notification and just delete the token.
                             Events.raiseEvent(Events.INFO, "exposureSummary - empty exposure windows.");
-                            return Futures.immediateFailedFuture(new EmptyExposureWindows());
+                            return Futures.immediateFuture(null);
                         }
 
                         if (dailySummaries == null) {
                             Events.raiseEvent(Events.INFO, "exposureWindows - no dailySummaries");
-                            return Futures.immediateFailedFuture(new NoDailySummaries());
+                            return Futures.immediateFuture(null);
+                        }
+                        if (dailySummaries.size() == 0) {
+                            Events.raiseEvent(Events.INFO, "exposureWindows - empty dailySummaries");
+                            return Futures.immediateFuture(null);
                         }
 
                         ExposureEntity exposureEntity = buildExposureEntity(dailySummaries, exposureWindows, ensConfig);
@@ -280,9 +306,4 @@ public class RiskCalculationV2 implements RiskCalculation {
                     }, AppExecutors.getBackgroundExecutor());
                 }, AppExecutors.getBackgroundExecutor());
     }
-
-
-    private static class NoExposureWindows extends Exception {}
-    private static class EmptyExposureWindows extends Exception {}
-    private static class NoDailySummaries extends Exception {}
 }

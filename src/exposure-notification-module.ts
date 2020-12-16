@@ -40,6 +40,7 @@ export interface WindowData {
   diagnosisReportType: number;
   infectiousness: number;
   buckets: number[];
+  weightedBuckets: number[];
   numScans: number;
   exceedsThreshold: boolean;
 }

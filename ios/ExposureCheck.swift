@@ -4,7 +4,7 @@ import ExposureNotification
 import SSZipArchive
 import Alamofire
 
-@available(iOS 13.5, *)
+@available(iOS 12.5, *)
 class ExposureCheck: AsyncOperation {
     public static let REPEAT_NOTIFICATION_ID = "repeatExposure"
     public static let INITIAL_NOTIFICATION_ID = "exposure"
@@ -237,7 +237,7 @@ class ExposureCheck: AsyncOperation {
        
         os_log("Checking exposures against %d files", log: OSLog.checkExposure, type: .info, files.count)
         
-       ExposureManager.shared.manager.detectExposures(configuration: configuration, diagnosisKeyURLs: files) { summary, error in
+        ExposureManager.shared.manager.detectExposures(configuration: configuration, diagnosisKeyURLs: files) { summary, error in
            
            self.deleteLocalFiles(files)
            if let error = error {
@@ -249,7 +249,7 @@ class ExposureCheck: AsyncOperation {
               return self.finishProcessing(.success((nil, lastIndex)))
            }
         
-            if #available(iOS 13.7, *), v2Mode {
+           if ExposureProcessor.shared.getSupportedExposureNotificationsVersion() == .version2, v2Mode {
                 RiskCalculationV2.calculateRisk(summaryData, configuration, thresholds) { result in
                     switch result {
                         case let .success(exposureInfo):
@@ -258,7 +258,7 @@ class ExposureCheck: AsyncOperation {
                             self.finishProcessing((.failure(error)))
                     }
                  }
-            } else {
+           } else if #available(iOS 13.5, *) {
                  RiskCalculationV1.calculateRisk(summaryData, thresholds) { result in
                     switch result {
                         case let .success(exposureInfo):
@@ -268,7 +268,10 @@ class ExposureCheck: AsyncOperation {
                     }
 
                  }
-            }
+           } else {
+               os_log("Config not set for v2, iOS12 only supports V2", log: OSLog.checkExposure, type: .info)
+               return self.finishProcessing(.success((nil, lastIndex)))
+           }
         }
     }
 
@@ -640,7 +643,7 @@ class ExposureCheck: AsyncOperation {
                 exposureConfiguration.metadata = meta
                 
                 let v2Mode = codableExposureConfiguration.v2Mode ?? false
-                if #available(iOS 13.7, *), v2Mode == true {
+                if ExposureProcessor.shared.getSupportedExposureNotificationsVersion() == .version2, v2Mode == true {
                     exposureConfiguration.immediateDurationWeight =  codableExposureConfiguration.immediateDurationWeight ?? 100.0
                     exposureConfiguration.nearDurationWeight =  codableExposureConfiguration.nearDurationWeight ?? 100.0
                     exposureConfiguration.mediumDurationWeight =  codableExposureConfiguration.mediumDurationWeight ?? 100.0
@@ -683,7 +686,6 @@ class ExposureCheck: AsyncOperation {
        }
     }
     
-    @available(iOS 13.7, *)
     private func convertToMap(_ daysSinceOnsetToInfectiousness: [Int]) -> [NSNumber : NSNumber] {
         var map: [Int: Int] = [:]
         var counter = 0
@@ -747,6 +749,7 @@ class ExposureCheck: AsyncOperation {
                    "diagnosisReportType": window.diagnosisReportType,
                    "infectiousness": window.infectiousness,
                    "buckets": window.scanData.buckets,
+                   "weightedBuckets": window.scanData.weightedBuckets!,
                    "exceedsThreshold": window.scanData.exceedsThreshold
             ]
           }

@@ -127,92 +127,99 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   @NonNull
   @Override
   public ListenableFuture<Result> startWork() {
-      Tracing.currentContext = getApplicationContext();
-      Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
-      SharedPrefs.remove("lastApiError", Tracing.currentContext);
-      SharedPrefs.remove("lastError", Tracing.currentContext);
-      final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);
+      try {
+        Tracing.currentContext = getApplicationContext();
+        Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
+        SharedPrefs.remove("lastApiError", Tracing.currentContext);
+        SharedPrefs.remove("lastError", Tracing.currentContext);
+        final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);
 
-      setForegroundAsync(createForegroundInfo());
+        setForegroundAsync(createForegroundInfo());
+  
+        /*long lastRun = SharedPrefs.getLong("lastRunDate", Tracing.currentContext);
+        long checkFrequency = SharedPrefs.getLong("exposureCheckFrequency", Tracing.context);
+        if (checkFrequency == 0) {
+          checkFrequency = 180;
+        }
+        if (!skipTimeCheck && (lastRun + (checkFrequency * 60)) < (System.currentTimeMillis() / 1000)) {
+          String ran = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastRun);
+          SharedPrefs.setString("lastError", String.format("Check was run at %s, interval is %s, its too soon to check again", ran, checkFrequency), Tracing.currentContext);
+          return Futures.immediateFailedFuture(new TooSoonToRun());
+        }
+        */
 
-      /*long lastRun = SharedPrefs.getLong("lastRunDate", Tracing.currentContext);
-      long checkFrequency = SharedPrefs.getLong("exposureCheckFrequency", Tracing.context);
-      if (checkFrequency == 0) {
-        checkFrequency = 180;
+        updateLastRun();
+
+        // validate config set before running
+        final String server = SharedPrefs.getString("serverUrl", Tracing.currentContext);
+        if (server.isEmpty()) {
+          // config not yet populated so don't run
+          SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", Tracing.currentContext);
+          Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
+          return Futures.immediateFailedFuture(new ConfigNotSetException());
+        }
+
+        final Boolean paused = SharedPrefs.getBoolean("servicePaused", Tracing.currentContext);
+        if (paused) {
+          // ENS is paused
+          SharedPrefs.setString("lastError", "ENS is paused", Tracing.currentContext);
+          Events.raiseEvent(Events.INFO, "ENS Paused");
+          return Futures.immediateFailedFuture(new ENSPaused());
+        }
+
+        deleteOldData();
+
+        final String token = generateRandomToken();
+        AtomicReference<ExposureConfig> ensConfig = new AtomicReference<>();
+
+        return FluentFuture.from(TaskToFutureAdapter
+                .getFutureWithTimeout(
+                        ExposureNotificationClientWrapper.get(Tracing.currentContext).isEnabled(),
+                        DEFAULT_API_TIMEOUT.toMillis(),
+                        TimeUnit.MILLISECONDS,
+                        AppExecutors.getScheduledExecutor()))
+                .transformAsync(isEnabled -> {
+                          return saveDailyMetric(isEnabled);     // try save daily metric, does not affect success
+                        },
+                        AppExecutors.getBackgroundExecutor())
+                .transformAsync(isEnabled -> {
+                          // Only continue if it is enabled.
+                          if (isEnabled != null && isEnabled) {
+                            return ExposureNotificationClientWrapper.get(context).fetchExposureConfig(Tracing.currentContext);
+                          } else {
+                            // Stop here because things aren't enabled. Will still return successful though.
+                            SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
+                            Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
+                            return Futures.immediateFailedFuture(new NotEnabledException());
+                          }
+                        },
+                        AppExecutors.getBackgroundExecutor())
+                .transformAsync(config -> {
+                          ensConfig.set(config);
+                          return diagnosisKeys.download(config.getNumFilesAndroid());
+                        },
+                        AppExecutors.getBackgroundExecutor())
+                .transformAsync(files -> submitter.parseFiles(files, token, ensConfig.get()),
+                        AppExecutors.getBackgroundExecutor())
+                .transformAsync(done -> repository.upsertTokenEntityAsync(TokenEntity.create(token, false)),
+                        AppExecutors.getBackgroundExecutor())
+                .transform(done -> processSuccess(), // all done, do tidy ups here
+                        AppExecutors.getLightweightExecutor())
+                .catching(NotEnabledException.class,
+                        ex -> {
+                          SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
+                          Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
+                          return Result.success(); // not enabled, just return success
+                        },
+                        AppExecutors.getBackgroundExecutor())
+                .catching(Exception.class, this::processFailure,
+                        AppExecutors.getBackgroundExecutor());
+      } catch(Exception ex) {
+        SharedPrefs.setString("lastError", "ProvideDiagnosisKeysWorker - startWork - " + ex.getLocalizedMessage(), Tracing.currentContext);
+        Events.raiseError("ProvideDiagnosisKeysWorker - startWork", ex);
+        
+        return Futures.immediateFuture(Result.success());
       }
-      if (!skipTimeCheck && (lastRun + (checkFrequency * 60)) < (System.currentTimeMillis() / 1000)) {
-        String ran = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastRun);
-        SharedPrefs.setString("lastError", String.format("Check was run at %s, interval is %s, its too soon to check again", ran, checkFrequency), Tracing.currentContext);
-        return Futures.immediateFailedFuture(new TooSoonToRun());
-      }
-      */
-
-      updateLastRun();
-
-      // validate config set before running
-      final String server = SharedPrefs.getString("serverUrl", Tracing.currentContext);
-      if (server.isEmpty()) {
-        // config not yet populated so don't run
-        SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", Tracing.currentContext);
-        Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
-        return Futures.immediateFailedFuture(new ConfigNotSetException());
-      }
-
-      final Boolean paused = SharedPrefs.getBoolean("servicePaused", Tracing.currentContext);
-      if (paused) {
-        // ENS is paused
-        SharedPrefs.setString("lastError", "ENS is paused", Tracing.currentContext);
-        Events.raiseEvent(Events.INFO, "ENS Paused");
-        return Futures.immediateFailedFuture(new ENSPaused());
-      }
-
-      deleteOldData();
-
-      final String token = generateRandomToken();
-      AtomicReference<ExposureConfig> ensConfig = new AtomicReference<>();
-
-      return FluentFuture.from(TaskToFutureAdapter
-              .getFutureWithTimeout(
-                      ExposureNotificationClientWrapper.get(Tracing.currentContext).isEnabled(),
-                      DEFAULT_API_TIMEOUT.toMillis(),
-                      TimeUnit.MILLISECONDS,
-                      AppExecutors.getScheduledExecutor()))
-              .transformAsync(isEnabled -> {
-                return saveDailyMetric(isEnabled);     // try save daily metric, does not affect success
-              },
-                      AppExecutors.getBackgroundExecutor())
-              .transformAsync(isEnabled -> {
-                        // Only continue if it is enabled.
-                if (isEnabled != null && isEnabled) {
-                  return ExposureNotificationClientWrapper.get(context).fetchExposureConfig(Tracing.currentContext);
-                } else {
-                  // Stop here because things aren't enabled. Will still return successful though.
-                  SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
-                  Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
-                  return Futures.immediateFailedFuture(new NotEnabledException());
-                }
-              },
-                      AppExecutors.getBackgroundExecutor())
-              .transformAsync(config -> {
-                  ensConfig.set(config);
-                  return diagnosisKeys.download(config.getNumFilesAndroid());
-              },
-                      AppExecutors.getBackgroundExecutor())
-              .transformAsync(files -> submitter.parseFiles(files, token, ensConfig.get()),
-                      AppExecutors.getBackgroundExecutor())
-              .transformAsync(done -> repository.upsertTokenEntityAsync(TokenEntity.create(token, false)),
-                      AppExecutors.getBackgroundExecutor())
-              .transform(done -> processSuccess(), // all done, do tidy ups here
-                      AppExecutors.getLightweightExecutor())
-              .catching(NotEnabledException.class,
-                      ex -> {
-                        SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
-                        Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
-                        return Result.success(); // not enabled, just return success
-                      },
-                      AppExecutors.getBackgroundExecutor())
-              .catching(Exception.class, this::processFailure,
-                      AppExecutors.getBackgroundExecutor());
   }
 
   @NonNull

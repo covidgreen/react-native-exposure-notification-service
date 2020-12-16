@@ -2,7 +2,7 @@
 import UIKit
 
 public extension UIDevice {
-    static let supportsIOS13: Bool = {
+    static let supportsENS: Bool = {
         var systemInfo = utsname()
         uname(&systemInfo)
         let machineMirror = Mirror(reflecting: systemInfo.machine)
@@ -20,9 +20,9 @@ public extension UIDevice {
             case "iPhone4,1":                               return false
             case "iPhone5,1", "iPhone5,2":                  return false
             case "iPhone5,3", "iPhone5,4":                  return false
-            case "iPhone6,1", "iPhone6,2":                  return false
-            case "iPhone7,2":                               return false
-            case "iPhone7,1":                               return false
+            case "iPhone6,1", "iPhone6,2":                  return true
+            case "iPhone7,2":                               return true
+            case "iPhone7,1":                               return true
             case "iPhone8,1":                               return true
             case "iPhone8,2":                               return true
             case "iPhone9,1", "iPhone9,3":                  return true

@@ -1,7 +1,9 @@
 package ie.gov.tracing.nearby.riskcalculation
 
 import com.google.android.gms.nearby.exposurenotification.ExposureWindow
+import androidx.annotation.Keep
 
+@Keep
 data class WindowData (
         var date: Long,
         var calibrationConfidence: Int,

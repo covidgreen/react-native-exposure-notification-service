@@ -27,6 +27,20 @@ public class ExposureNotificationModule: RCTEventEmitter {
         return [:]
     }
     
+    public static func ENManagerIsAvailable() -> Bool {
+        return NSClassFromString("ENManager") != nil
+    }
+    
+    public static func isExposureNotificationsSupported() -> Bool {
+        if #available(iOS 13.5, *) {
+            return true
+        } else if ExposureNotificationModule.ENManagerIsAvailable() {
+            return true
+        } else {
+            return false
+        }
+    }
+    
     @objc
     public override static func requiresMainQueueSetup() -> Bool {
         return true
@@ -70,7 +84,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
     }
 
     @objc public func cancelNotifications() {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             os_log("Cancel repeat notifications", log: OSLog.setup, type: .debug)
             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [ExposureCheck.REPEAT_NOTIFICATION_ID])
         } else {
@@ -80,7 +94,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
 
     @objc public func authoriseExposure(_ resolve: @escaping RCTPromiseResolveBlock,
                                         rejecter reject: @escaping RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             os_log("Cancelling notifications", log: OSLog.setup, type: .debug)
             ExposureProcessor.shared.authoriseExposure(resolve, rejecter: reject)
         } else {
@@ -90,7 +104,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
     
     @objc public func exposureEnabled(_ resolve: RCTPromiseResolveBlock,
                                       rejecter reject: RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             ExposureProcessor.shared.exposureEnabled(resolve, rejecter: reject)
         } else {
             resolve("unavailable")
@@ -99,7 +113,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
 
     @objc public func isAuthorised(_ resolve: RCTPromiseResolveBlock,
                                       rejecter reject: RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             ExposureProcessor.shared.isAuthorised(resolve, rejecter: reject)
         } else {
             resolve("unavailable")
@@ -108,7 +122,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
 
     @objc public func isSupported(_ resolve: RCTPromiseResolveBlock,
                                       rejecter reject: RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if ExposureNotificationModule.isExposureNotificationsSupported() {
             resolve(true)
         } else {
             resolve(false)
@@ -118,12 +132,12 @@ public class ExposureNotificationModule: RCTEventEmitter {
     @objc public func canSupport(_ resolve: RCTPromiseResolveBlock,
                                       rejecter reject: RCTPromiseRejectBlock) {
         
-      resolve(UIDevice.supportsIOS13)
+      resolve(UIDevice.supportsENS)
     }
 
     @objc public func status(_ resolve: @escaping RCTPromiseResolveBlock,
                                       rejecter reject: RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
           ExposureProcessor.shared.status(resolve, rejecter: reject)
         } else {
           resolve(["state": "unavailable"])
@@ -132,7 +146,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
   
     @objc public func start(_ resolve: @escaping RCTPromiseResolveBlock,
                             rejecter reject: @escaping RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
           ExposureProcessor.shared.start(resolve, rejecter: reject)
         } else {
             //nothing to do here
@@ -142,7 +156,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
 
     @objc public func pause(_ resolve: @escaping RCTPromiseResolveBlock,
                             rejecter reject: @escaping RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
           ExposureProcessor.shared.pause(resolve, rejecter: reject)
         } else {
             //nothing to do here
@@ -152,7 +166,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
     
     @objc public func stop(_ resolve: @escaping RCTPromiseResolveBlock,
                            rejecter reject: @escaping RCTPromiseRejectBlock) {
-       if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
         ExposureProcessor.shared.stop(resolve, rejecter: reject)
        } else {
            ///nothing to do here
@@ -162,7 +176,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
 
     @objc public func getDiagnosisKeys(_ resolve: @escaping RCTPromiseResolveBlock,
                                         rejecter reject: @escaping RCTPromiseRejectBlock) {
-       if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
            ExposureProcessor.shared.getDiagnosisKeys(resolve, rejecter: reject)
        } else {
            resolve([])
@@ -171,7 +185,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
     
     @objc public func getCloseContacts(_ resolve: @escaping RCTPromiseResolveBlock,
                                      rejecter reject: @escaping RCTPromiseRejectBlock) {
-      if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
           ExposureProcessor.shared.getCloseContacts(resolve, rejecter: reject)
       } else {
           resolve([])
@@ -180,7 +194,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
   
     @objc public func getLogData(_ resolve: @escaping RCTPromiseResolveBlock,
                                      rejecter reject: @escaping RCTPromiseRejectBlock) {
-      if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
           ExposureProcessor.shared.getLogData(resolve, rejecter: reject)
       } else {
           resolve([])
@@ -189,7 +203,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
 
     @objc public func getConfigData(_ resolve: @escaping RCTPromiseResolveBlock,
                                     rejecter reject: @escaping RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             ExposureProcessor.shared.getConfigData(resolve, rejecter: reject)
         } else {
             resolve([])
@@ -204,7 +218,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
   
     @objc public func simulateExposure(_ timeDelay: Int, _ numDays: Int) {
         
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             os_log("Request to simulate exposure after %f", log: OSLog.setup, type: .debug, timeDelay)
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(timeDelay)) {
                 ExposureProcessor.shared.checkExposureForeground(true, true, numDays)
@@ -213,7 +227,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
     }
 
     @objc static public func registerBackgroundProcessing() {
-         if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             ExposureProcessor.shared.registerBackgroundProcessing()
          } else {
              os_log("Skipping registering background as not 13.5 or higher", log: OSLog.setup, type: .debug)
@@ -221,14 +235,14 @@ public class ExposureNotificationModule: RCTEventEmitter {
     }
      
     @objc public func checkExposure(_ skipTimeCheck: Bool) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             ExposureProcessor.shared.checkExposureForeground(skipTimeCheck, false, 0)
         }
     }
      
     @objc public func deleteAllData(_ resolve: @escaping RCTPromiseResolveBlock,
                                     rejecter reject: @escaping RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             ExposureProcessor.shared.deleteAllData(resolve, rejecter: reject)
             cancelNotifications()
         } else {
@@ -238,7 +252,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
 
     @objc public func deleteExposureData(_ resolve: @escaping RCTPromiseResolveBlock,
                                     rejecter reject: @escaping RCTPromiseRejectBlock) {
-        if #available(iOS 13.5, *) {
+        if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
             ExposureProcessor.shared.deleteExposureData(resolve, rejecter: reject)
         } else {
             resolve(true)
@@ -269,7 +283,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
    @objc private func onStatusChanged(_ notification: Notification) {
       var status: [String: Any] = [:]
     
-      if #available(iOS 13.5, *) {
+    if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
         guard let item = notification.object as? ENStatus else {
           os_log("No data in status change event", log: OSLog.exposure, type: .debug)
           return

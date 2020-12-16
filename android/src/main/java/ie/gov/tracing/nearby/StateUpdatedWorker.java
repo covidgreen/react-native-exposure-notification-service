@@ -119,13 +119,14 @@ public class StateUpdatedWorker extends ListenableWorker {
         Events.raiseEvent(Events.INFO, "Beginning ENS result checking, v2 mode: " + inV2Mode);
         RiskCalculation risk;
 
-        if (inV2Mode) {
-            risk = new RiskCalculationV2(config);
-        } else if (!inV2Mode && ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED.equals(action)) {
-            risk = new RiskCalculationV1(repository, token);
-        } else {
+        if (ExposureNotificationClient.ACTION_EXPOSURE_NOT_FOUND.equals(action)) {
             Events.raiseEvent(Events.INFO, "No keys matched, ending processing");
             return Futures.immediateFuture(Result.success());
+        }
+        if (inV2Mode ) {
+            risk = new RiskCalculationV2(config);
+        } else {
+            risk = new RiskCalculationV1(repository, token);
         }
 
         return FluentFuture.from(risk.processKeys(context, simulate, simulateDays))
