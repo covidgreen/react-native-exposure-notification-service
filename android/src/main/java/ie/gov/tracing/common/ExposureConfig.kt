@@ -28,7 +28,7 @@ data class ExposureConfig(
         val reportTypeSelfReportedWeight: Double? = 100.0,
         val reportTypeRecursiveWeight: Double? = 100.0,
         val daysSinceLastExposureThreshold: Int? = 0,
-        val minimumRiskScoreFullRange: Double? = 100.0,
+        val minimumRiskScoreFullRange: Double? = 1.0,
         val attenuationDurationThresholds: IntArray = intArrayOf(50, 70, 90),
         val infectiousnessForDaysSinceOnsetOfSymptoms: IntArray = intArrayOf(),
         val contiguousMode: Boolean = false,

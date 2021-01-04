@@ -439,10 +439,13 @@ object Tracing {
         fun version(runningContext: Context?): WritableMap {
             var versionName: String
             var versionCode: String
-            var currentContext = context
+            var currentContext: Context
             if (runningContext != null) {
                 currentContext = runningContext
+            } else {
+                currentContext = context
             }
+
             try {
                 val pinfo: PackageInfo = currentContext.getPackageManager().getPackageInfo(currentContext.getPackageName(), 0)
                 versionName = pinfo.versionName
