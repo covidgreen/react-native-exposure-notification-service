@@ -98,7 +98,7 @@ public class StateUpdatedWorker extends ListenableWorker {
     @Override
     public ListenableFuture<Result> startWork() {
         Events.raiseEvent(Events.INFO, "StatueUpdatedWorker - startWork");
-        Tracing.currentContext = getApplicationContext();
+        Tracing.currentContext = this.context;
 
         final boolean simulate = getInputData().getBoolean("simulate", false);
         final int simulateDays = getInputData().getInt("simulateDays", 3);
@@ -107,7 +107,7 @@ public class StateUpdatedWorker extends ListenableWorker {
         ExposureConfig config = null;
 
         Gson gson = new Gson();
-        String configData = SharedPrefs.getString("exposureConfig", Tracing.currentContext);
+        String configData = SharedPrefs.getString("exposureConfig", this.context);
         if (!configData.isEmpty()) {
             config = gson.fromJson(configData, ExposureConfig.class);
             inV2Mode = config.getV2Mode();

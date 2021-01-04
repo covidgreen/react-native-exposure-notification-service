@@ -104,7 +104,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
   private void updateLastRun() {
     try {
-      String [] lastRun = SharedPrefs.getString("lastRun", Tracing.currentContext).split("\\s*,\\s*");
+      String [] lastRun = SharedPrefs.getString("lastRun", this.context).split("\\s*,\\s*");
 
       List<String> lastRuns = new ArrayList<>(Arrays.asList(lastRun));
 
@@ -117,8 +117,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         newLastRun += "," + lastRuns.get(i).trim();
       }
 
-      SharedPrefs.setString("lastRun", newLastRun, Tracing.currentContext);
-      SharedPrefs.setLong("lastRunDate", System.currentTimeMillis(), Tracing.currentContext);
+      SharedPrefs.setString("lastRun", newLastRun, this.context);
+      SharedPrefs.setLong("lastRunDate", System.currentTimeMillis(), this.context);
     } catch(Exception ex) {
       Events.raiseError("lastRun",  ex);
     }
@@ -128,10 +128,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   @Override
   public ListenableFuture<Result> startWork() {
       try {
-        Tracing.currentContext = getApplicationContext();
+        Tracing.currentContext = this.context;
         Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
-        SharedPrefs.remove("lastApiError", Tracing.currentContext);
-        SharedPrefs.remove("lastError", Tracing.currentContext);
+        SharedPrefs.remove("lastApiError", this.context);
+        SharedPrefs.remove("lastError", this.context);
         final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);
 
         setForegroundAsync(createForegroundInfo());
@@ -151,20 +151,22 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         updateLastRun();
 
         // validate config set before running
-        final String server = SharedPrefs.getString("serverUrl", Tracing.currentContext);
+        final String server = SharedPrefs.getString("serverUrl", this.context);
         if (server.isEmpty()) {
           // config not yet populated so don't run
-          SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", Tracing.currentContext);
+          SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", this.context);
           Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
-          return Futures.immediateFailedFuture(new ConfigNotSetException());
+          return Futures.immediateFuture(Result.success());
         }
 
-        final Boolean paused = SharedPrefs.getBoolean("servicePaused", Tracing.currentContext);
+        saveDailyMetric();
+
+        final Boolean paused = SharedPrefs.getBoolean("servicePaused", this.context);
         if (paused) {
           // ENS is paused
-          SharedPrefs.setString("lastError", "ENS is paused", Tracing.currentContext);
+          SharedPrefs.setString("lastError", "ENS is paused", this.context);
           Events.raiseEvent(Events.INFO, "ENS Paused");
-          return Futures.immediateFailedFuture(new ENSPaused());
+          return Futures.immediateFuture(Result.success());
         }
 
         deleteOldData();
@@ -174,21 +176,17 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
         return FluentFuture.from(TaskToFutureAdapter
                 .getFutureWithTimeout(
-                        ExposureNotificationClientWrapper.get(Tracing.currentContext).isEnabled(),
+                        ExposureNotificationClientWrapper.get(this.context).isEnabled(),
                         DEFAULT_API_TIMEOUT.toMillis(),
                         TimeUnit.MILLISECONDS,
                         AppExecutors.getScheduledExecutor()))
                 .transformAsync(isEnabled -> {
-                          return saveDailyMetric(isEnabled);     // try save daily metric, does not affect success
-                        },
-                        AppExecutors.getBackgroundExecutor())
-                .transformAsync(isEnabled -> {
                           // Only continue if it is enabled.
                           if (isEnabled != null && isEnabled) {
-                            return ExposureNotificationClientWrapper.get(context).fetchExposureConfig(Tracing.currentContext);
+                            return ExposureNotificationClientWrapper.get(this.context).fetchExposureConfig(this.context);
                           } else {
                             // Stop here because things aren't enabled. Will still return successful though.
-                            SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
+                            SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
                             Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
                             return Futures.immediateFailedFuture(new NotEnabledException());
                           }
@@ -207,7 +205,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                         AppExecutors.getLightweightExecutor())
                 .catching(NotEnabledException.class,
                         ex -> {
-                          SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", Tracing.currentContext);
+                          SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
                           Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
                           return Result.success(); // not enabled, just return success
                         },
@@ -215,7 +213,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                 .catching(Exception.class, this::processFailure,
                         AppExecutors.getBackgroundExecutor());
       } catch(Exception ex) {
-        SharedPrefs.setString("lastError", "ProvideDiagnosisKeysWorker - startWork - " + ex.getLocalizedMessage(), Tracing.currentContext);
+        SharedPrefs.setString("lastError", "ProvideDiagnosisKeysWorker - startWork - " + ex.getLocalizedMessage(), this.context);
         Events.raiseError("ProvideDiagnosisKeysWorker - startWork", ex);
         
         return Futures.immediateFuture(Result.success());
@@ -257,7 +255,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private Result processFailure(Exception ex) {
     HashMap<String, Object> payload = new HashMap<>();
     payload.put("description", "error processing file: " + ex);
-    Fetcher.saveMetric("LOG_ERROR", context, payload);
+    Fetcher.saveMetric("LOG_ERROR", this.context, payload);
 
     Events.raiseError("error processing file: ",  ex);
     return Result.success();
@@ -284,9 +282,9 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     }
   }
 
-  private ListenableFuture<Boolean> saveDailyMetric(Boolean enabled) {
+  private void saveDailyMetric() {
     try {
-      long dailyActiveTrace = SharedPrefs.getLong("dailyActiveTrace", Tracing.currentContext);
+      long dailyActiveTrace = SharedPrefs.getLong("dailyActiveTrace", this.context);
 
       Events.raiseEvent(Events.INFO, "saveDailyMetric - last DAILY_ACTIVE_TRACE: " + dailyActiveTrace);
 
@@ -299,24 +297,22 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
       if(dayDiff == 0) {
         Events.raiseEvent(Events.INFO, "saveDailyMetric - already sent today");
-        return Futures.immediateFuture(enabled);
+        return;
       }
 
       Events.raiseEvent(Events.INFO, "saveDailyMetric - saving DAILY_ACTIVE_TRACE metric");
-      Fetcher.saveMetric("DAILY_ACTIVE_TRACE", Tracing.currentContext, null);
-      SharedPrefs.setLong("dailyActiveTrace", System.currentTimeMillis(), Tracing.currentContext);
-      return Futures.immediateFuture(enabled);
+      Fetcher.saveMetric("DAILY_ACTIVE_TRACE", this.context, null);
+      SharedPrefs.setLong("dailyActiveTrace", System.currentTimeMillis(), this.context);
 
     } catch(Exception ex) {
       Events.raiseError("saveDailyMetric - error", ex);
-      return Futures.immediateFuture(enabled);
     }
   }
 
   private Result processSuccess() {
     if(nextSince > 0) {
       Events.raiseEvent(Events.INFO, "success processing exports, setting since index to: " + nextSince);
-      SharedPrefs.setLong("since", nextSince, Tracing.currentContext);
+      SharedPrefs.setLong("since", nextSince, this.context);
 
       // try delete, does not affect success
       deleteExports();
@@ -385,7 +381,4 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   }
 
   private static class NotEnabledException extends Exception {}
-  private static class ConfigNotSetException extends Exception {}
-  private static class ENSPaused extends Exception {}
-  private static class TooSoonToRun extends Exception {}
 }
