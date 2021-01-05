@@ -469,8 +469,7 @@ object Fetcher {
 
             val metric = Metric("android", event, version, payload)
 
-            post("/metrics", Gson().toJson(metric), context)
-            /*Single.fromCallable {
+            Single.fromCallable {
                 return@fromCallable Fetcher.post("/metrics", Gson().toJson(metric), context)
             }
                     .subscribeOn(Schedulers.io())
@@ -480,7 +479,7 @@ object Fetcher {
                     }, {
                         Events.raiseError("saveMetric - error - background", java.lang.Exception(it))
                     })
-             */
+             
 
         } catch (ex: Exception) {
             Events.raiseError("saveMetric - error", ex)
