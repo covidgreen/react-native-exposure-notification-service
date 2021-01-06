@@ -101,18 +101,6 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
             .provideDiagnosisKeys(files, exposureConfiguration, token);
   }
 
-  public ListenableFuture<ExposureConfig> fetchExposureConfig(Context context) {
-    String version = Tracing.version(context).getString("display");
-    String settings = Fetcher.fetch("/settings/exposures?os=android&version=" + version, context);
-    Gson gson = new Gson();
-    Map map = gson.fromJson(settings, Map.class);
-    String exposureConfig = (String) map.get("exposureConfig");
-    ExposureConfig config = gson.fromJson(exposureConfig, ExposureConfig.class);
-
-    SharedPrefs.setString("exposureConfig", exposureConfig, context);
-    return Futures.immediateFuture(config);
-  }
-
   public Task<Void> provideDiagnosisKeys(List<File> files) {
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with v1.6");

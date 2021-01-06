@@ -74,6 +74,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private final ExposureNotificationRepository repository;
   public static long nextSince = 0;
   private final Context context;
+  private final ExposureClientWrapper client;
 
   public ProvideDiagnosisKeysWorker(@NonNull Context context,
                                     @NonNull WorkerParameters workerParams) {
@@ -83,6 +84,12 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     secureRandom = new SecureRandom();
     repository = new ExposureNotificationRepository(context);
     this.context = context;
+    if (ApiAvailabilityCheckUtils.isHMS(context)) {
+      client = ContactShieldWrapper.getInstance(context);
+    } else {
+      client = ExposureNotificationClientWrapper.get(context);
+    }
+
     setForegroundAsync(createForegroundInfo());
   }
 
@@ -181,8 +188,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
         return FluentFuture.from(TaskToFutureAdapter
                 .getFutureWithTimeout(
-                        isGMS(Tracing.currentContext) ? ExposureNotificationClientWrapper.get(this.context).isEnabled() : null,
-                        isHMS(Tracing.currentContext) ? ContactShieldWrapper.getInstance(this.context).isEnabled() : null,
+                        client.isEnabled(),
                         ExposureNotificationClientWrapper.get(this.context).isEnabled(),
                         DEFAULT_API_TIMEOUT.toMillis(),
                         TimeUnit.MILLISECONDS,
@@ -190,7 +196,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                 .transformAsync(isEnabled -> {
                           // Only continue if it is enabled.
                           if (isEnabled != null && isEnabled) {
-                            return ExposureNotificationClientWrapper.get(this.context).fetchExposureConfig(this.context);
+                            return fetchExposureConfig(this.context);
                           } else {
                             // Stop here because things aren't enabled. Will still return successful though.
                             SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
@@ -225,6 +231,18 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         
         return Futures.immediateFuture(Result.success());
       }
+  }
+
+  private ListenableFuture<ExposureConfig> fetchExposureConfig(Context context) {
+    String version = Tracing.version(context).getString("display");
+    String settings = Fetcher.fetch("/settings/exposures?os=android&version=" + version, context);
+    Gson gson = new Gson();
+    Map map = gson.fromJson(settings, Map.class);
+    String exposureConfig = (String) map.get("exposureConfig");
+    ExposureConfig config = gson.fromJson(exposureConfig, ExposureConfig.class);
+
+    SharedPrefs.setString("exposureConfig", exposureConfig, context);
+    return Futures.immediateFuture(config);
   }
 
   @NonNull
