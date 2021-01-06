@@ -37,6 +37,13 @@ import ie.gov.tracing.storage.SharedPrefs
 import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import com.huawei.hms.api.HuaweiApiAvailability
+import com.huawei.hms.contactshield.PeriodicKey
+import com.huawei.hms.utils.HMSPackageManager
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils.isGMS
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils.isHMS
+import ie.gov.tracing.hms.ContactShieldWrapper
 
 object Tracing {
     class Listener: ActivityEventListener {
@@ -99,8 +106,24 @@ object Tracing {
                         Events.raiseEvent(Events.INFO, "triggerUpdate - update cancelled")
                         Tracing.resolutionPromise?.resolve("cancelled")
                     }
-                }
+                } else if(requestCode == RequestCodes.HMS_PLAY_SERVICES_UPDATE){
+                    if (resultCode == Activity.RESULT_OK) {
+                        val result = HuaweiApiAvailability.getInstance().isHuaweiMobileServicesAvailable(Tracing.context.applicationContext);
+                        Tracing.base.hmsServicesVersion = HMSPackageManager.getInstance(Tracing.context.applicationContext).hmsVersionCode
+                        Events.raiseEvent(Events.INFO,"triggerUpdate - version after activity: ${Tracing.base.hmsServicesVersion}")
 
+                        if(result == ConnectionResult.SUCCESS) {
+                            Events.raiseEvent(Events.INFO, "triggerUpdate - update successful")
+                            Tracing.resolutionPromise?.resolve("success")
+                        } else {
+                            Events.raiseEvent(Events.ERROR, "triggerUpdate - update failed: $result")
+                            Tracing.resolutionPromise?.resolve("failed")
+                        }
+                    } else {
+                        Events.raiseEvent(Events.INFO, "triggerUpdate - update cancelled")
+                        Tracing.resolutionPromise?.resolve("cancelled")
+                    }
+                }
             } catch (ex: Exception) {
                 Events.raiseError("onActivityResult", ex)
                 Tracing.resolutionPromise?.resolve(false)
@@ -168,7 +191,7 @@ object Tracing {
         var doesSupportENS = false
         var hasCheckedENS = false
 
-        private lateinit var exposureWrapper: ExposureNotificationClientWrapper
+        private lateinit var exposureWrapper: ExposureClientWrapper
 
         var resolutionPromise: Promise? = null
         var startPromise: Promise? = null
@@ -284,7 +307,11 @@ object Tracing {
                 base = baseJavaModule
                 reactContext = appContext
                 context = reactContext.applicationContext
-                exposureWrapper = ExposureNotificationClientWrapper.get(context)
+                if (isHMS()) {
+                    exposureWrapper = ContactShieldWrapper.getInstance(context)
+                } else {
+                    exposureWrapper = ExposureNotificationClientWrapper.get(context)
+                }                
                 reactContext.addActivityEventListener(Listener())
                 currentContext = context // this is overridden depending on path into codebase
 
@@ -465,7 +492,7 @@ object Tracing {
         private fun getExposureKeyAsMap(tek: TemporaryExposureKey): WritableMap {
             val result: WritableMap = Arguments.createMap()
             result.putString("keyData", BaseEncoding.base64().encode(tek.keyData))
-            result.putInt("rollingPeriod", 144)
+            result.putInt("rollingPeriod", tek.)
             result.putInt("rollingStartNumber", tek.rollingStartIntervalNumber)
             result.putInt("transmissionRiskLevel", tek.transmissionRiskLevel) // app should overwrite
 

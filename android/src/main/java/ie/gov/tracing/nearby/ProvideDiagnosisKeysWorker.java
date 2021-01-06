@@ -52,6 +52,11 @@ import ie.gov.tracing.storage.SharedPrefs;
 import ie.gov.tracing.storage.TokenEntity;
 import ie.gov.tracing.R;
 
+import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isGMS;
+import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isHMS;
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
+import ie.gov.tracing.hms.ContactShieldWrapper;
+
 public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   public static final Duration DEFAULT_API_TIMEOUT = Duration.ofSeconds(15);
 
@@ -176,6 +181,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
         return FluentFuture.from(TaskToFutureAdapter
                 .getFutureWithTimeout(
+                        isGMS(Tracing.currentContext) ? ExposureNotificationClientWrapper.get(this.context).isEnabled() : null,
+                        isHMS(Tracing.currentContext) ? ContactShieldWrapper.getInstance(this.context).isEnabled() : null,
                         ExposureNotificationClientWrapper.get(this.context).isEnabled(),
                         DEFAULT_API_TIMEOUT.toMillis(),
                         TimeUnit.MILLISECONDS,

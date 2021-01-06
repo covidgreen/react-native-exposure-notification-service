@@ -15,7 +15,9 @@ import org.jetbrains.annotations.NotNull;
 import org.threeten.bp.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
+import com.huawei.hms.api.HuaweiApiAvailability;
+import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isGMS;
+import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isHMS;
 
 public class ExposureNotificationHelper implements LifecycleObserver {
 
@@ -88,33 +90,37 @@ public class ExposureNotificationHelper implements LifecycleObserver {
 
   private static ListenableFuture<Boolean> isEnabled() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-        ExposureNotificationClientWrapper.get(Tracing.reactContext).isEnabled(),
-        API_TIMEOUT.toMillis(),
-        TimeUnit.MILLISECONDS,
-        AppExecutors.getScheduledExecutor());
+      isGMS(Tracing.reactContext) ? ExposureNotificationClientWrapper.get(Tracing.reactContext).isEnabled() : null,
+      isHMS(Tracing.reactContext) ? ContactShieldWrapper.getInstance(Tracing.reactContext).isEnabled() : null,
+      API_TIMEOUT.toMillis(),
+      TimeUnit.MILLISECONDS,
+      AppExecutors.getScheduledExecutor());
   }
 
   private static ListenableFuture<Void> start() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-        ExposureNotificationClientWrapper.get(Tracing.reactContext).start(),
-        API_TIMEOUT.toMillis(),
-        TimeUnit.MILLISECONDS,
-        AppExecutors.getScheduledExecutor());
+      isGMS(Tracing.reactContext) ? ExposureNotificationClientWrapper.get(Tracing.reactContext).start() : null,
+      isHMS(Tracing.reactContext) ? ContactShieldWrapper.getInstance(Tracing.reactContext).start() : null,
+      API_TIMEOUT.toMillis(),
+      TimeUnit.MILLISECONDS,
+      AppExecutors.getScheduledExecutor());    
   }
 
   private static ListenableFuture<Void> stop() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-        ExposureNotificationClientWrapper.get(Tracing.reactContext).stop(),
-        API_TIMEOUT.toMillis(),
-        TimeUnit.MILLISECONDS,
-        AppExecutors.getScheduledExecutor());
+      isGMS(Tracing.reactContext) ? ExposureNotificationClientWrapper.get(Tracing.reactContext).stop() : null,
+      isHMS(Tracing.reactContext) ? ContactShieldWrapper.getInstance(Tracing.reactContext).stop() : null,
+      API_TIMEOUT.toMillis(),
+      TimeUnit.MILLISECONDS,
+      AppExecutors.getScheduledExecutor());
   }
 
   public static ListenableFuture<Long> getDeviceENSVersion() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-            ExposureNotificationClientWrapper.get(Tracing.reactContext).getDeviceENSVersion(),
-            API_TIMEOUT.toMillis(),
-            TimeUnit.MILLISECONDS,
-            AppExecutors.getScheduledExecutor());
+      isGMS(Tracing.reactContext) ? ExposureNotificationClientWrapper.get(Tracing.reactContext).getDeviceENSVersion() : null,
+      isHMS(Tracing.reactContext) ? ContactShieldWrapper.getInstance(Tracing.reactContext).getDeviceENSVersion() : null,
+      API_TIMEOUT.toMillis(),
+      TimeUnit.MILLISECONDS,
+      AppExecutors.getScheduledExecutor());    
   }
 }

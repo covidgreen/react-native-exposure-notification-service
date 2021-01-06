@@ -34,33 +34,34 @@ import java.util.stream.Collectors;
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
+import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.SharedPrefs;
 
-public class ExposureNotificationClientWrapper {
+public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
 
   private static ExposureNotificationClientWrapper INSTANCE;
 
   private final Context appContext;
   private final ExposureNotificationClient exposureNotificationClient;
 
-  public static ExposureNotificationClientWrapper get(Context context) {
+  /*public static ExposureNotificationClientWrapper get(Context context) {
     if (INSTANCE == null) {
       INSTANCE = new ExposureNotificationClientWrapper(context);
     }
     return INSTANCE;
-  }
+  }*/
 
   private ExposureNotificationClientWrapper(Context context) {
     this.appContext = context.getApplicationContext();
     exposureNotificationClient = Nearby.getExposureNotificationClient(appContext);
   }
 
-  Task<Void> start() {
+  public Task<Void> start() {
     return exposureNotificationClient.start();
   }
 
-  Task<Void> stop() {
+  public Task<Void> stop() {
     return exposureNotificationClient.stop();
   }
 
@@ -73,7 +74,7 @@ public class ExposureNotificationClientWrapper {
     return exposureNotificationClient.getTemporaryExposureKeyHistory();
   }
 
-  Task<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config) {
+  public Task<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config) {
 
     Events.raiseEvent(Events.INFO, "mapping exposure configuration with " + config);
     // error will be thrown here if config is not complete
@@ -112,7 +113,7 @@ public class ExposureNotificationClientWrapper {
     return Futures.immediateFuture(config);
   }
 
-  Task<Void> provideDiagnosisKeys(List<File> files) {
+  public Task<Void> provideDiagnosisKeys(List<File> files) {
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with v1.6");
 

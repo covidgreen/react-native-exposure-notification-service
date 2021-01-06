@@ -11,13 +11,18 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.google.android.gms.common.GoogleApiAvailability;
+import com.huawei.hms.api.HuaweiApiAvailability;
+import com.huawei.hms.utils.HMSPackageManager;
 
 import org.jetbrains.annotations.NotNull;
 
 import ie.gov.tracing.common.Events;
+import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isGMS;
+import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isHMS;
 
 public class ExposureNotificationModule extends ReactContextBaseJavaModule {
-    private static int playServicesVersion = 0;
+    private static int gmsServicesVersion = 0;
+    private static int hmsServicesVersion = 0;
     private static int apiError = 0;
 
     public boolean nearbyNotSupported(){
@@ -29,24 +34,25 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
         apiError = errorCode;
     }
 
-    // after update performed this should be called
-    public void setPlayServicesVersion(int version) {
-        playServicesVersion = version;
-    }
-    public int getPlayServicesVersion() { return playServicesVersion; }
-
     //@SuppressWarnings("WeakerAccess")
     ExposureNotificationModule(ReactApplicationContext reactContext) {
         super(reactContext);
 
         try {
-            GoogleApiAvailability gps = GoogleApiAvailability.getInstance();
-            playServicesVersion = gps.getApkVersion(reactContext.getApplicationContext());
-
-            Events.raiseEvent(Events.INFO,
-                    "Play Services Version: " + playServicesVersion
-                            + ", Android version: " +  Build.VERSION.SDK_INT
-            );
+            if(isGMS(reactContext.getApplicationContext())){
+                GoogleApiAvailability gps = GoogleApiAvailability.getInstance();
+                gmsServicesVersion = gps.getApkVersion(reactContext.getApplicationContext());
+                Events.raiseEvent(Events.INFO,
+                        "Play Services Version: " + gmsServicesVersion
+                                + ", Android version: " +  Build.VERSION.SDK_INT
+                );
+            }else if(isHMS(reactContext.getApplicationContext())){
+                hmsServicesVersion = HMSPackageManager.getInstance(reactContext.getApplicationContext()).getHmsVersionCode();
+                Events.raiseEvent(Events.INFO,
+                        "Huawei Services Version: " + hmsServicesVersion
+                                + ", Android version: " +  Build.VERSION.SDK_INT
+                );
+            }            
 
         } catch(Exception ex) {
             Events.raiseError("ExposureNotification - Unable to get play services version", ex);
