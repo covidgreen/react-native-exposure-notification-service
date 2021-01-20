@@ -1,10 +1,17 @@
 package ie.gov.tracing.nearby;
 
+import android.content.Context;
+
 import androidx.lifecycle.LifecycleObserver;
+
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
+import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.TaskToFutureAdapter;
+import ie.gov.tracing.hms.ContactShieldWrapper;
+
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -15,7 +22,6 @@ import org.jetbrains.annotations.NotNull;
 import org.threeten.bp.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import com.huawei.hms.api.HuaweiApiAvailability;
 import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isGMS;
 import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isHMS;
 
@@ -29,9 +35,17 @@ public class ExposureNotificationHelper implements LifecycleObserver {
   private static final Duration API_TIMEOUT = Duration.ofSeconds(10);
 
   private final Callback callback;
+  private final ExposureClientWrapper client;
+  private final Context context;
 
-  public ExposureNotificationHelper(Callback callback) {
-    this.callback = callback;
+  public ExposureNotificationHelper(Callback callback, Context context) {
+      this.callback = callback;
+      this.context = context;
+      if (ApiAvailabilityCheckUtils.isHMS(context)) {
+          client = ContactShieldWrapper.get(context);
+      } else {
+          client = ExposureNotificationClientWrapper.get(context);
+      }
   }
 
   public void startExposure() {
@@ -88,39 +102,39 @@ public class ExposureNotificationHelper implements LifecycleObserver {
             }, MoreExecutors.directExecutor());
   }
 
-  private static ListenableFuture<Boolean> isEnabled() {
+  private ListenableFuture<Boolean> isEnabled() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-      isGMS(Tracing.reactContext) ? ExposureNotificationClientWrapper.get(Tracing.reactContext).isEnabled() : null,
-      isHMS(Tracing.reactContext) ? ContactShieldWrapper.getInstance(Tracing.reactContext).isEnabled() : null,
+      this.client.isEnabled(),
       API_TIMEOUT.toMillis(),
       TimeUnit.MILLISECONDS,
+      this.context,
       AppExecutors.getScheduledExecutor());
   }
 
-  private static ListenableFuture<Void> start() {
+  private ListenableFuture<Void> start() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-      isGMS(Tracing.reactContext) ? ExposureNotificationClientWrapper.get(Tracing.reactContext).start() : null,
-      isHMS(Tracing.reactContext) ? ContactShieldWrapper.getInstance(Tracing.reactContext).start() : null,
+      this.client.start(),
       API_TIMEOUT.toMillis(),
       TimeUnit.MILLISECONDS,
+      this.context,
       AppExecutors.getScheduledExecutor());    
   }
 
-  private static ListenableFuture<Void> stop() {
+  private ListenableFuture<Void> stop() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-      isGMS(Tracing.reactContext) ? ExposureNotificationClientWrapper.get(Tracing.reactContext).stop() : null,
-      isHMS(Tracing.reactContext) ? ContactShieldWrapper.getInstance(Tracing.reactContext).stop() : null,
+      this.client.stop(),
       API_TIMEOUT.toMillis(),
       TimeUnit.MILLISECONDS,
+      this.context,
       AppExecutors.getScheduledExecutor());
   }
 
-  public static ListenableFuture<Long> getDeviceENSVersion() {
+  public ListenableFuture<Long> getDeviceENSVersion() {
     return TaskToFutureAdapter.getFutureWithTimeout(
-      isGMS(Tracing.reactContext) ? ExposureNotificationClientWrapper.get(Tracing.reactContext).getDeviceENSVersion() : null,
-      isHMS(Tracing.reactContext) ? ContactShieldWrapper.getInstance(Tracing.reactContext).getDeviceENSVersion() : null,
+      this.client.getDeviceENSVersion(),
       API_TIMEOUT.toMillis(),
       TimeUnit.MILLISECONDS,
+      this.context,
       AppExecutors.getScheduledExecutor());    
   }
 }

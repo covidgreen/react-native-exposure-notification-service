@@ -113,7 +113,6 @@ public class StateUpdatedWorker extends ListenableWorker {
             inV2Mode = config.getV2Mode();
         }
 
-        ExposureNotificationClientWrapper exposureNotificationClient = ExposureNotificationClientWrapper.get(context);
         final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);
 
         Events.raiseEvent(Events.INFO, "Beginning ENS result checking, v2 mode: " + inV2Mode);
@@ -124,9 +123,9 @@ public class StateUpdatedWorker extends ListenableWorker {
             return Futures.immediateFuture(Result.success());
         }
         if (inV2Mode ) {
-            risk = new RiskCalculationV2(config);
+            risk = new RiskCalculationV2(config, this.context);
         } else {
-            risk = new RiskCalculationV1(repository, token);
+            risk = new RiskCalculationV1(repository, token, this.context);
         }
 
         return FluentFuture.from(risk.processKeys(context, simulate, simulateDays))

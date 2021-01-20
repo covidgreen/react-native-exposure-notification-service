@@ -25,13 +25,15 @@ import ie.gov.tracing.hms.ContactShieldWrapper;
 class DiagnosisKeyFileSubmitter {
   private static final Duration API_TIMEOUT = Duration.ofSeconds(10);
   private final ExposureClientWrapper client;
+  private Context context;
 
   DiagnosisKeyFileSubmitter(Context context) {
     if (ApiAvailabilityCheckUtils.isHMS(context)) {
-      client = ContactShieldWrapper.getInstance(context);
+      client = ContactShieldWrapper.get(context);
     } else {
       client = ExposureNotificationClientWrapper.get(context);
     }
+    this.context = context;
   }
 
   ListenableFuture<?> parseFiles(List<File> files, String token, ExposureConfig config) {
@@ -49,12 +51,14 @@ class DiagnosisKeyFileSubmitter {
         client.provideDiagnosisKeys(files),
         API_TIMEOUT.toMillis(),
         TimeUnit.MILLISECONDS,
+        this.context,
         AppExecutors.getScheduledExecutor());      
     } else {
       return TaskToFutureAdapter.getFutureWithTimeout(
         client.provideDiagnosisKeys(files, token, config),
         API_TIMEOUT.toMillis(),
         TimeUnit.MILLISECONDS,
+        this.context,
         AppExecutors.getScheduledExecutor());        
     }
   }

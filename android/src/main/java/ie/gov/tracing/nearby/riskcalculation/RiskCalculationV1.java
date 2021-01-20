@@ -12,9 +12,12 @@ import java.util.Calendar;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
+import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.TaskToFutureAdapter;
+import ie.gov.tracing.hms.ContactShieldWrapper;
 import ie.gov.tracing.nearby.ExposureNotificationClientWrapper;
 import ie.gov.tracing.storage.ExposureEntity;
 import ie.gov.tracing.storage.ExposureNotificationRepository;
@@ -24,10 +27,19 @@ import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEO
 public class RiskCalculationV1 implements RiskCalculation {
     private final ExposureNotificationRepository repository;
     private final String ensToken;
+    private final ExposureClientWrapper client;
+    private final Context context;
 
-    public RiskCalculationV1(ExposureNotificationRepository reposit, String token) {
+    public RiskCalculationV1(ExposureNotificationRepository reposit, String token, Context context) {
         repository = reposit;
         ensToken = token;
+        this.context = context;
+        if (ApiAvailabilityCheckUtils.isHMS(context)) {
+            client = ContactShieldWrapper.get(context);
+        } else {
+            client = ExposureNotificationClientWrapper.get(context);
+        }
+
     }
 
     private static double[] doubleArrayFromString(String string) {
@@ -60,9 +72,10 @@ public class RiskCalculationV1 implements RiskCalculation {
         AtomicReference<ExposureEntity> exposureEntity = new AtomicReference<>(null);
 
         return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                ExposureNotificationClientWrapper.get(context).getExposureSummary(ensToken),
+                client.getExposureSummary(ensToken),
                 DEFAULT_API_TIMEOUT.toMillis(),
                 TimeUnit.MILLISECONDS,
+                this.context,
                 AppExecutors.getScheduledExecutor()))
                 .transformAsync((exposureSummary) -> {
                     Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results, simulate: " + simulate);

@@ -98,8 +98,8 @@ dependencies {
     implementation "com.squareup.okhttp3:logging-interceptor:4.2.1"
     
     //hms
-    implementation 'com.huawei.hms:contactshield:5.0.3.300'
-    
+    implementation 'com.huawei.hms:contactshield:5.1.0.300'    
+
     //noinspection GradleDynamicVersion
     implementation 'com.facebook.react:react-native:+'  // From node_modules
 

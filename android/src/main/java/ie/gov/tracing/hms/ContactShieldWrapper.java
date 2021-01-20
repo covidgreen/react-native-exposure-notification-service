@@ -4,10 +4,13 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 
+import com.google.android.gms.nearby.exposurenotification.DailySummary;
 import com.google.android.gms.nearby.exposurenotification.ExposureConfiguration;
 import com.google.android.gms.nearby.exposurenotification.ExposureInformation;
 import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
+import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
+
 import com.google.gson.Gson;
 import com.huawei.hmf.tasks.Task;
 import com.huawei.hms.contactshield.ContactDetail;
@@ -28,6 +31,7 @@ import java.util.Map;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.ExposureClientWrapper;
+import ie.gov.tracing.common.NfTask;
 import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.SharedPrefs;
 
@@ -39,10 +43,12 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
     private WeakReference<Context> mContextWeakRef;
 
     private ContactShieldEngine mContactShieldEngine;
+    private Context context;
 
     private ContactShieldWrapper(Context context) {
         mContactShieldEngine = ContactShield.getContactShieldEngine(context);
         mContextWeakRef = new WeakReference<>(context);
+        this.context = context;
     }
 
     public static ContactShieldWrapper get(Context context) {
@@ -56,27 +62,19 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
         return instance;
     }
 
-    public Task<Void> start() {
-        return mContactShieldEngine.startContactShield(ContactShieldSetting.DEFAULT);
+    public NfTask<Void> start() {
+        return new NfTask(mContactShieldEngine.startContactShield(ContactShieldSetting.DEFAULT));
     }
 
-    public Task<Void> stop() {
-        return mContactShieldEngine.stopContactShield();
+    public NfTask<Void> stop() {
+        return new NfTask(mContactShieldEngine.stopContactShield());
     }
 
-    public Task<Boolean> isEnabled() {
-        return mContactShieldEngine.isContactShieldRunning();
+    public NfTask<Boolean> isEnabled() {
+        return new NfTask(mContactShieldEngine.isContactShieldRunning());
     }
 
-    public Task<Void> provideDiagnosisKeys(List<File> files, String token) {
-        Context context = mContextWeakRef.get();
-        String settings = Fetcher.fetch("/settings/exposures", false, false, context);
-        Gson gson = new Gson();
-        Map map = gson.fromJson(settings, Map.class);
-
-        String exposureConfig = (String) map.get("exposureConfig");
-        ExposureConfig config = gson.fromJson(exposureConfig, ExposureConfig.class);
-
+    public NfTask<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config) {
         Events.raiseEvent(Events.INFO, "mapping exposure configuration with " + config);
         // error will be thrown here if config is not complete
         ExposureConfiguration configuration =
@@ -92,13 +90,9 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
                         .setDaysSinceLastExposureWeight(config.getDaysSinceLastExposureWeight())
                         .setDurationAtAttenuationThresholds(config.getDurationAtAttenuationThresholds()).build();
 
-        // we use these when we receive match broadcasts from exposure API
-        SharedPrefs.setString("thresholdWeightings", Arrays.toString(config.getThresholdWeightings()), context);
-        SharedPrefs.setLong("timeThreshold", config.getTimeThreshold(), context);
-
         Events.raiseEvent(Events.INFO, "processing diagnosis keys with: " + configuration);
-        PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                new Intent(context, BackgroundContackShieldIntentService.class), PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = PendingIntent.getService(this.context, 0,
+                new Intent(this.context, BackgroundContackShieldIntentService.class), PendingIntent.FLAG_UPDATE_CURRENT);
         DiagnosisConfiguration diagnosisConfiguration = new DiagnosisConfiguration.Builder()
                 .setMinimumRiskValueThreshold(configuration.getMinimumRiskScore())
                 .setAttenuationRiskValues(configuration.getAttenuationScores())
@@ -107,19 +101,45 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
                 .setInitialRiskLevelRiskValues(configuration.getTransmissionRiskScores())
                 .setAttenuationDurationThresholds(configuration.getDurationAtAttenuationThresholds())
                 .build();
-        return mContactShieldEngine.putSharedKeyFiles(pendingIntent, files, diagnosisConfiguration, token);
+        return new NfTask(mContactShieldEngine.putSharedKeyFiles(pendingIntent, files, diagnosisConfiguration, token));
     }
 
-    public Task<List<PeriodicKey>> getTemporaryExposureKeyHistory() {
-        return mContactShieldEngine.getPeriodicKey();
+    public NfTask<List<PeriodicKey>> getTemporaryExposureKeyHistory() {
+        return new NfTask(mContactShieldEngine.getPeriodicKey());
     }
 
-    public Task<ContactSketch> getExposureSummary(String token) {
-        return mContactShieldEngine.getContactSketch(token);
+    @Override
+    public NfTask<Void> provideDiagnosisKeys(List<File> files) {
+        return null;
     }
 
-    public Task<List<ContactDetail>> getExposureInformation(String token) {
-        return mContactShieldEngine.getContactDetail(token);
+    public NfTask<ContactSketch> getExposureSummary(String token) {
+        return new NfTask(mContactShieldEngine.getContactSketch(token));
+    }
+
+    @Override
+    public NfTask<List<DailySummary>> getDailySummaries(ExposureConfig config) {
+        return null;
+    }
+
+    @Override
+    public void setDiagnosisKeysDataMapping(ExposureConfig config) {
+
+    }
+
+    @Override
+    public boolean deviceSupportsLocationlessScanning() {
+        return false;
+    }
+
+    @Override
+    public NfTask<List<ExposureWindow>> getExposureWindows() {
+        return null;
+    }
+
+    @Override
+    public NfTask<Long> getDeviceENSVersion() {
+        return new NfTask(mContactShieldEngine.getContactShieldVersion());
     }
 
     public static List<TemporaryExposureKey> getTemporaryExposureKeyList(List<PeriodicKey> periodicKeyList) {
@@ -147,20 +167,4 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
                 .build();
     }
 
-    public static List<ExposureInformation> getExposureInformationList(List<ContactDetail> contactDetailList) {
-        List<ExposureInformation> exposureInformationList = new ArrayList<>();
-        for (ContactDetail detail : contactDetailList) {
-            ExposureInformation exposureInformation =
-                    new ExposureInformation.ExposureInformationBuilder()
-                            .setDateMillisSinceEpoch(detail.getDayNumber())
-                            .setAttenuationValue(detail.getAttenuationRiskValue())
-                            .setTransmissionRiskLevel(detail.getInitialRiskLevel())
-                            .setDurationMinutes(detail.getDurationMinutes())
-                            .setAttenuationDurations(detail.getAttenuationDurations())
-                            .setTotalRiskScore(detail.getTotalRiskValue())
-                            .build();
-            exposureInformationList.add(exposureInformation);
-        }
-        return exposureInformationList;
-    }
 }

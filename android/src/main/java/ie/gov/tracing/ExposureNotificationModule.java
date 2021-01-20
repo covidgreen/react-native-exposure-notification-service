@@ -3,6 +3,9 @@ package ie.gov.tracing;
 import android.app.Activity;
 import android.os.Build;
 import android.content.pm.PackageInfo;
+
+import androidx.annotation.RequiresApi;
+
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -29,6 +32,19 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
         return !Tracing.isENSSupported();
     }
 
+    public int getGmsServicesVersion() {
+        return gmsServicesVersion;
+    }
+    public int getHmsServicesVersion() {
+        return hmsServicesVersion;
+    }
+    public void setGmsServicesVersion(int version) {
+        gmsServicesVersion = version;
+    }
+    public void setHmsServicesVersion(int version) {
+        hmsServicesVersion = version;
+    }
+    
     // after update performed this should be called
     public void setApiError(int errorCode) {
         apiError = errorCode;
@@ -125,6 +141,7 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
         Tracing.checkExposure(skipTimeCheck);
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @ReactMethod
     public void simulateExposure(Integer timeDelay, Integer numDays) {
         if(nearbyNotSupported()) return;

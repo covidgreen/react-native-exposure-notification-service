@@ -25,6 +25,7 @@ import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.gson.Gson;
 
 import java.util.HashMap;
 import java.io.File;
@@ -34,6 +35,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -44,6 +46,7 @@ import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
+import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.network.DiagnosisKeyDownloader;
 import ie.gov.tracing.network.Fetcher;
@@ -52,8 +55,6 @@ import ie.gov.tracing.storage.SharedPrefs;
 import ie.gov.tracing.storage.TokenEntity;
 import ie.gov.tracing.R;
 
-import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isGMS;
-import static ie.gov.tracing.common.ApiAvailabilityCheckUtils.isHMS;
 import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
 import ie.gov.tracing.hms.ContactShieldWrapper;
 
@@ -85,7 +86,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     repository = new ExposureNotificationRepository(context);
     this.context = context;
     if (ApiAvailabilityCheckUtils.isHMS(context)) {
-      client = ContactShieldWrapper.getInstance(context);
+      client = ContactShieldWrapper.get(context);
     } else {
       client = ExposureNotificationClientWrapper.get(context);
     }
@@ -189,9 +190,9 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         return FluentFuture.from(TaskToFutureAdapter
                 .getFutureWithTimeout(
                         client.isEnabled(),
-                        ExposureNotificationClientWrapper.get(this.context).isEnabled(),
                         DEFAULT_API_TIMEOUT.toMillis(),
                         TimeUnit.MILLISECONDS,
+                        this.context,
                         AppExecutors.getScheduledExecutor()))
                 .transformAsync(isEnabled -> {
                           // Only continue if it is enabled.

@@ -20,9 +20,6 @@ import com.google.android.gms.nearby.exposurenotification.ReportType;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.gson.Gson;
 
 import java.io.File;
 import java.util.Arrays;
@@ -31,11 +28,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.ExposureClientWrapper;
-import ie.gov.tracing.network.Fetcher;
+import ie.gov.tracing.common.NfTask;
 import ie.gov.tracing.storage.SharedPrefs;
 
 public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
@@ -45,36 +41,36 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
   private final Context appContext;
   private final ExposureNotificationClient exposureNotificationClient;
 
-  /*public static ExposureNotificationClientWrapper get(Context context) {
+  public static ExposureNotificationClientWrapper get(Context context) {
     if (INSTANCE == null) {
       INSTANCE = new ExposureNotificationClientWrapper(context);
     }
     return INSTANCE;
-  }*/
+  }
 
   private ExposureNotificationClientWrapper(Context context) {
     this.appContext = context.getApplicationContext();
     exposureNotificationClient = Nearby.getExposureNotificationClient(appContext);
   }
 
-  public Task<Void> start() {
-    return exposureNotificationClient.start();
+  public NfTask<Void> start() {
+    return new NfTask(exposureNotificationClient.start());
   }
 
-  public Task<Void> stop() {
-    return exposureNotificationClient.stop();
+  public NfTask<Void> stop() {
+    return new NfTask(exposureNotificationClient.stop());
   }
 
-  public Task<Boolean> isEnabled() {
-    return exposureNotificationClient.isEnabled();
+  public NfTask<Boolean> isEnabled() {
+    return new NfTask(exposureNotificationClient.isEnabled());
   }
 
-  public Task<List<TemporaryExposureKey>> getTemporaryExposureKeyHistory() {
+  public NfTask<List<TemporaryExposureKey>> getTemporaryExposureKeyHistory() {
     // will only return inactive keys i.e. not today's
-    return exposureNotificationClient.getTemporaryExposureKeyHistory();
+    return new NfTask(exposureNotificationClient.getTemporaryExposureKeyHistory());
   }
 
-  public Task<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config) {
+  public NfTask<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config) {
 
     Events.raiseEvent(Events.INFO, "mapping exposure configuration with " + config);
     // error will be thrown here if config is not complete
@@ -97,26 +93,26 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with: " + exposureConfiguration);
 
-    return exposureNotificationClient
-            .provideDiagnosisKeys(files, exposureConfiguration, token);
+    return new NfTask(exposureNotificationClient
+            .provideDiagnosisKeys(files, exposureConfiguration, token));
   }
 
-  public Task<Void> provideDiagnosisKeys(List<File> files) {
+  public NfTask<Void> provideDiagnosisKeys(List<File> files) {
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with v1.6");
 
     DiagnosisKeyFileProvider provider = new DiagnosisKeyFileProvider(files);
-    return exposureNotificationClient
-            .provideDiagnosisKeys(provider);
+    return new NfTask(exposureNotificationClient
+            .provideDiagnosisKeys(provider));
   }
 
   @Deprecated
-  public Task<ExposureSummary> getExposureSummary(String token) {
-    return exposureNotificationClient.getExposureSummary(token);
+  public NfTask<ExposureSummary> getExposureSummary(String token) {
+    return new NfTask(exposureNotificationClient.getExposureSummary(token));
   }
 
   @RequiresApi(api = Build.VERSION_CODES.N)
-  public Task<List<DailySummary>> getDailySummaries(ExposureConfig config) {
+  public NfTask<List<DailySummary>> getDailySummaries(ExposureConfig config) {
     DailySummariesConfig.DailySummariesConfigBuilder builder = new DailySummariesConfig.DailySummariesConfigBuilder();
     List<Double> attenuationWeightings = Arrays.asList(config.getImmediateDurationWeight() / 100.0, config.getNearDurationWeight() / 100.0, config.getMediumDurationWeight() / 100.0, config.getOtherDurationWeight() / 100.0);
     List<Integer> attenuations = Arrays.stream(config.getAttenuationDurationThresholds()).boxed().collect(Collectors.toList());
@@ -133,7 +129,7 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
             .setInfectiousnessWeight(Infectiousness.HIGH, config.getInfectiousnessHighWeight() / 100.0)
             .setMinimumWindowScore(config.getMinimumRiskScoreFullRange())
             .build();
-    return exposureNotificationClient.getDailySummaries(dailySummaryConfig);
+    return new NfTask(exposureNotificationClient.getDailySummaries(dailySummaryConfig));
   }
 
   public void setDiagnosisKeysDataMapping(ExposureConfig config) {
@@ -180,13 +176,12 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
     return exposureNotificationClient.deviceSupportsLocationlessScanning();
   }
 
-  public Task<List<ExposureWindow>> getExposureWindows() {
-    return exposureNotificationClient.getExposureWindows();
+  public NfTask<List<ExposureWindow>> getExposureWindows() {
+    return new NfTask(exposureNotificationClient.getExposureWindows());
   }
   
-  public Task<Long> getDeviceENSVersion() {
-    return exposureNotificationClient.getVersion();
+  public NfTask<Long> getDeviceENSVersion() {
+    return new NfTask(exposureNotificationClient.getVersion());
   }
-    
 
 }
