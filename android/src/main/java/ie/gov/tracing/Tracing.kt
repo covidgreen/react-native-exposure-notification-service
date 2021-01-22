@@ -399,7 +399,7 @@ object Tracing {
                 start(null)
 
             }
-            Events.raiseEvent(Events.INFO, "ENS Service Status updated status " + exposureStatus)
+            Events.raiseEvent(Events.INFO, "ENS Service Status updated, new status " + exposureStatus)
         }
 
         private val authorisationCallback: Callback = object : Callback {
