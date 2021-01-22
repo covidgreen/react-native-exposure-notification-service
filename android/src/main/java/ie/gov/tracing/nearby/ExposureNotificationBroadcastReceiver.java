@@ -20,7 +20,7 @@ public class ExposureNotificationBroadcastReceiver extends BroadcastReceiver {
         Tracing.currentContext = context;
         String action = intent.getAction();
 
-        Log.d("RN_ENService", "onReceive $action");
+        Log.d("RN_ENService", "onReceive " + action);
         WorkManager workManager = WorkManager.getInstance(context);
         String token = intent.getStringExtra(ExposureNotificationClient.EXTRA_TOKEN);
         if (action.equals(ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED) || action.equals(ExposureNotificationClient.ACTION_EXPOSURE_NOT_FOUND)) {
@@ -31,6 +31,9 @@ public class ExposureNotificationBroadcastReceiver extends BroadcastReceiver {
                                             .putString("action", action)
                                             .build())
                             .build());
+        } else if (action.equals(ExposureNotificationClient.ACTION_SERVICE_STATE_UPDATED)) {
+            Boolean serviceStatus = intent.getBooleanExtra(ExposureNotificationClient.EXTRA_SERVICE_STATE, false);
+            Tracing.updateExposureServiceStatus(serviceStatus);
         }
     }
 }

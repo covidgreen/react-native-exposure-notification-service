@@ -189,6 +189,18 @@ object Tracing {
             }
         }
 
+        @JvmStatic
+        fun updateExposureServiceStatus(serviceStatus: Boolean) {
+            Events.raiseEvent(Events.INFO, "ENS Service Status enabled: " + serviceStatus + ", app status: " + exposureStatus)
+            if (!serviceStatus && exposureStatus == EXPOSURE_STATUS_ACTIVE) {
+                stop()
+            } else if ((exposureStatus == EXPOSURE_STATUS_DISABLED) && serviceStatus) {
+                start(null)
+
+            }
+            Events.raiseEvent(Events.INFO, "ENS Service Status updated status " + exposureStatus)
+        }
+
         private val authorisationCallback: Callback = object : Callback {
             override fun onFailure(t: Throwable) {
                 try {
@@ -834,8 +846,8 @@ object Tracing {
                     ExposureNotificationStatusCodes.RESOLUTION_REQUIRED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "resolution")
                     ExposureNotificationStatusCodes.SIGN_IN_REQUIRED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "signin_required")
                     ExposureNotificationStatusCodes.FAILED_BLUETOOTH_DISABLED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "bluetooth")
-                    ExposureNotificationStatusCodes.FAILED_REJECTED_OPT_IN -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "rejected")
                     ExposureNotificationStatusCodes.FAILED_NOT_SUPPORTED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "not_supported")
+                    ExposureNotificationStatusCodes.FAILED_REJECTED_OPT_IN -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "rejected")
                     ExposureNotificationStatusCodes.FAILED_SERVICE_DISABLED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "disabled")
                     ExposureNotificationStatusCodes.FAILED_UNAUTHORIZED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "unauthorised")
                     ExposureNotificationStatusCodes.FAILED_DISK_IO -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "disk")
