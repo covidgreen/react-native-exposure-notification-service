@@ -21,6 +21,7 @@
                 <action android:name="com.google.android.gms.exposurenotification.ACTION_EXPOSURE_STATE_UPDATED" />
                 <action android:name="com.google.android.gms.exposurenotification.ACTION_EXPOSURE_NOT_FOUND" />
                 <action android:name="com.google.android.gms.exposurenotification.ACTION_REQUEST_DIAGNOSIS_KEYS" />
+                <action android:name="com.google.android.gms.exposurenotification.ACTION_SERVICE_STATE_UPDATED" />
             </intent-filter>
         </receiver>
 
