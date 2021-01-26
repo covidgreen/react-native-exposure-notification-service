@@ -19,6 +19,7 @@ import com.facebook.react.bridge.*
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.nearby.exposurenotification.ExposureNotificationClient
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationStatusCodes
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey
 import com.google.common.io.BaseEncoding
@@ -37,6 +38,7 @@ import ie.gov.tracing.storage.SharedPrefs
 import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import okhttp3.internal.wait
 
 object Tracing {
     class Listener: ActivityEventListener {
@@ -766,15 +768,19 @@ object Tracing {
         }
 
         @JvmStatic
-        fun getExposureStatus(promise: Promise? = null): ReadableMap {
+        fun getExposureStatus(promise: Promise? = null): ReadableMap = runBlocking {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
+
+            val enabled = ExposureNotificationHelper.isEnabled().await()
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
-            if (doesSupportENS && isPaused) {
+            if (doesSupportENS && isPaused && !enabled) {
                 exposureStatus = EXPOSURE_STATUS_DISABLED
                 exposureDisabledReason = "paused"
+            } else if (doesSupportENS && enabled) {
+                exposureStatus = EXPOSURE_STATUS_ACTIVE
+                exposureDisabledReason = ""
             }
-
             try {
                 if (doesSupportENS && !isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
@@ -795,7 +801,7 @@ object Tracing {
                 result.putArray("type", typeData)
                 promise?.resolve(result)
             }
-            return result
+            result
         }
 
         @JvmStatic
