@@ -479,7 +479,7 @@ object Tracing {
         private fun getExposureKeyAsMap(tek: TemporaryExposureKey): WritableMap {
             val result: WritableMap = Arguments.createMap()
             result.putString("keyData", BaseEncoding.base64().encode(tek.keyData))
-            result.putInt("rollingPeriod", 144)
+            result.putInt("rollingPeriod", tek.rollingPeriod)
             result.putInt("rollingStartNumber", tek.rollingStartIntervalNumber)
             result.putInt("transmissionRiskLevel", tek.transmissionRiskLevel) // app should overwrite
 
