@@ -127,14 +127,18 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   @NonNull
   @Override
   public ListenableFuture<Result> startWork() {
+    return FluentFuture
+            .from(setForegroundAsync(createForegroundInfo()))
+            .transformAsync(result -> {return _startWork();}, AppExecutors.getScheduledExecutor());
+  }
+
+  public ListenableFuture<Result> _startWork() {
       try {
         Tracing.currentContext = this.context;
         Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
         SharedPrefs.remove("lastApiError", this.context);
         SharedPrefs.remove("lastError", this.context);
         final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);
-
-        setForegroundAsync(createForegroundInfo());
   
         /*long lastRun = SharedPrefs.getLong("lastRunDate", Tracing.currentContext);
         long checkFrequency = SharedPrefs.getLong("exposureCheckFrequency", Tracing.context);
