@@ -86,7 +86,7 @@ public class ExposureNotificationHelper implements LifecycleObserver {
             }, MoreExecutors.directExecutor());
   }
 
-  private static ListenableFuture<Boolean> isEnabled() {
+  public static ListenableFuture<Boolean> isEnabled() {
     return TaskToFutureAdapter.getFutureWithTimeout(
         ExposureNotificationClientWrapper.get(Tracing.reactContext).isEnabled(),
         API_TIMEOUT.toMillis(),

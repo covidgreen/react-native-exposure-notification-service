@@ -477,7 +477,7 @@ object Tracing {
         private fun getExposureKeyAsMap(tek: TemporaryExposureKey): WritableMap {
             val result: WritableMap = Arguments.createMap()
             result.putString("keyData", BaseEncoding.base64().encode(tek.keyData))
-            result.putInt("rollingPeriod", 144)
+            result.putInt("rollingPeriod", tek.rollingPeriod)
             result.putInt("rollingStartNumber", tek.rollingStartIntervalNumber)
             result.putInt("transmissionRiskLevel", tek.transmissionRiskLevel) // app should overwrite
 
@@ -766,15 +766,19 @@ object Tracing {
         }
 
         @JvmStatic
-        fun getExposureStatus(promise: Promise? = null): ReadableMap {
+        fun getExposureStatus(promise: Promise? = null): ReadableMap = runBlocking {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
+
+            val enabled = ExposureNotificationHelper.isEnabled().await()
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
-            if (doesSupportENS && isPaused) {
+            if (doesSupportENS && isPaused && !enabled) {
                 exposureStatus = EXPOSURE_STATUS_DISABLED
                 exposureDisabledReason = "paused"
+            } else if (doesSupportENS && enabled) {
+                exposureStatus = EXPOSURE_STATUS_ACTIVE
+                exposureDisabledReason = ""
             }
-
             try {
                 if (doesSupportENS && !isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
@@ -795,7 +799,7 @@ object Tracing {
                 result.putArray("type", typeData)
                 promise?.resolve(result)
             }
-            return result
+            result
         }
 
         @JvmStatic
