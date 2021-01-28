@@ -362,6 +362,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     workManager
             .enqueueUniquePeriodicWork(WORKER_NAME, policy, workRequest);
     SharedPrefs.setLong("scheduledExposureCheckFrequency", checkFrequency, Tracing.context);
+    Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startScheduler: policy " + policy);
   }
 
 
