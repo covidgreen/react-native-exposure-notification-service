@@ -355,8 +355,13 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                             .setRequiredNetworkType(NetworkType.CONNECTED)
                             .build())
             .build();
+    long scheduledCheckFrequency = SharedPrefs.getLong("scheduledExposureCheckFrequency", Tracing.context);
+    ExistingPeriodicWorkPolicy policy = scheduledCheckFrequency == 0 || checkFrequency != scheduledCheckFrequency
+            ? ExistingPeriodicWorkPolicy.REPLACE
+            : ExistingPeriodicWorkPolicy.KEEP;
     workManager
-            .enqueueUniquePeriodicWork(WORKER_NAME, ExistingPeriodicWorkPolicy.REPLACE, workRequest);
+            .enqueueUniquePeriodicWork(WORKER_NAME, policy, workRequest);
+    SharedPrefs.setLong("scheduledExposureCheckFrequency", checkFrequency, Tracing.context);
   }
 
 
