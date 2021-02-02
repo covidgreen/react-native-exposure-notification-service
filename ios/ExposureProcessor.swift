@@ -99,6 +99,7 @@ public class ExposureProcessor {
     public func status(_ resolve: @escaping RCTPromiseResolveBlock,
                     rejecter reject: RCTPromiseRejectBlock) {
       var result: [String: Any] = [:]
+      result["type"] = [""]
       switch ExposureManager.shared.manager.exposureNotificationStatus {
         case .active:
             result["state"] = "active"
