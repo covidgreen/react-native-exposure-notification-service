@@ -681,7 +681,6 @@ object Tracing {
         private fun scheduleCheckExposure() {
             try {
                 // stop and re-start with config value
-                ProvideDiagnosisKeysWorker.stopScheduler()
                 ProvideDiagnosisKeysWorker.startScheduler()
             } catch (ex: Exception) {
                 Events.raiseError("scheduleCheckExposure", ex)
