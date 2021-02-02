@@ -6,10 +6,16 @@ import ExposureNotification
 
 @objc(ExposureNotificationModule)
 public class ExposureNotificationModule: RCTEventEmitter {
-    
+    private struct ENSStaus {
+        var state: String
+        var type: String
+    }
     private let notificationCenter = NotificationCenter.default
+    private var currentStatus: ENSStaus
     
     public override init() {
+        currentStatus = ENSStaus(state: "", type: "")
+        
         super.init()
         setupNotifications()
     }
@@ -281,9 +287,9 @@ public class ExposureNotificationModule: RCTEventEmitter {
     
 
    @objc private func onStatusChanged(_ notification: Notification) {
-      var status: [String: Any] = [:]
+      var status: ENSStaus = ENSStaus(state: "", type: "")
     
-    if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
+      if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
         guard let item = notification.object as? ENStatus else {
           os_log("No data in status change event", log: OSLog.exposure, type: .debug)
           return
@@ -291,36 +297,42 @@ public class ExposureNotificationModule: RCTEventEmitter {
         
         switch item {
           case .active:
-              status["state"] = "active"
+            status.state = "active"
           case .unknown:
-              status["state"] = "unknown"
+            status.state = "unknown"
           case .disabled:
-              status["state"] = "disabled"
-              status["type"] = ["exposure"]
+            status.state = "disabled"
+            status.type = "exposure"
           case .bluetoothOff:
-              status["state"] = "disabled"
-              status["type"] = ["bluetooth"]
+            status.state = "disabled"
+            status.type = "bluetooth"
           case .restricted:
-              status["state"] = "restricted"
+            status.state = "restricted"
           case .paused:
-              status["state"] = "disabled"
-              status["type"] = ["paused"]
+            status.state = "disabled"
+            status.type = "paused"
           case .unauthorized:
-              status["state"] = "disabled"
-              status["type"] = ["unauthorized"]
+            status.state = "disabled"
+            status.type = "unauthorized"
           @unknown default:
-              status["state"] = "unavailable"
+            status.state = "unavailable"
         }
-        if ExposureManager.shared.isPaused() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
-           status["state"] = "disabled"
-           status["type"] = ["paused"]
+        if ExposureManager.shared.isPaused() && (status.state == "disabled" || status.state == "unknown") {
+            status.state = "disabled"
+            status.type = "paused"
         }
-        if ExposureManager.shared.isStopped() && (status["state"] as! String == "disabled" || status["state"] as! String == "unknown") {
-           status["state"] = "disabled"
-           status["type"] = ["stopped"]
+        if ExposureManager.shared.isStopped() && (status.state == "disabled" || status.state == "unknown") {
+            status.state = "disabled"
+            status.type = "stopped"
         }
-        os_log("Status of exposure service has changed %@", log: OSLog.exposure, type: .debug, status)
-        sendEvent(withName: "exposureEvent", body: ["onStatusChanged": status])
+        if (status.state != currentStatus.state || status.type != currentStatus.type) {
+            os_log("Status of exposure service has changed %@, %@", log: OSLog.exposure, type: .debug, status.state, status.type)
+            currentStatus = status
+            var ensStatus: [String: Any] = [:]
+            ensStatus["state"] = status.state
+            ensStatus["type"] = [status.type]
+            sendEvent(withName: "exposureEvent", body: ["onStatusChanged": ensStatus])
+        }
       }
   }
 }
