@@ -127,12 +127,12 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   @NonNull
   @Override
   public ListenableFuture<Result> startWork() {
-    return FluentFuture
-            .from(setForegroundAsync(createForegroundInfo()))
-            .transformAsync(result -> {return _startWork();}, AppExecutors.getScheduledExecutor());
-  }
-
-  public ListenableFuture<Result> _startWork() {
+      try {
+        setForegroundAsync(createForegroundInfo()).get();
+      }
+      catch(Exception ex) {
+          Events.raiseError("ProvideDiagnosisKeysWorker - startWork-foreground", ex);
+      }
       try {
         Tracing.currentContext = this.context;
         Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
