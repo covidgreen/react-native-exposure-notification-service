@@ -62,6 +62,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
           "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID";
   private static final String FOREGROUND_NOTIFICATION_ID =
           "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID.noBadge";
+  private static int INITIAL_DELAY = 30;
+  private static int MAX_DELAY = 15 * 60;
 
   private final DiagnosisKeyDownloader diagnosisKeys;
   private final DiagnosisKeyFileSubmitter submitter;
@@ -348,9 +350,11 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startScheduler: run every " +
             checkFrequency + " minutes");
     WorkManager workManager = WorkManager.getInstance(Tracing.context);
+
+    long delay = Math.round(Math.random() * (MAX_DELAY - INITIAL_DELAY) + INITIAL_DELAY);
     PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
             ProvideDiagnosisKeysWorker.class, checkFrequency, TimeUnit.MINUTES)
-            .setInitialDelay(30, TimeUnit.SECONDS) // could offset this, but idle may be good enough
+            .setInitialDelay(delay, TimeUnit.SECONDS) // could offset this, but idle may be good enough
             .addTag(WORKER_NAME)
             .setConstraints(
                     new Constraints.Builder()
