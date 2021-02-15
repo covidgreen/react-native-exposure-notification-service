@@ -769,7 +769,11 @@ object Tracing {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
 
-            val enabled = ExposureNotificationHelper.isEnabled().await()
+            try {
+                enabled = ExposureNotificationHelper.isEnabled().await()
+            } catch(ex: Exception) {
+                Events.raiseError("Error reading ENS status", ex)
+            }
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
             if (doesSupportENS && isPaused && !enabled) {
                 exposureStatus = EXPOSURE_STATUS_DISABLED
