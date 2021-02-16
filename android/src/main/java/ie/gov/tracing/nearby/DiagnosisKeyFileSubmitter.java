@@ -23,7 +23,6 @@ import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
 import ie.gov.tracing.hms.ContactShieldWrapper;
 
 class DiagnosisKeyFileSubmitter {
-  private static final Duration API_TIMEOUT = Duration.ofSeconds(10);
   private final ExposureClientWrapper client;
   private Context context;
 

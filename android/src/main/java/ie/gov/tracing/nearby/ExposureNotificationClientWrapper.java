@@ -18,27 +18,37 @@ import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
 import com.google.android.gms.nearby.exposurenotification.Infectiousness;
 import com.google.android.gms.nearby.exposurenotification.ReportType;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
-import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.common.util.concurrent.FluentFuture;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+
+import org.threeten.bp.Duration;
 
 import java.io.File;
+import java.time.temporal.TemporalUnit;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import ie.gov.tracing.Tracing;
+import ie.gov.tracing.common.AppExecutors;
+import ie.gov.tracing.common.Config;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.NfTask;
+import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.storage.SharedPrefs;
 
 public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
 
   private static ExposureNotificationClientWrapper INSTANCE;
 
-  private final Context appContext;
+  private final Context context;
   private final ExposureNotificationClient exposureNotificationClient;
 
   public static ExposureNotificationClientWrapper get(Context context) {
@@ -49,25 +59,54 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
   }
 
   private ExposureNotificationClientWrapper(Context context) {
-    this.appContext = context.getApplicationContext();
-    exposureNotificationClient = Nearby.getExposureNotificationClient(appContext);
+    this.context = context.getApplicationContext();
+    exposureNotificationClient = Nearby.getExposureNotificationClient(this.context);
   }
 
-  public NfTask<Void> start() {
-    return new NfTask(exposureNotificationClient.start());
+  public ListenableFuture<Void> start() {
+    return  FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+              new NfTask(exposureNotificationClient.isEnabled()),
+              Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+              TimeUnit.MILLISECONDS,
+              this.context,
+              AppExecutors.getScheduledExecutor()))
+            .transformAsync(enabled -> {
+              if ((Boolean) enabled) {
+                return Futures.immediateVoidFuture();
+              }
+              Events.raiseEvent(Events.INFO, "starting exposure tracing...");
+
+              return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                new NfTask(exposureNotificationClient.start()),
+                Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+                TimeUnit.MILLISECONDS,
+                this.context,
+                AppExecutors.getScheduledExecutor()))
+                  .transformAsync(stat -> Futures.immediateVoidFuture(), AppExecutors.getScheduledExecutor());
+            }, AppExecutors.getScheduledExecutor());
   }
 
   public NfTask<Void> stop() {
     return new NfTask(exposureNotificationClient.stop());
   }
 
-  public NfTask<Boolean> isEnabled() {
-    return new NfTask(exposureNotificationClient.isEnabled());
+  public ListenableFuture<Boolean> isEnabled() {
+    return TaskToFutureAdapter.getFutureWithTimeout(
+            new NfTask(exposureNotificationClient.isEnabled()),
+            Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+            TimeUnit.MILLISECONDS,
+            this.context,
+            AppExecutors.getScheduledExecutor());
+
   }
 
-  public NfTask<List<TemporaryExposureKey>> getTemporaryExposureKeyHistory() {
-    // will only return inactive keys i.e. not today's
-    return new NfTask(exposureNotificationClient.getTemporaryExposureKeyHistory());
+  public ListenableFuture<List<TemporaryExposureKey>> getTemporaryExposureKeyHistory() {
+    return TaskToFutureAdapter.getFutureWithTimeout(
+            new NfTask(exposureNotificationClient.getTemporaryExposureKeyHistory()),
+            Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+            TimeUnit.MILLISECONDS,
+            this.context,
+            AppExecutors.getScheduledExecutor());
   }
 
   public NfTask<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config) {
@@ -88,8 +127,8 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
                     .setDurationAtAttenuationThresholds(config.getDurationAtAttenuationThresholds()).build();
 
     // we use these when we receive match broadcasts from exposure API
-    SharedPrefs.setString("thresholdWeightings", Arrays.toString(config.getThresholdWeightings()), appContext);
-    SharedPrefs.setLong("timeThreshold", config.getTimeThreshold(), appContext);
+    SharedPrefs.setString("thresholdWeightings", Arrays.toString(config.getThresholdWeightings()), this.context);
+    SharedPrefs.setLong("timeThreshold", config.getTimeThreshold(), this.context);
 
     Events.raiseEvent(Events.INFO, "processing diagnosis keys with: " + exposureConfiguration);
 
@@ -107,8 +146,13 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
   }
 
   @Deprecated
-  public NfTask<ExposureSummary> getExposureSummary(String token) {
-    return new NfTask(exposureNotificationClient.getExposureSummary(token));
+  public ListenableFuture<ExposureSummary> getExposureSummary(String token) {
+    return TaskToFutureAdapter.getFutureWithTimeout(
+            new NfTask(exposureNotificationClient.getExposureSummary(token)),
+            Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+            TimeUnit.MILLISECONDS,
+            this.context,
+            AppExecutors.getScheduledExecutor());
   }
 
   @RequiresApi(api = Build.VERSION_CODES.N)
@@ -180,8 +224,13 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
     return new NfTask(exposureNotificationClient.getExposureWindows());
   }
   
-  public NfTask<Long> getDeviceENSVersion() {
-    return new NfTask(exposureNotificationClient.getVersion());
+  public ListenableFuture<Long> getDeviceENSVersion() {
+    return TaskToFutureAdapter.getFutureWithTimeout(
+            new NfTask(exposureNotificationClient.getVersion()),
+            Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+            TimeUnit.MILLISECONDS,
+            this.context,
+            AppExecutors.getScheduledExecutor());
   }
 
 }

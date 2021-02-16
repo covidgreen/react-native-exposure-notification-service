@@ -11,6 +11,9 @@ import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
 import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
 
+import com.google.common.util.concurrent.FluentFuture;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import com.huawei.hmf.tasks.Task;
 import com.huawei.hms.contactshield.ContactDetail;
@@ -21,19 +24,27 @@ import com.huawei.hms.contactshield.ContactSketch;
 import com.huawei.hms.contactshield.DiagnosisConfiguration;
 import com.huawei.hms.contactshield.PeriodicKey;
 
+import org.threeten.bp.Duration;
+
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import ie.gov.tracing.common.AppExecutors;
+import ie.gov.tracing.common.Config;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.NfTask;
+import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.network.Fetcher;
 import ie.gov.tracing.storage.SharedPrefs;
+
+import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEOUT;
 
 public class ContactShieldWrapper  extends ExposureClientWrapper {
     private static final String TAG = "ContactShieldWrapper";
@@ -70,8 +81,13 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
         return new NfTask(mContactShieldEngine.stopContactShield());
     }
 
-    public NfTask<Boolean> isEnabled() {
-        return new NfTask(mContactShieldEngine.isContactShieldRunning());
+    public ListenableFuture<Boolean> isEnabled() {
+        return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                new NfTask(mContactShieldEngine.isContactShieldRunning()),
+                Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+                TimeUnit.MILLISECONDS,
+                this.context,
+                AppExecutors.getScheduledExecutor()));
     }
 
     public NfTask<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config) {
@@ -104,8 +120,14 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
         return new NfTask(mContactShieldEngine.putSharedKeyFiles(pendingIntent, files, diagnosisConfiguration, token));
     }
 
-    public NfTask<List<PeriodicKey>> getTemporaryExposureKeyHistory() {
-        return new NfTask(mContactShieldEngine.getPeriodicKey());
+    public ListenableFuture<List<TemporaryExposureKey>> getTemporaryExposureKeyHistory() {
+        return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                new NfTask(mContactShieldEngine.getPeriodicKey()),
+                Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+                TimeUnit.MILLISECONDS,
+                this.context,
+                AppExecutors.getScheduledExecutor()))
+                .transformAsync(keyList -> Futures.immediateFuture(convertTemporaryExposureKeyList((List<PeriodicKey>)keyList)), AppExecutors.getBackgroundExecutor());
     }
 
     @Override
@@ -113,8 +135,14 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
         return null;
     }
 
-    public NfTask<ContactSketch> getExposureSummary(String token) {
-        return new NfTask(mContactShieldEngine.getContactSketch(token));
+    public ListenableFuture<ExposureSummary> getExposureSummary(String token) {
+        return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                new NfTask(mContactShieldEngine.getContactSketch(token)),
+                Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+                TimeUnit.MILLISECONDS,
+                this.context,
+                AppExecutors.getScheduledExecutor()))
+                .transformAsync(summary -> Futures.immediateFuture(convertExposureSummary((ContactSketch)summary)), AppExecutors.getBackgroundExecutor());
     }
 
     @Override
@@ -138,11 +166,16 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
     }
 
     @Override
-    public NfTask<Long> getDeviceENSVersion() {
-        return new NfTask(mContactShieldEngine.getContactShieldVersion());
+    public ListenableFuture<Long> getDeviceENSVersion() {
+        return TaskToFutureAdapter.getFutureWithTimeout(
+                new NfTask(mContactShieldEngine.getContactShieldVersion()),
+                Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+                TimeUnit.MILLISECONDS,
+                this.context,
+                AppExecutors.getScheduledExecutor());
     }
 
-    public static List<TemporaryExposureKey> getTemporaryExposureKeyList(List<PeriodicKey> periodicKeyList) {
+    private static List<TemporaryExposureKey> convertTemporaryExposureKeyList(List<PeriodicKey> periodicKeyList) {
         List<TemporaryExposureKey> temporaryExposureKeyList = new ArrayList<>();
         for (PeriodicKey periodicKey : periodicKeyList) {
             TemporaryExposureKey temporaryExposureKey =
@@ -157,7 +190,7 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
         return temporaryExposureKeyList;
     }
 
-    public static ExposureSummary getExposureSummary(ContactSketch contactSketch) {
+    private static ExposureSummary convertExposureSummary(ContactSketch contactSketch) {
         return new ExposureSummary.ExposureSummaryBuilder()
                 .setDaysSinceLastExposure(contactSketch.getDaysSinceLastHit())
                 .setMatchedKeyCount(contactSketch.getNumberOfHits())

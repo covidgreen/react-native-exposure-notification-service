@@ -8,6 +8,7 @@ import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
 import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
 import com.google.android.gms.tasks.Task;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
 import java.util.List;
@@ -20,16 +21,16 @@ public abstract class ExposureClientWrapper {
 
   public abstract NfTask<Void> stop();
 
-  public abstract NfTask<Boolean> isEnabled();
+  public abstract ListenableFuture<Boolean> isEnabled();
 
-  public abstract NfTask<List<TemporaryExposureKey>> getTemporaryExposureKeyHistory();
+  public abstract ListenableFuture<List<TemporaryExposureKey>> getTemporaryExposureKeyHistory();
 
   public abstract NfTask<Void> provideDiagnosisKeys(List<File> files, String token, ExposureConfig config);
 
   public abstract NfTask<Void> provideDiagnosisKeys(List<File> files);
 
   @Deprecated
-  public abstract NfTask<ExposureSummary> getExposureSummary(String token);
+  public abstract  ListenableFuture<ExposureSummary> getExposureSummary(String token);
 
   @RequiresApi(api = Build.VERSION_CODES.N)
   public abstract NfTask<List<DailySummary>> getDailySummaries(ExposureConfig config);
@@ -40,6 +41,6 @@ public abstract class ExposureClientWrapper {
 
   public abstract NfTask<List<ExposureWindow>> getExposureWindows();
   
-  public abstract NfTask<Long> getDeviceENSVersion();
+  public abstract ListenableFuture<Long> getDeviceENSVersion();
 
 }
