@@ -776,7 +776,8 @@ object Tracing {
         fun getExposureStatus(promise: Promise? = null): ReadableMap = runBlocking {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
-
+            var enabled = false
+            
             try {
                 enabled = ExposureNotificationHelper.isEnabled().await()
             } catch(ex: Exception) {
