@@ -37,6 +37,8 @@ import ie.gov.tracing.storage.SharedPrefs
 import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.util.*
+import kotlin.concurrent.schedule
 
 object Tracing {
     class Listener: ActivityEventListener {
@@ -126,7 +128,7 @@ object Tracing {
             }
             Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action, $doesSupportENS")
             if (doesSupportENS) {
-                Tracing.setExposureStatus(newStatus, newExposureDisabledReason)
+                Tracing.setExposureStatus(newStatus, newExposureDisabledReason, true)
             }            
         }
     }
@@ -185,8 +187,14 @@ object Tracing {
                 changed = true
             }
             if (changed) {
-                Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
-            }
+                if (scheduleCheck) {
+                    Timer("DelayedENSCheck", false).schedule(300) {
+                        Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+                    }
+                } else {
+                    Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+                }
+            }                
         }
 
         @JvmStatic
