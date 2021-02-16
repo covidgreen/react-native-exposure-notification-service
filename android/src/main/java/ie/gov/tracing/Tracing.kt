@@ -176,7 +176,7 @@ object Tracing {
         var startPromise: Promise? = null
 
         @JvmStatic
-        fun setExposureStatus(status: String, reason: String = "") {
+        fun setExposureStatus(status: String, reason: String = "", scheduleCheck: Boolean = false) {
             var changed = false
             if (exposureStatus != status) {
                 exposureStatus = status
