@@ -37,6 +37,8 @@ import ie.gov.tracing.storage.SharedPrefs
 import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.util.*
+import kotlin.concurrent.schedule
 
 object Tracing {
     class Listener: ActivityEventListener {
@@ -126,7 +128,7 @@ object Tracing {
             }
             Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action, $doesSupportENS")
             if (doesSupportENS) {
-                Tracing.setExposureStatus(newStatus, newExposureDisabledReason)
+                Tracing.setExposureStatus(newStatus, newExposureDisabledReason, true)
             }            
         }
     }
@@ -174,7 +176,7 @@ object Tracing {
         var startPromise: Promise? = null
 
         @JvmStatic
-        fun setExposureStatus(status: String, reason: String = "") {
+        fun setExposureStatus(status: String, reason: String = "", scheduleCheck: Boolean = false) {
             var changed = false
             if (exposureStatus != status) {
                 exposureStatus = status
@@ -185,8 +187,14 @@ object Tracing {
                 changed = true
             }
             if (changed) {
-                Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
-            }
+                if (scheduleCheck) {
+                    Timer("DelayedENSCheck", false).schedule(300) {
+                        Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+                    }
+                } else {
+                    Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+                }
+            }                
         }
 
         @JvmStatic
@@ -768,8 +776,13 @@ object Tracing {
         fun getExposureStatus(promise: Promise? = null): ReadableMap = runBlocking {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
-
-            val enabled = ExposureNotificationHelper.isEnabled().await()
+            var enabled = false
+            
+            try {
+                enabled = ExposureNotificationHelper.isEnabled().await()
+            } catch(ex: Exception) {
+                Events.raiseError("Error reading ENS status", ex)
+            }
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
             if (doesSupportENS && isPaused && !enabled) {
                 exposureStatus = EXPOSURE_STATUS_DISABLED
