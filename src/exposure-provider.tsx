@@ -163,7 +163,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   analyticsOptin = false,
   notificationRepeat = 0,
   certList = '',
-  hideForeground
+  hideForeground = false
 }) => {
   const [state, setState] = useState<State>(initialState);
 
@@ -199,13 +199,12 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     async function checkSupportAndStart() {
       await supportsExposureApi();
 
-      await configure();
-
       // Start as soon as we're able to
       if (
         isReady &&
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
+        await configure();
         const latestStatus = await ExposureNotification.status();
 
         if (

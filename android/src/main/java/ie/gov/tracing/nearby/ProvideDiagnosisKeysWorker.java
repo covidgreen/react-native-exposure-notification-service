@@ -128,6 +128,15 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   @NonNull
   @Override
   public ListenableFuture<Result> startWork() {
+      // validate config set before running
+      final String server = SharedPrefs.getString("serverUrl", this.context);
+      if (server.isEmpty()) {
+        // config not yet populated so don't run
+        SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", this.context);
+        Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
+        return Futures.immediateFuture(Result.success());
+      }
+
       boolean hideForeground = SharedPrefs.getBoolean("hideForeground", this.context);
       try {
         if (!hideForeground) {
@@ -157,15 +166,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         */
 
         updateLastRun();
-
-        // validate config set before running
-        final String server = SharedPrefs.getString("serverUrl", this.context);
-        if (server.isEmpty()) {
-          // config not yet populated so don't run
-          SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", this.context);
-          Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
-          return Futures.immediateFuture(Result.success());
-        }
 
         saveDailyMetric();
 
