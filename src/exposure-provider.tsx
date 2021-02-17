@@ -118,6 +118,7 @@ export interface ExposureProviderProps {
   analyticsOptin?: boolean;
   notificationRepeat?: number;
   certList?: string;
+  hideForeground?: boolean;
 }
 
 export const getVersion = async () => {
@@ -161,7 +162,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   callbackNumber = '',
   analyticsOptin = false,
   notificationRepeat = 0,
-  certList = ''
+  certList = '',
+  hideForeground
 }) => {
   const [state, setState] = useState<State>(initialState);
 
@@ -197,12 +199,13 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
     async function checkSupportAndStart() {
       await supportsExposureApi();
 
+      await configure();
+
       // Start as soon as we're able to
       if (
         isReady &&
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
-        await configure();
         const latestStatus = await ExposureNotification.status();
 
         if (
@@ -311,7 +314,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         callbackNumber,
         analyticsOptin,
         notificationRepeat,
-        certList
+        certList,
+        hideForeground
       };
       await ExposureNotification.configure(config);
 

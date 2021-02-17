@@ -80,7 +80,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     secureRandom = new SecureRandom();
     repository = new ExposureNotificationRepository(context);
     this.context = context;
-    setForegroundAsync(createForegroundInfo());
   }
 
   private String generateRandomToken() {
@@ -129,15 +128,18 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   @NonNull
   @Override
   public ListenableFuture<Result> startWork() {
+      boolean hideForeground = SharedPrefs.getBoolean("hideForeground", this.context);
       try {
-        setForegroundAsync(createForegroundInfo()).get();
+        if (!hideForeground) {
+          setForegroundAsync(createForegroundInfo()).get();
+        }
       }
       catch(Exception ex) {
           Events.raiseError("ProvideDiagnosisKeysWorker - startWork-foreground", ex);
       }
       try {
         Tracing.currentContext = this.context;
-        Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
+        Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork foreground: " + !hideForeground);
         SharedPrefs.remove("lastApiError", this.context);
         SharedPrefs.remove("lastError", this.context);
         final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);

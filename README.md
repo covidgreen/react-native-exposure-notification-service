@@ -133,6 +133,7 @@ Use to configure the module. This method is synchronous, and should be called be
 - `notificationDesc`: a string representing the description for positive exposure notifications popup,
 - `callbackNumber`: a string representing the phone number of a user if opted into automatic callback on positive exposure notification,
 - `analyticsOptin`: a boolean representing whether the user opted in or not
+- `hideForeground`: Android only. a boolean representing whether to hide foreground notifications
 
 ---
 
