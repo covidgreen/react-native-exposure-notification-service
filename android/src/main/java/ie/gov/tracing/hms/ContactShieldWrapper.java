@@ -73,12 +73,39 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
         return instance;
     }
 
-    public NfTask<Void> start() {
-        return new NfTask(mContactShieldEngine.startContactShield(ContactShieldSetting.DEFAULT));
-    }
+    public ListenableFuture<Void> start() {
+        return FluentFuture.from(isEnabled())
+                .transformAsync(enabled -> {
+                    if (!enabled) {
+                        return Futures.immediateVoidFuture();
+                    }
+                    Events.raiseEvent(Events.INFO, "stopping exposure tracing...");
 
-    public NfTask<Void> stop() {
-        return new NfTask(mContactShieldEngine.stopContactShield());
+                    return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                            new NfTask(mContactShieldEngine.startContactShield(ContactShieldSetting.DEFAULT)),
+                            Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+                            TimeUnit.MILLISECONDS,
+                            this.context,
+                            AppExecutors.getScheduledExecutor()))
+                            .transformAsync(stat -> Futures.immediateVoidFuture(), AppExecutors.getScheduledExecutor());
+                }, AppExecutors.getScheduledExecutor());   }
+
+    public ListenableFuture<Void> stop() {
+        return FluentFuture.from(isEnabled())
+                .transformAsync(enabled -> {
+                    if (!enabled) {
+                        return Futures.immediateVoidFuture();
+                    }
+                    Events.raiseEvent(Events.INFO, "stopping exposure tracing...");
+
+                    return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                            new NfTask(mContactShieldEngine.stopContactShield()),
+                            Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+                            TimeUnit.MILLISECONDS,
+                            this.context,
+                            AppExecutors.getScheduledExecutor()))
+                            .transformAsync(stat -> Futures.immediateVoidFuture(), AppExecutors.getScheduledExecutor());
+                }, AppExecutors.getScheduledExecutor());
     }
 
     public ListenableFuture<Boolean> isEnabled() {

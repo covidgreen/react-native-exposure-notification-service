@@ -1,5 +1,5 @@
 PODS:
-  - Alamofire (5.2.2)
+  - Alamofire (5.3.0)
   - boost-for-react-native (1.63.0)
   - DoubleConversion (1.1.6)
   - EXConstants (9.2.0):
@@ -224,7 +224,7 @@ PODS:
     - React-cxxreact (= 0.63.3)
     - React-jsi (= 0.63.3)
   - React-jsinspector (0.63.3)
-  - react-native-exposure-notification-service (1.1.33):
+  - react-native-exposure-notification-service (1.2.7):
     - Alamofire (~> 5.2)
     - KeychainSwift (~> 19.0)
     - React
@@ -322,15 +322,15 @@ DEPENDENCIES:
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - EXErrorRecovery (from `../node_modules/expo-error-recovery/ios`)
-  - EXFileSystem (from `../node_modules/react-native-exposure-notification-service/test-app/node_modules/expo-file-system/ios`)
+  - EXFileSystem (from `../node_modules/expo-file-system/ios`)
   - EXFont (from `../node_modules/expo-font/ios`)
   - EXImageLoader (from `../node_modules/expo-image-loader/ios`)
-  - EXKeepAwake (from `../node_modules/react-native-exposure-notification-service/test-app/node_modules/expo-keep-awake/ios`)
+  - EXKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - EXLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
   - EXLocation (from `../node_modules/expo-location/ios`)
   - EXPermissions (from `../node_modules/expo-permissions/ios`)
   - EXSplashScreen (from `../node_modules/expo-splash-screen/ios`)
-  - EXSQLite (from `../node_modules/react-native-exposure-notification-service/test-app/node_modules/expo-sqlite/ios`)
+  - EXSQLite (from `../node_modules/expo-sqlite/ios`)
   - EXUpdates (from `../node_modules/expo-updates/ios`)
   - EXWebBrowser (from `../node_modules/expo-web-browser/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
@@ -366,18 +366,18 @@ DEPENDENCIES:
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - SSZipArchive
-  - UMAppLoader (from `../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-app-loader/ios`)
+  - UMAppLoader (from `../node_modules/unimodules-app-loader/ios`)
   - UMBarCodeScannerInterface (from `../node_modules/unimodules-barcode-scanner-interface/ios`)
   - UMCameraInterface (from `../node_modules/unimodules-camera-interface/ios`)
-  - UMConstantsInterface (from `../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-constants-interface/ios`)
+  - UMConstantsInterface (from `../node_modules/unimodules-constants-interface/ios`)
   - "UMCore (from `../node_modules/@unimodules/core/ios`)"
-  - UMFaceDetectorInterface (from `../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-face-detector-interface/ios`)
+  - UMFaceDetectorInterface (from `../node_modules/unimodules-face-detector-interface/ios`)
   - UMFileSystemInterface (from `../node_modules/unimodules-file-system-interface/ios`)
   - UMFontInterface (from `../node_modules/unimodules-font-interface/ios`)
-  - UMImageLoaderInterface (from `../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-image-loader-interface/ios`)
+  - UMImageLoaderInterface (from `../node_modules/unimodules-image-loader-interface/ios`)
   - UMPermissionsInterface (from `../node_modules/unimodules-permissions-interface/ios`)
   - "UMReactNativeAdapter (from `../node_modules/@unimodules/react-native-adapter/ios`)"
-  - UMSensorsInterface (from `../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-sensors-interface/ios`)
+  - UMSensorsInterface (from `../node_modules/unimodules-sensors-interface/ios`)
   - UMTaskManagerInterface (from `../node_modules/unimodules-task-manager-interface/ios`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
@@ -396,13 +396,13 @@ EXTERNAL SOURCES:
   EXErrorRecovery:
     :path: "../node_modules/expo-error-recovery/ios"
   EXFileSystem:
-    :path: "../node_modules/react-native-exposure-notification-service/test-app/node_modules/expo-file-system/ios"
+    :path: "../node_modules/expo-file-system/ios"
   EXFont:
     :path: "../node_modules/expo-font/ios"
   EXImageLoader:
     :path: "../node_modules/expo-image-loader/ios"
   EXKeepAwake:
-    :path: "../node_modules/react-native-exposure-notification-service/test-app/node_modules/expo-keep-awake/ios"
+    :path: "../node_modules/expo-keep-awake/ios"
   EXLinearGradient:
     :path: "../node_modules/expo-linear-gradient/ios"
   EXLocation:
@@ -412,7 +412,7 @@ EXTERNAL SOURCES:
   EXSplashScreen:
     :path: "../node_modules/expo-splash-screen/ios"
   EXSQLite:
-    :path: "../node_modules/react-native-exposure-notification-service/test-app/node_modules/expo-sqlite/ios"
+    :path: "../node_modules/expo-sqlite/ios"
   EXUpdates:
     :path: "../node_modules/expo-updates/ios"
   EXWebBrowser:
@@ -476,36 +476,36 @@ EXTERNAL SOURCES:
   RNScreens:
     :path: "../node_modules/react-native-screens"
   UMAppLoader:
-    :path: "../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-app-loader/ios"
+    :path: "../node_modules/unimodules-app-loader/ios"
   UMBarCodeScannerInterface:
     :path: "../node_modules/unimodules-barcode-scanner-interface/ios"
   UMCameraInterface:
     :path: "../node_modules/unimodules-camera-interface/ios"
   UMConstantsInterface:
-    :path: "../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-constants-interface/ios"
+    :path: "../node_modules/unimodules-constants-interface/ios"
   UMCore:
     :path: "../node_modules/@unimodules/core/ios"
   UMFaceDetectorInterface:
-    :path: "../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-face-detector-interface/ios"
+    :path: "../node_modules/unimodules-face-detector-interface/ios"
   UMFileSystemInterface:
     :path: "../node_modules/unimodules-file-system-interface/ios"
   UMFontInterface:
     :path: "../node_modules/unimodules-font-interface/ios"
   UMImageLoaderInterface:
-    :path: "../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-image-loader-interface/ios"
+    :path: "../node_modules/unimodules-image-loader-interface/ios"
   UMPermissionsInterface:
     :path: "../node_modules/unimodules-permissions-interface/ios"
   UMReactNativeAdapter:
     :path: "../node_modules/@unimodules/react-native-adapter/ios"
   UMSensorsInterface:
-    :path: "../node_modules/react-native-exposure-notification-service/test-app/node_modules/unimodules-sensors-interface/ios"
+    :path: "../node_modules/unimodules-sensors-interface/ios"
   UMTaskManagerInterface:
     :path: "../node_modules/unimodules-task-manager-interface/ios"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  Alamofire: 814429acc853c6c54ff123fc3d2ef66803823ce0
+  Alamofire: 2c792affbdc2f18016e08fdbcacd60aebe1ba593
   boost-for-react-native: 39c7adb57c4e60d6c5479dd8623128eb5b3f0f2c
   DoubleConversion: cde416483dac037923206447da6e1454df403714
   EXConstants: f486f6b4a36b86e47ab258d4d2b7b2699786fdce
@@ -536,7 +536,7 @@ SPEC CHECKSUMS:
   React-jsi: df07aa95b39c5be3e41199921509bfa929ed2b9d
   React-jsiexecutor: b56c03e61c0dd5f5801255f2160a815f4a53d451
   React-jsinspector: 8e68ffbfe23880d3ee9bafa8be2777f60b25cbe2
-  react-native-exposure-notification-service: 94fd21719cc691e2842be05cc793f29ac90c0231
+  react-native-exposure-notification-service: d44199d6cfdeb21c408f3c25e6cc0466daf69c1c
   React-RCTActionSheet: 53ea72699698b0b47a6421cb1c8b4ab215a774aa
   React-RCTAnimation: 1befece0b5183c22ae01b966f5583f42e69a83c2
   React-RCTBlob: 0b284339cbe4b15705a05e2313a51c6d8b51fa40
@@ -569,4 +569,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 8887fb9ac02d18ee24ee03a25c527177a462d698
 
-COCOAPODS: 1.9.3
+COCOAPODS: 1.10.1

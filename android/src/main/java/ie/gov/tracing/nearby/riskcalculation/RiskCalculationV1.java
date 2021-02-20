@@ -71,12 +71,7 @@ public class RiskCalculationV1 implements RiskCalculation {
         Events.raiseEvent(Events.INFO, "Running v1 risk checks");
         AtomicReference<ExposureEntity> exposureEntity = new AtomicReference<>(null);
 
-        return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                client.getExposureSummary(ensToken),
-                DEFAULT_API_TIMEOUT.toMillis(),
-                TimeUnit.MILLISECONDS,
-                this.context,
-                AppExecutors.getScheduledExecutor()))
+        return FluentFuture.from(client.getExposureSummary(ensToken))
                 .transformAsync((exposureSummary) -> {
                     Events.raiseEvent(Events.INFO, "StatusUpdatedWorker - checking results, simulate: " + simulate);
                     if (simulate) {

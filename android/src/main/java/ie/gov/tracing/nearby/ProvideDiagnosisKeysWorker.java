@@ -187,16 +187,10 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         final String token = generateRandomToken();
         AtomicReference<ExposureConfig> ensConfig = new AtomicReference<>();
 
-        return FluentFuture.from(TaskToFutureAdapter
-                .getFutureWithTimeout(
-                        client.isEnabled(),
-                        DEFAULT_API_TIMEOUT.toMillis(),
-                        TimeUnit.MILLISECONDS,
-                        this.context,
-                        AppExecutors.getScheduledExecutor()))
+        return FluentFuture.from(client.isEnabled())
                 .transformAsync(isEnabled -> {
                           // Only continue if it is enabled.
-                          if (isEnabled != null && isEnabled) {
+                          if (isEnabled) {
                             return fetchExposureConfig(this.context);
                           } else {
                             // Stop here because things aren't enabled. Will still return successful though.

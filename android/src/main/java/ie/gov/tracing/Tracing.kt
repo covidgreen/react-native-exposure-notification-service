@@ -46,6 +46,8 @@ import ie.gov.tracing.common.ApiAvailabilityCheckUtils
 import ie.gov.tracing.common.ApiAvailabilityCheckUtils.isGMS
 import ie.gov.tracing.common.ApiAvailabilityCheckUtils.isHMS
 import ie.gov.tracing.hms.ContactShieldWrapper
+import java.util.*
+import kotlin.concurrent.schedule
 
 object Tracing {
     class Listener: ActivityEventListener {
@@ -151,7 +153,7 @@ object Tracing {
             }
             Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action, $doesSupportENS")
             if (doesSupportENS) {
-                Tracing.setExposureStatus(newStatus, newExposureDisabledReason)
+                Tracing.setExposureStatus(newStatus, newExposureDisabledReason, true)
             }            
         }
     }
@@ -199,7 +201,7 @@ object Tracing {
         var startPromise: Promise? = null
 
         @JvmStatic
-        fun setExposureStatus(status: String, reason: String = "") {
+        fun setExposureStatus(status: String, reason: String = "", scheduleCheck: Boolean = false) {
             var changed = false
             if (exposureStatus != status) {
                 exposureStatus = status
@@ -210,8 +212,26 @@ object Tracing {
                 changed = true
             }
             if (changed) {
-                Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+                if (scheduleCheck) {
+                    Timer("DelayedENSCheck", false).schedule(300) {
+                        Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+                    }
+                } else {
+                    Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+                }
+            }                
+        }
+
+        @JvmStatic
+        fun updateExposureServiceStatus(serviceStatus: Boolean) {
+            Events.raiseEvent(Events.INFO, "ENS Service Status enabled: " + serviceStatus + ", app status: " + exposureStatus)
+            if (!serviceStatus && exposureStatus == EXPOSURE_STATUS_ACTIVE) {
+                stop()
+            } else if ((exposureStatus == EXPOSURE_STATUS_DISABLED) && serviceStatus) {
+                start(null)
+
             }
+            Events.raiseEvent(Events.INFO, "ENS Service Status updated status " + exposureStatus)
         }
 
         private val authorisationCallback: Callback = object : Callback {
@@ -692,7 +712,6 @@ object Tracing {
         private fun scheduleCheckExposure() {
             try {
                 // stop and re-start with config value
-                ProvideDiagnosisKeysWorker.stopScheduler()
                 ProvideDiagnosisKeysWorker.startScheduler()
             } catch (ex: Exception) {
                 Events.raiseError("scheduleCheckExposure", ex)
@@ -777,15 +796,24 @@ object Tracing {
         }
 
         @JvmStatic
-        fun getExposureStatus(promise: Promise? = null): ReadableMap {
+        fun getExposureStatus(promise: Promise? = null): ReadableMap = runBlocking {
             val result: WritableMap = Arguments.createMap()
             val typeData: WritableArray = Arguments.createArray()
+            var enabled = false
+            
+            try {
+                enabled = ExposureNotificationHelper.isEnabled().await()
+            } catch(ex: Exception) {
+                Events.raiseError("Error reading ENS status", ex)
+            }
             val isPaused = SharedPrefs.getBoolean("servicePaused", context)
-            if (doesSupportENS && isPaused) {
+            if (doesSupportENS && isPaused && !enabled) {
                 exposureStatus = EXPOSURE_STATUS_DISABLED
                 exposureDisabledReason = "paused"
+            } else if (doesSupportENS && enabled) {
+                exposureStatus = EXPOSURE_STATUS_ACTIVE
+                exposureDisabledReason = ""
             }
-
             try {
                 if (doesSupportENS && !isBluetoothAvailable()) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
@@ -806,7 +834,7 @@ object Tracing {
                 result.putArray("type", typeData)
                 promise?.resolve(result)
             }
-            return result
+            result
         }
 
         @JvmStatic
@@ -861,8 +889,8 @@ object Tracing {
                     ExposureNotificationStatusCodes.RESOLUTION_REQUIRED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "resolution")
                     ExposureNotificationStatusCodes.SIGN_IN_REQUIRED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "signin_required")
                     ExposureNotificationStatusCodes.FAILED_BLUETOOTH_DISABLED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "bluetooth")
-                    ExposureNotificationStatusCodes.FAILED_REJECTED_OPT_IN -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "rejected")
                     ExposureNotificationStatusCodes.FAILED_NOT_SUPPORTED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "not_supported")
+                    ExposureNotificationStatusCodes.FAILED_REJECTED_OPT_IN -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "rejected")
                     ExposureNotificationStatusCodes.FAILED_SERVICE_DISABLED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "disabled")
                     ExposureNotificationStatusCodes.FAILED_UNAUTHORIZED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "unauthorised")
                     ExposureNotificationStatusCodes.FAILED_DISK_IO -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "disk")

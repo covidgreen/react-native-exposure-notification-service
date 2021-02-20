@@ -64,14 +64,9 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
   }
 
   public ListenableFuture<Void> start() {
-    return  FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-              new NfTask(exposureNotificationClient.isEnabled()),
-              Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
-              TimeUnit.MILLISECONDS,
-              this.context,
-              AppExecutors.getScheduledExecutor()))
+    return  FluentFuture.from(isEnabled())
             .transformAsync(enabled -> {
-              if ((Boolean) enabled) {
+              if (!(Boolean) enabled) {
                 return Futures.immediateVoidFuture();
               }
               Events.raiseEvent(Events.INFO, "starting exposure tracing...");
@@ -86,8 +81,22 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
             }, AppExecutors.getScheduledExecutor());
   }
 
-  public NfTask<Void> stop() {
-    return new NfTask(exposureNotificationClient.stop());
+  public ListenableFuture<Void> stop() {
+    return  FluentFuture.from(isEnabled())
+            .transformAsync(enabled -> {
+              if (!(Boolean) enabled) {
+                return Futures.immediateVoidFuture();
+              }
+              Events.raiseEvent(Events.INFO, "stopping exposure tracing...");
+
+              return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                      new NfTask(exposureNotificationClient.stop()),
+                      Duration.ofSeconds(Config.API_TIMEOUT).toMillis(),
+                      TimeUnit.MILLISECONDS,
+                      this.context,
+                      AppExecutors.getScheduledExecutor()))
+                      .transformAsync(stat -> Futures.immediateVoidFuture(), AppExecutors.getScheduledExecutor());
+            }, AppExecutors.getScheduledExecutor());
   }
 
   public ListenableFuture<Boolean> isEnabled() {

@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 
 import ie.gov.tracing.R;
 import ie.gov.tracing.Tracing;
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
@@ -110,7 +111,7 @@ public class StateUpdatedWorker extends ListenableWorker {
         String configData = SharedPrefs.getString("exposureConfig", this.context);
         if (!configData.isEmpty()) {
             config = gson.fromJson(configData, ExposureConfig.class);
-            inV2Mode = config.getV2Mode();
+            inV2Mode = config.getV2Mode() && ApiAvailabilityCheckUtils.isGMS(this.context);
         }
 
         final String token = getInputData().getString(ExposureNotificationClient.EXTRA_TOKEN);

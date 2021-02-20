@@ -23,6 +23,7 @@ import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
 import ie.gov.tracing.hms.ContactShieldWrapper;
 
 class DiagnosisKeyFileSubmitter {
+  private static final Duration API_TIMEOUT = Duration.ofSeconds(10);
   private final ExposureClientWrapper client;
   private Context context;
 
@@ -44,7 +45,8 @@ class DiagnosisKeyFileSubmitter {
 
     Events.raiseEvent(Events.INFO, "Processing " + files.size() + " export files...");
 
-    if (config.getV2Mode()) {
+    // not supporting V2 in HMS yet
+    if (config.getV2Mode() && ApiAvailabilityCheckUtils.isGMS(this.context)) {
       client.setDiagnosisKeysDataMapping(config);
       return TaskToFutureAdapter.getFutureWithTimeout(
         client.provideDiagnosisKeys(files),

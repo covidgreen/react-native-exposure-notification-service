@@ -203,7 +203,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         state.permissions.exposure.status === PermissionStatus.Allowed
       ) {
         await configure();
-        const latestStatus = state.status;
+        const latestStatus = await ExposureNotification.status();
 
         if (
           !(

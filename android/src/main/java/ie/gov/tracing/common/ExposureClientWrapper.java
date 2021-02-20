@@ -17,9 +17,9 @@ public abstract class ExposureClientWrapper {
   
   private static ExposureClientWrapper INSTANCE;
 
-  public abstract NfTask<Void> start();
+  public abstract ListenableFuture<Void> start();
 
-  public abstract NfTask<Void> stop();
+  public abstract ListenableFuture<Void> stop();
 
   public abstract ListenableFuture<Boolean> isEnabled();
 
