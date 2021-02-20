@@ -109,7 +109,8 @@ const mockConfig = {
   analyticsOptin: true,
   callbackNumber: '0123456789',
   notificationRepeat: 0,
-  certList: 'cert12'
+  certList: 'cert12',
+  hideForeground: true
 };
 
 const ExposureProviderWithMockConfig: React.FC<Partial<
@@ -221,7 +222,8 @@ describe('<ExposureProvider />', () => {
       keyServerType: mockConfig.keyServerType,
       storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
       notificationRepeat: mockConfig.notificationRepeat,
-      certList: mockConfig.certList
+      certList: mockConfig.certList,
+      hideForeground: mockConfig.hideForeground
     });
   });
 
@@ -400,7 +402,8 @@ describe('useExposure', () => {
         keyServerType: mockConfig.keyServerType,
         storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
         notificationRepeat: mockConfig.notificationRepeat,
-        certList: mockConfig.certList
+        certList: mockConfig.certList,
+        hideForeground: mockConfig.hideForeground
       });
     });
 
@@ -687,7 +690,8 @@ describe('useExposure', () => {
         1
       );
       expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledWith(
-        10, 4
+        10,
+        4
       );
     });
   });

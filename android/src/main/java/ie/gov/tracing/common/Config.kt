@@ -39,6 +39,7 @@ object Config {
             SharedPrefs.setString("lastUpdated", ran, Tracing.context)
             SharedPrefs.setLong("notificationRepeat", params.getInt("notificationRepeat").toLong(), Tracing.context)
             SharedPrefs.setString("certList", params.getString("certList")!!, Tracing.context)
+            SharedPrefs.setBoolean("hideForeground", params.getBoolean("hideForeground")!!, Tracing.context)
 
         } catch (ex: Exception) {
             Events.raiseError("Error setting configuration: ", ex)

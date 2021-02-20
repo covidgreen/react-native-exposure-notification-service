@@ -28,6 +28,7 @@ export interface ConfigurationOptions {
   analyticsOptin: boolean;
   notificationRepeat: number;
   certList: string;
+  hideForeground?: boolean;
 }
 
 export interface DiagnosisKey {
