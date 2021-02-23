@@ -6,7 +6,6 @@ import android.content.Intent;
 
 import com.google.android.gms.nearby.exposurenotification.DailySummary;
 import com.google.android.gms.nearby.exposurenotification.ExposureConfiguration;
-import com.google.android.gms.nearby.exposurenotification.ExposureInformation;
 import com.google.android.gms.nearby.exposurenotification.ExposureSummary;
 import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey;
@@ -16,6 +15,8 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import com.huawei.hmf.tasks.Task;
+import com.huawei.hms.api.ConnectionResult;
+import com.huawei.hms.api.HuaweiApiAvailability;
 import com.huawei.hms.contactshield.ContactDetail;
 import com.huawei.hms.contactshield.ContactShield;
 import com.huawei.hms.contactshield.ContactShieldEngine;
@@ -29,11 +30,10 @@ import org.threeten.bp.Duration;
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Config;
 import ie.gov.tracing.common.Events;
@@ -41,10 +41,6 @@ import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.NfTask;
 import ie.gov.tracing.common.TaskToFutureAdapter;
-import ie.gov.tracing.network.Fetcher;
-import ie.gov.tracing.storage.SharedPrefs;
-
-import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEOUT;
 
 public class ContactShieldWrapper  extends ExposureClientWrapper {
     private static final String TAG = "ContactShieldWrapper";
@@ -71,6 +67,20 @@ public class ContactShieldWrapper  extends ExposureClientWrapper {
             }
         }
         return instance;
+    }
+
+    public boolean checkAvailability() throws Exception {
+        int result = HuaweiApiAvailability.getInstance().isHuaweiMobileServicesAvailable(this.context);
+
+        if (result == ConnectionResult.SUCCESS) {
+            return true;
+        } else if (result == ConnectionResult.SERVICE_INVALID || result == ConnectionResult.SERVICE_DISABLED || result == ConnectionResult.SERVICE_MISSING) {
+            Events.raiseEvent(Events.INFO, "HMS Not Available" + result);
+            Tracing.base.setApiError(result);
+            return false;
+        } else {
+            throw new Exception("HMS not available " +result);
+        }
     }
 
     public ListenableFuture<Void> start() {

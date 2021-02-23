@@ -17,6 +17,8 @@ public abstract class ExposureClientWrapper {
   
   private static ExposureClientWrapper INSTANCE;
 
+  public abstract boolean checkAvailability() throws Exception;
+
   public abstract ListenableFuture<Void> start();
 
   public abstract ListenableFuture<Void> stop();

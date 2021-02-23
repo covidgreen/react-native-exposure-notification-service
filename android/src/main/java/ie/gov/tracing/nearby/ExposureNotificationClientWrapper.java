@@ -6,6 +6,8 @@ import android.os.Build;
 
 import androidx.annotation.RequiresApi;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.exposurenotification.DailySummariesConfig;
 import com.google.android.gms.nearby.exposurenotification.DailySummary;
@@ -63,10 +65,25 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
     exposureNotificationClient = Nearby.getExposureNotificationClient(this.context);
   }
 
+  public boolean checkAvailability() throws Exception {
+    int result =  GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this.context);
+
+    if (result == ConnectionResult.SUCCESS) {
+      return true;
+    } else if (result == ConnectionResult.SERVICE_INVALID || result == ConnectionResult.SERVICE_DISABLED || result == ConnectionResult.SERVICE_MISSING) {
+      Events.raiseEvent(Events.INFO, "GMS Not Available" + result);
+      Tracing.base.setApiError(result);
+      return false;
+    } else {
+      throw new Exception("GMS Not available, " + result);
+    }
+  }
+
+
   public ListenableFuture<Void> start() {
     return  FluentFuture.from(isEnabled())
             .transformAsync(enabled -> {
-              if (!(Boolean) enabled) {
+              if (enabled) {
                 return Futures.immediateVoidFuture();
               }
               Events.raiseEvent(Events.INFO, "starting exposure tracing...");
@@ -84,7 +101,7 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
   public ListenableFuture<Void> stop() {
     return  FluentFuture.from(isEnabled())
             .transformAsync(enabled -> {
-              if (!(Boolean) enabled) {
+              if (!enabled) {
                 return Futures.immediateVoidFuture();
               }
               Events.raiseEvent(Events.INFO, "stopping exposure tracing...");
