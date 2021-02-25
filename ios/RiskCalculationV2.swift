@@ -124,7 +124,7 @@ class RiskCalculationV2 {
             var added = false
             for (index, element) in configuration.attenuationDurationThresholds.enumerated() {
                 if scan.typicalAttenuation <= Int(truncating: element) {
-                    data.weightedBuckets[index] += scan.secondsSinceLastScan / 60 * Int(thresholdWeightings[index] / 100.0)
+                    data.weightedBuckets[index] += Int((scan.secondsSinceLastScan / 60) * (thresholdWeightings[index] / 100.0))
                     data.buckets[index] += scan.secondsSinceLastScan / 60
                     added = true
                     break
@@ -132,7 +132,7 @@ class RiskCalculationV2 {
             }
             if (!added) {
                 let index = data.weightedBuckets.count - 1
-                data.weightedBuckets[index] += scan.secondsSinceLastScan / 60 * Int(thresholdWeightings[index] / 100.0)
+                data.weightedBuckets[index] += Int((scan.secondsSinceLastScan / 60) * (thresholdWeightings[index] / 100.0))
                 data.buckets[index] += scan.secondsSinceLastScan / 60
             }
         }
