@@ -216,7 +216,7 @@ public class ExposureNotificationModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void status(Promise promise) {
         if(nearbyNotSupported()) {
-            Tracing.setExposureStatus("unavailable", "apiError: " + apiError, false);
+            Tracing.setExposureStatus("unavailable", "apiError: " + apiError);
         }
         Tracing.getExposureStatus(promise);
     }

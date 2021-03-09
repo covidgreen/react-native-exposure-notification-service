@@ -214,6 +214,19 @@ object Tracing {
             }
         }
 
+        @JvmStatic
+        fun updateExposureServiceStatus(serviceStatus: Boolean) {
+            Events.raiseEvent(Events.INFO, "ENS Service Status enabled: " + serviceStatus + ", app status: " + exposureStatus)
+            if (!serviceStatus && exposureStatus == EXPOSURE_STATUS_ACTIVE) {
+                stop()
+            } else if ((exposureStatus == EXPOSURE_STATUS_DISABLED) && serviceStatus) {
+                start(null)
+
+                Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+            }
+            Events.raiseEvent(Events.INFO, "ENS Service Status updated status " + exposureStatus)
+        }
+
         private val authorisationCallback: Callback = object : Callback {
             override fun onFailure(t: Throwable) {
                 try {
