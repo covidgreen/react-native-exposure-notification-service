@@ -32,7 +32,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import ie.gov.tracing.R;
@@ -93,7 +92,6 @@ public class StateUpdatedWorker extends ListenableWorker {
 
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     @NonNull
     @Override
     public ListenableFuture<Result> startWork() {
@@ -246,6 +244,7 @@ public class StateUpdatedWorker extends ListenableWorker {
                             .putString("action", ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED)
                             .build())
                 .build();
+
         workManager.enqueueUniqueWork("SimulateWorker", ExistingWorkPolicy.REPLACE, workRequest);
     }
 

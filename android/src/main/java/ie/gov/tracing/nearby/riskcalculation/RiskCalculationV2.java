@@ -1,16 +1,8 @@
 package ie.gov.tracing.nearby.riskcalculation;
 
 import android.content.Context;
-import android.os.Build;
-import android.view.Window;
-
-import androidx.annotation.RequiresApi;
-
-import com.google.android.gms.nearby.exposurenotification.CalibrationConfidence;
 import com.google.android.gms.nearby.exposurenotification.DailySummary;
 import com.google.android.gms.nearby.exposurenotification.ExposureWindow;
-import com.google.android.gms.nearby.exposurenotification.Infectiousness;
-import com.google.android.gms.nearby.exposurenotification.ReportType;
 import com.google.android.gms.nearby.exposurenotification.ScanInstance;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
@@ -25,16 +17,12 @@ import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.nearby.ExposureNotificationClientWrapper;
 import ie.gov.tracing.storage.ExposureEntity;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEOUT;
 
@@ -46,7 +34,6 @@ public class RiskCalculationV2 implements RiskCalculation {
             ensConfig = config;
         }
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
     @NotNull
     private ExposureEntity buildSimulatedExposureEntity(int simulateDays) {
 
@@ -54,7 +41,6 @@ public class RiskCalculationV2 implements RiskCalculation {
         today.set(Calendar.HOUR_OF_DAY, 0);
         today.set(Calendar.MINUTE, 0);
         today.set(Calendar.SECOND, 0);
-        long todaySinceEpoch = LocalDate.now().toEpochDay();
         long daysSinceExposure = simulateDays;
         today.add(Calendar.DATE, 0 - new Long(daysSinceExposure).intValue());
 
@@ -69,7 +55,6 @@ public class RiskCalculationV2 implements RiskCalculation {
         return entity;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     private List<WindowData> extractExposureWindows(List<ExposureWindow> windows, Long daysSinceEpoch, ExposureConfig config) {
         List<ExposureWindow> matchWindows = windows;
 
@@ -99,19 +84,20 @@ public class RiskCalculationV2 implements RiskCalculation {
         return windowList;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    private ExposureEntity constructSummaryInfo(DailySummary summary, List<WindowData> windows) {
+        private ExposureEntity constructSummaryInfo(DailySummary summary, List<WindowData> windows) {
         Calendar today = Calendar.getInstance();
         today.set(Calendar.HOUR_OF_DAY, 0);
         today.set(Calendar.MINUTE, 0);
         today.set(Calendar.SECOND, 0);
-        long todaySinceEpoch = LocalDate.now().toEpochDay();
+        Calendar cal1 = Calendar.getInstance(); // now
+        long todaySinceEpoch = TimeUnit.DAYS.convert(cal1.getTimeInMillis(), TimeUnit.MILLISECONDS);
         long daysSinceExposure =  todaySinceEpoch - summary.getDaysSinceEpoch();
         today.add(Calendar.DATE, 0 - new Long(daysSinceExposure).intValue());
 
         List<WindowData> filteredWindows = new ArrayList<>();
         for (int i = 0; i < windows.size(); i++) {
-            long dayVal = Instant.ofEpochMilli(windows.get(i).getDate()).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay();
+            cal1.setTime(new Date(windows.get(i).getDate()));
+            long dayVal = TimeUnit.DAYS.convert(cal1.getTimeInMillis(), TimeUnit.MILLISECONDS);
             if (dayVal == summary.getDaysSinceEpoch()) {
                 filteredWindows.add(windows.get(i));
             }
@@ -132,27 +118,25 @@ public class RiskCalculationV2 implements RiskCalculation {
         return entity;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     private ScanData sumDurations(List<WindowData> windows) {
         ScanData scanData = new ScanData();
 
-        windows.forEach(window -> {
-             for (int i = 0; i < scanData.getWeightedBuckets().length; i++) {
-                 scanData.getBuckets()[i] += window.getScanData().getBuckets()[i];
-                 scanData.getWeightedBuckets()[i] += window.getScanData().getWeightedBuckets()[i];
-             }
-        });
+        for (WindowData window : windows) {
+         for (int i = 0; i < scanData.getWeightedBuckets().length; i++) {
+             scanData.getBuckets()[i] += window.getScanData().getBuckets()[i];
+             scanData.getWeightedBuckets()[i] += window.getScanData().getWeightedBuckets()[i];
+         }
+        }
         scanData.setNumScans(windows.size());
         return scanData;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     private ScanData buildScanData(ExposureConfig config, List<ScanInstance> scanData) {
         ScanData scanItem = new ScanData();
         scanItem.setNumScans(scanData.size());
         double[] thresholdWeightings = new double[]{config.getImmediateDurationWeight(), config.getNearDurationWeight(), config.getMediumDurationWeight(), config.getOtherDurationWeight()};
 
-        scanData.forEach(scan -> {
+        for (ScanInstance scan : scanData) {
             Boolean added = false;
             for (int i = 0; i < config.getAttenuationDurationThresholds().length; i++) {
                 if (scan.getTypicalAttenuationDb() <= config.getAttenuationDurationThresholds()[i]) {
@@ -167,7 +151,7 @@ public class RiskCalculationV2 implements RiskCalculation {
                 scanItem.getWeightedBuckets()[lastBucket] += scan.getSecondsSinceLastScan() / 60 * thresholdWeightings[lastBucket] / 100.0;
                 scanItem.getBuckets()[lastBucket] += scan.getSecondsSinceLastScan() / 60;
             }
-        });
+        }
 
         int totalTime = 0;
         for (int i = 0; i < scanItem.getWeightedBuckets().length; i++) {
@@ -179,7 +163,6 @@ public class RiskCalculationV2 implements RiskCalculation {
         return scanItem;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     private List<WindowData> filterForExceededWindows(List<WindowData> windows) {
 
         List<WindowData> filtered = new ArrayList<>();
@@ -189,14 +172,8 @@ public class RiskCalculationV2 implements RiskCalculation {
                 filtered.add(windows.get(i));
             }
         }
-        filtered.sort((o1, o2) -> {
-            if (o1.getDate() < o2.getDate()) {
-                return 1;
-            } else if (o1.getDate() > o2.getDate()) {
-                return -1;
-            }
-            return 0;
-        });
+
+        Collections.sort(filtered, (obj1, obj2) -> Long.valueOf(obj1.getDate()).compareTo(obj2.getDate()));
 
         return filtered;
     }
@@ -211,16 +188,11 @@ public class RiskCalculationV2 implements RiskCalculation {
         return null;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
     private ExposureEntity buildExposureEntity(List<DailySummary> dailySummaries, List<ExposureWindow> exposureWindows, ExposureConfig config) {
 
-        dailySummaries.sort((o1, o2) -> {
-            if (o1.getDaysSinceEpoch() < o2.getDaysSinceEpoch()) {
-                return 1;
-            } else if (o1.getDaysSinceEpoch() > o2.getDaysSinceEpoch()) {
-                return -1;
-            }
-            return 0;
+        Collections.sort(dailySummaries, (obj1, obj2) -> {
+            // ## Ascending order
+            return Integer.valueOf(obj1.getDaysSinceEpoch()).compareTo(obj2.getDaysSinceEpoch());
         });
 
         List<DailySummary> valid = new ArrayList<>();
@@ -242,7 +214,9 @@ public class RiskCalculationV2 implements RiskCalculation {
         if (config.getContiguousMode()) {
             List<WindowData> exceeded = filterForExceededWindows(windowItems);
             if (exceeded.size() > 0) {
-                long dayVal = Instant.ofEpochMilli(exceeded.get(0).getDate()).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay();
+                Calendar cal1 = Calendar.getInstance();
+                cal1.setTime(new Date(exceeded.get(0).getDate()));
+                long dayVal = TimeUnit.DAYS.convert(cal1.getTimeInMillis(), TimeUnit.MILLISECONDS);
 
                 DailySummary day = findDay(valid, dayVal);
                 if (day != null) {
@@ -260,7 +234,6 @@ public class RiskCalculationV2 implements RiskCalculation {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     public ListenableFuture<ExposureEntity> processKeys(Context context, Boolean simulate, Integer simulateDays) {
 
         return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
