@@ -96,8 +96,7 @@ public class RiskCalculationV2 implements RiskCalculation {
 
         List<WindowData> filteredWindows = new ArrayList<>();
         for (int i = 0; i < windows.size(); i++) {
-            cal1.setTime(new Date(windows.get(i).getDate()));
-            long dayVal = TimeUnit.DAYS.convert(cal1.getTimeInMillis(), TimeUnit.MILLISECONDS);
+            long dayVal = TimeUnit.DAYS.convert(windows.get(i).getDate(), TimeUnit.MILLISECONDS);
             if (dayVal == summary.getDaysSinceEpoch()) {
                 filteredWindows.add(windows.get(i));
             }
@@ -173,7 +172,7 @@ public class RiskCalculationV2 implements RiskCalculation {
             }
         }
 
-        Collections.sort(filtered, (obj1, obj2) -> Long.valueOf(obj1.getDate()).compareTo(obj2.getDate()));
+        Collections.sort(filtered, (obj1, obj2) -> Long.valueOf(obj2.getDate()).compareTo(obj1.getDate()));
 
         return filtered;
     }
@@ -191,8 +190,8 @@ public class RiskCalculationV2 implements RiskCalculation {
     private ExposureEntity buildExposureEntity(List<DailySummary> dailySummaries, List<ExposureWindow> exposureWindows, ExposureConfig config) {
 
         Collections.sort(dailySummaries, (obj1, obj2) -> {
-            // ## Ascending order
-            return Integer.valueOf(obj1.getDaysSinceEpoch()).compareTo(obj2.getDaysSinceEpoch());
+            // ## descending order
+            return Integer.valueOf(obj2.getDaysSinceEpoch()).compareTo(obj1.getDaysSinceEpoch());
         });
 
         List<DailySummary> valid = new ArrayList<>();
@@ -214,9 +213,7 @@ public class RiskCalculationV2 implements RiskCalculation {
         if (config.getContiguousMode()) {
             List<WindowData> exceeded = filterForExceededWindows(windowItems);
             if (exceeded.size() > 0) {
-                Calendar cal1 = Calendar.getInstance();
-                cal1.setTime(new Date(exceeded.get(0).getDate()));
-                long dayVal = TimeUnit.DAYS.convert(cal1.getTimeInMillis(), TimeUnit.MILLISECONDS);
+                long dayVal = TimeUnit.DAYS.convert(new Date(exceeded.get(0).getDate()).getTime(), TimeUnit.MILLISECONDS);
 
                 DailySummary day = findDay(valid, dayVal);
                 if (day != null) {
