@@ -17,23 +17,27 @@ import ie.gov.tracing.common.Events;
 public class ExposureNotificationBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        Tracing.currentContext = context;
-        String action = intent.getAction();
+        try {
+            Tracing.currentContext = context;
+            String action = intent.getAction();
 
-        Log.d("RN_ENService", "onReceive " + action);
-        WorkManager workManager = WorkManager.getInstance(context);
-        String token = intent.getStringExtra(ExposureNotificationClient.EXTRA_TOKEN);
-        if (action.equals(ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED) || action.equals(ExposureNotificationClient.ACTION_EXPOSURE_NOT_FOUND)) {
-            workManager.enqueue(
-                    new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
-                            .setInputData(
-                                    new Data.Builder().putString(ExposureNotificationClient.EXTRA_TOKEN, token)
-                                            .putString("action", action)
-                                            .build())
-                            .build());
-        } else if (action.equals(ExposureNotificationClient.ACTION_SERVICE_STATE_UPDATED)) {
-            Boolean serviceStatus = intent.getBooleanExtra(ExposureNotificationClient.EXTRA_SERVICE_STATE, false);
-            Tracing.updateExposureServiceStatus(serviceStatus);
+            Log.d("RN_ENService", "onReceive " + action);
+            WorkManager workManager = WorkManager.getInstance(context);
+            String token = intent.getStringExtra(ExposureNotificationClient.EXTRA_TOKEN);
+            if (action.equals(ExposureNotificationClient.ACTION_EXPOSURE_STATE_UPDATED) || action.equals(ExposureNotificationClient.ACTION_EXPOSURE_NOT_FOUND)) {
+                workManager.enqueue(
+                        new OneTimeWorkRequest.Builder(StateUpdatedWorker.class)
+                                .setInputData(
+                                        new Data.Builder().putString(ExposureNotificationClient.EXTRA_TOKEN, token)
+                                                .putString("action", action)
+                                                .build())
+                                .build());
+            } else if (action.equals(ExposureNotificationClient.ACTION_SERVICE_STATE_UPDATED)) {
+                Boolean serviceStatus = intent.getBooleanExtra(ExposureNotificationClient.EXTRA_SERVICE_STATE, false);
+                Tracing.updateExposureServiceStatus(serviceStatus);
+            }
+        } catch(Exception e) {
+            Log.d("RN_ENService", "onReceive error" + e.getLocalizedMessage());
         }
     }
 }
