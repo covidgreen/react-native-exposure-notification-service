@@ -63,8 +63,7 @@ public class RiskCalculationV2 implements RiskCalculation {
 
             for (int i = 0; i < windows.size(); i++) {
                 ExposureWindow window = windows.get(i);
-                long millis = window.getDateMillisSinceEpoch();
-                long days = millis / (1000*60*60*24);
+                long days = TimeUnit.DAYS.convert(window.getDateMillisSinceEpoch(), TimeUnit.MILLISECONDS);
                 if (days == daysSinceEpoch) {
                     matchWindows.add(window);
                 }
@@ -196,6 +195,8 @@ public class RiskCalculationV2 implements RiskCalculation {
 
         List<DailySummary> valid = new ArrayList<>();
         for (int i = 0; i < dailySummaries.size(); i++) {
+
+
             if (dailySummaries.get(i).getSummaryData().getMaximumScore() >= config.getMinimumRiskScoreFullRange()) {
                 valid.add(dailySummaries.get(i));
             }
