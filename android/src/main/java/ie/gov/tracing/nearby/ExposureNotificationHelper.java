@@ -55,7 +55,7 @@ public class ExposureNotificationHelper implements LifecycleObserver {
             public void onFailure(@NotNull Throwable t) {
                 callback.onFailure(t);
             }
-        }, MoreExecutors.directExecutor());
+        }, AppExecutors.getLightweightExecutor());
   }
 
   public void stopExposure() {
@@ -83,7 +83,7 @@ public class ExposureNotificationHelper implements LifecycleObserver {
                 callback.onFailure(t);
               }
 
-            }, MoreExecutors.directExecutor());
+            }, AppExecutors.getLightweightExecutor());
   }
 
   public static ListenableFuture<Boolean> isEnabled() {
