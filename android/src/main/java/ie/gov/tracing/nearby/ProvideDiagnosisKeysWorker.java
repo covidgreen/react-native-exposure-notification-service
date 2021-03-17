@@ -139,7 +139,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
       try {
         Tracing.currentContext = this.context;
-        Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork foreground: " + !hideForeground);
         SharedPrefs.remove("lastApiError", this.context);
         SharedPrefs.remove("lastError", this.context);
         final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);
@@ -183,6 +182,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                           // Only continue if it is enabled.
                           if (isEnabled != null && isEnabled) {
                             boolean hideForeground = SharedPrefs.getBoolean("hideForeground", this.context);
+                            Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork foreground: " + !hideForeground);
                             try {
                               if (!hideForeground) {
                                 setForegroundAsync(createForegroundInfo()).get();
