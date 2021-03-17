@@ -113,23 +113,27 @@ object Tracing {
     class BleStatusReceiver : BroadcastReceiver() {
 
         override fun onReceive(context: Context, intent: Intent) {
-            var newExposureDisabledReason = Tracing.exposureDisabledReason
-            var newStatus = Tracing.exposureStatus
-            if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
-                if (isBluetoothAvailable()) {
-                    if (newExposureDisabledReason == "bluetooth") {
-                        newExposureDisabledReason = ""
-                        newStatus = Tracing.EXPOSURE_STATUS_ACTIVE
+            try {
+                var newExposureDisabledReason = Tracing.exposureDisabledReason
+                var newStatus = Tracing.exposureStatus
+                if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
+                    if (isBluetoothAvailable()) {
+                        if (newExposureDisabledReason == "bluetooth") {
+                            newExposureDisabledReason = ""
+                            newStatus = Tracing.EXPOSURE_STATUS_ACTIVE
+                        }
+                    } else {
+                        newExposureDisabledReason = "bluetooth"
+                        newStatus = Tracing.EXPOSURE_STATUS_DISABLED
                     }
-                } else {
-                    newExposureDisabledReason = "bluetooth"
-                    newStatus = Tracing.EXPOSURE_STATUS_DISABLED
                 }
+                Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action, $doesSupportENS")
+                if (doesSupportENS) {
+                    Tracing.setExposureStatus(newStatus, newExposureDisabledReason, true)
+                }
+            } catch (ex: Exception) {
+                Events.raiseError("Failure on bluetooth broadcast", ex)
             }
-            Events.raiseEvent(Events.INFO, "bleStatusUpdate - $intent.action, $doesSupportENS")
-            if (doesSupportENS) {
-                Tracing.setExposureStatus(newStatus, newExposureDisabledReason, true)
-            }            
         }
     }
 

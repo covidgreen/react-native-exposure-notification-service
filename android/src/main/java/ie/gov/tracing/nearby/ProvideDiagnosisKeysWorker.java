@@ -137,15 +137,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         return Futures.immediateFuture(Result.success());
       }
 
-      boolean hideForeground = SharedPrefs.getBoolean("hideForeground", this.context);
-      try {
-        if (!hideForeground) {
-          setForegroundAsync(createForegroundInfo()).get();
-        }
-      }
-      catch(Exception ex) {
-          Events.raiseError("ProvideDiagnosisKeysWorker - startWork-foreground", ex);
-      }
       try {
         Tracing.currentContext = this.context;
         Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork foreground: " + !hideForeground);
@@ -191,6 +182,15 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                 .transformAsync(isEnabled -> {
                           // Only continue if it is enabled.
                           if (isEnabled != null && isEnabled) {
+                            boolean hideForeground = SharedPrefs.getBoolean("hideForeground", this.context);
+                            try {
+                              if (!hideForeground) {
+                                setForegroundAsync(createForegroundInfo()).get();
+                              }
+                            }
+                            catch(Exception ex) {
+                                Events.raiseError("ProvideDiagnosisKeysWorker - startWork-foreground", ex);
+                            }                            
                             return ExposureNotificationClientWrapper.get(this.context).fetchExposureConfig(this.context);
                           } else {
                             // Stop here because things aren't enabled. Will still return successful though.
@@ -210,7 +210,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                 .transformAsync(done -> repository.upsertTokenEntityAsync(TokenEntity.create(token, false)),
                         AppExecutors.getBackgroundExecutor())
                 .transform(done -> processSuccess(), // all done, do tidy ups here
-                        AppExecutors.getLightweightExecutor())
+                        AppExecutors.getBackgroundExecutor())
                 .catching(NotEnabledException.class,
                         ex -> {
                           SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
