@@ -189,7 +189,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                               }
                             }
                             catch(Exception ex) {
-                                Events.raiseError("ProvideDiagnosisKeysWorker - startWork-foreground", ex);
+                                // ignore if fails to create foreground worker
                             }                            
                             return ExposureNotificationClientWrapper.get(this.context).fetchExposureConfig(this.context);
                           } else {

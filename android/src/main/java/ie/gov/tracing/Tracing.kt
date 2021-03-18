@@ -181,6 +181,7 @@ object Tracing {
 
         @JvmStatic
         fun setExposureStatus(status: String, reason: String = "", scheduleCheck: Boolean = false) {
+            Events.raiseEvent(Events.INFO, "Setting status $status, $reason")
             var changed = false
             if (exposureStatus != status) {
                 exposureStatus = status
@@ -601,8 +602,8 @@ object Tracing {
 
         @JvmStatic
         fun isSupported(promise: Promise?) = runBlocking<Unit> {
-            Events.raiseEvent(Events.INFO, "isSupported - Checking if ENS supported")
             launch {
+                Events.raiseEvent(Events.INFO, "isSupported - Checking if ENS supported")
 
                 try {
                     val apiResult = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
@@ -614,17 +615,17 @@ object Tracing {
                         hasCheckedENS = true
                         promise?.resolve(true)
                     } else if (apiResult == ConnectionResult.SERVICE_INVALID || apiResult == ConnectionResult.SERVICE_DISABLED || apiResult == ConnectionResult.SERVICE_MISSING) {
-                        promise?.resolve(false)
                         doesSupportENS = false
                         hasCheckedENS = true
                         base.setApiError(apiResult)
+                        promise?.resolve(false)
                     }
                 } catch (ex: Exception) {
                     Events.raiseError("isSupported - Exception", ex)
-                    promise?.resolve(false)
                     doesSupportENS = false
                     hasCheckedENS = true
-                    base.setApiError(1)
+                    // base.setApiError(1)
+                    promise?.resolve(false)
                 }
             }
         }
@@ -779,41 +780,46 @@ object Tracing {
         @JvmStatic
         fun getExposureStatus(promise: Promise? = null): ReadableMap = runBlocking {
             val result: WritableMap = Arguments.createMap()
-            val typeData: WritableArray = Arguments.createArray()
-            var enabled = false
             
-            try {
-                enabled = ExposureNotificationHelper.isEnabled().await()
-            } catch(ex: Exception) {
-                Events.raiseError("Error reading ENS status", ex)
-            }
-            val isPaused = SharedPrefs.getBoolean("servicePaused", context)
-            if (doesSupportENS && isPaused && !enabled) {
-                exposureStatus = EXPOSURE_STATUS_DISABLED
-                exposureDisabledReason = "paused"
-            } else if (doesSupportENS && enabled) {
-                exposureStatus = EXPOSURE_STATUS_ACTIVE
-                exposureDisabledReason = ""
-            }
-            try {
-                if (doesSupportENS && !isBluetoothAvailable()) {
+            Events.raiseEvent(Events.INFO, "Retrieving current status")
+            launch {
+                
+                val typeData: WritableArray = Arguments.createArray()
+                var enabled = false
+
+                try {
+                    enabled = ExposureNotificationHelper.isEnabled().await()
+                } catch (ex: Exception) {
+                    Events.raiseError("Error reading ENS status", ex)
+                }
+                val isPaused = SharedPrefs.getBoolean("servicePaused", context)
+                if (doesSupportENS && isPaused && !enabled) {
                     exposureStatus = EXPOSURE_STATUS_DISABLED
-                    exposureDisabledReason = "bluetooth"
-                } else if (doesSupportENS && exposureDisabledReason == "bluetooth") {
+                    exposureDisabledReason = "paused"
+                } else if (doesSupportENS && enabled) {
                     exposureStatus = EXPOSURE_STATUS_ACTIVE
                     exposureDisabledReason = ""
                 }
+                try {
+                    if (doesSupportENS && !isBluetoothAvailable()) {
+                        exposureStatus = EXPOSURE_STATUS_DISABLED
+                        exposureDisabledReason = "bluetooth"
+                    } else if (doesSupportENS && exposureDisabledReason == "bluetooth") {
+                        exposureStatus = EXPOSURE_STATUS_ACTIVE
+                        exposureDisabledReason = ""
+                    }
 
-                result.putString("state", exposureStatus)
-                typeData.pushString(exposureDisabledReason)
-                result.putArray("type", typeData)
-                promise?.resolve(result)
-            } catch (ex: Exception) {
-                Events.raiseError("getExposureStatus", ex)
-                result.putString("state", EXPOSURE_STATUS_UNKNOWN)
-                typeData.pushString("error")
-                result.putArray("type", typeData)
-                promise?.resolve(result)
+                    result.putString("state", exposureStatus)
+                    typeData.pushString(exposureDisabledReason)
+                    result.putArray("type", typeData)
+                    promise?.resolve(result)
+                } catch (ex: Exception) {
+                    Events.raiseError("getExposureStatus", ex)
+                    result.putString("state", EXPOSURE_STATUS_UNKNOWN)
+                    typeData.pushString("error")
+                    result.putArray("type", typeData)
+                    promise?.resolve(result)
+                }
             }
             result
         }
