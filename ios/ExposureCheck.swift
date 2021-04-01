@@ -16,6 +16,9 @@ class ExposureCheck: AsyncOperation {
         case callback
         case settings
         case refresh
+        case verify
+        case certificate
+        case publish
     }
   
     public struct Thresholds {
@@ -60,6 +63,8 @@ class ExposureCheck: AsyncOperation {
         let attenuationDurationThresholds: [Int]?
         let v2Mode: Bool?
         let contiguousMode: Bool?
+        let chaffEnabled: Bool?
+        let chaffWindow: Int?
     }
   
     private struct CodableExposureFiles: Codable {
@@ -98,6 +103,17 @@ class ExposureCheck: AsyncOperation {
           return self.configData.serverURL + "/settings/exposures"
         case .refresh:
           return self.configData.serverURL + "/refresh"
+        case .verify:
+          return self.configData.serverURL + "/verify"
+        case .certificate:
+          return self.configData.serverURL + "/certificate"
+        case .publish:
+          switch self.configData.keyServerType {
+          case .GoogleRefServer:
+              return self.configData.keyServerUrl + "/publish"
+          default:
+              return self.configData.serverURL + "/exposures"
+          }
       }
     }
   
@@ -107,15 +123,17 @@ class ExposureCheck: AsyncOperation {
     private var skipTimeCheck: Bool = false
     private var simulateExposureOnly: Bool = false
     private var simulateExposureDays: Int = 2
+    private var triggerChaffRequest: Bool = false
     private let storageContext = Storage.PersistentContainer.shared.newBackgroundContext()
     private var sessionManager: Session!
     
-    init(_ skipTimeCheck: Bool, _ simulateExposureOnly: Bool, _ simulateDays: Int) {
+    init(_ skipTimeCheck: Bool, _ simulateExposureOnly: Bool, _ simulateDays: Int, _ triggerChaffRequest: Bool) {
         super.init()
     
         self.skipTimeCheck = skipTimeCheck
         self.simulateExposureOnly = simulateExposureOnly
         self.simulateExposureDays = simulateDays
+        self.triggerChaffRequest = triggerChaffRequest
     }
     
     override func cancel() {
@@ -161,22 +179,146 @@ class ExposureCheck: AsyncOperation {
        // clean out any expired exposures
        Storage.shared.deleteOldExposures(self.configData.storeExposuresFor)
         
-       if (self.simulateExposureOnly) {
-           os_log("Simulating exposure alert", log: OSLog.exposure, type: .debug)
-           simulateExposureEvent(self.simulateExposureDays)
-           return
-       }
-        
        os_log("Starting exposure checking", log: OSLog.exposure, type: .debug)
-
        self.getExposureConfiguration { result in
             switch result {
               case let .failure(error):
                  self.finishNoProcessing("Failed to retrieve settings, \(error.localizedDescription)")
               case let .success((configuration, thresholds, v2Mode)):
-                self.processExposureFiles(configuration, thresholds, v2Mode)
+                if (self.simulateExposureOnly) {
+                    os_log("Simulating exposure alert", log: OSLog.exposure, type: .debug)
+                    self.simulateExposureEvent(self.simulateExposureDays)
+                } else {
+                    self.processExposureFiles(configuration, thresholds, v2Mode)
+                }
             }
        }
+    }
+    
+    private func checkChaff() {
+        if (self.configData.nextChaffDate == nil) {
+            os_log("Chaff request date not set", log: OSLog.exposure, type: .debug)
+            self.configData.nextChaffDate = self.calculateChaffDate()
+            Storage.shared.updateNextChaffDate(self.storageContext, date: self.configData.nextChaffDate)
+        }
+        
+        if self.configData.chaffEnabled && (self.configData.nextChaffDate > Date() || self.triggerChaffRequest) {
+             generateChaffRequest { _ in
+                 //set next schedule for chaff request
+                 self.configData.nextChaffDate = self.calculateChaffDate()
+                 Storage.shared.updateNextChaffDate(self.storageContext, date: self.configData.nextChaffDate)
+                
+                self.finish()
+             }
+        } else {
+            self.finish()
+        }
+    }
+    
+    private func generateChaffRequest(completion: @escaping  (Result<Bool, Error>) -> Void) {
+
+        self.chaffVerify { result in
+             switch result {
+             case .failure:
+                 completion(.success(true))
+               case .success:
+                if self.configData.keyServerType == .GoogleRefServer {
+                    self.chaffCertificate { result in
+                        switch result {
+                        case .failure:
+                            completion(.success(true))
+                        case .success:
+                            self.chaffPublish(completion: completion)
+                        }
+                    }
+                } else {
+                    self.chaffPublish(completion: completion)
+                }
+             }
+        }
+    }
+    
+    private func generateRandomPadding(_ len:Int? = nil) -> String {
+        var randomLength = Int.random(in: 50..<200)
+        if (len != nil) {
+            randomLength = len!
+        }
+        let letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        let randomString = String((0..<randomLength).map{ _ in letters.randomElement()! })
+        
+        return Data(randomString.utf8).base64EncodedString()
+    }
+    
+    private func chaffVerify(completion: @escaping (Result<Bool, Error>) -> Void) {
+        self.sessionManager.request(self.serverURL(.verify), method: .post, parameters: ["code": "123456", "padding": self.generateRandomPadding()], encoding: JSONEncoding.default, headers: ["X-Chaff": "chaff"])
+          .validate()
+          .response() { response in
+            switch response.result {
+            case .success:
+              os_log("Chaff verify request succeeded", log: OSLog.checkExposure, type: .debug)
+              completion(.success(true))
+            case let .failure(error):
+              os_log("Chaff verify request failed, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+              completion(.failure(error))
+          }
+        }
+    }
+    
+    private func chaffCertificate(completion: @escaping (Result<Bool, Error>) -> Void) {
+        self.sessionManager.request(self.serverURL(.certificate), method: .post, parameters: ["token": self.generateRandomPadding(50), "ekeyhmac": self.generateRandomPadding(44), "padding": self.generateRandomPadding()], encoding: JSONEncoding.default, headers: ["X-Chaff": "chaff"])
+          .validate()
+          .response() { response in
+            switch response.result {
+            case .success:
+              os_log("Chaff certificate request succeeded", log: OSLog.checkExposure, type: .debug)
+              completion(.success(true))
+            case let .failure(error):
+              os_log("Chaff cerificate request failed, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+              completion(.failure(error))
+          }
+        }
+    }
+
+    private func chaffPublish(completion: @escaping (Result<Bool, Error>) -> Void) {
+        var postParams: [String: Any] = [:]
+        
+        postParams["token"] = self.generateRandomPadding(16)
+        postParams["platform"] = "ios"
+        postParams["deviceVerificationPayload"] = self.generateRandomPadding(128)
+        postParams["exposures"] = String(describing: 0..<14).compactMap { _ -> [String: Any]? in
+            return [
+              "keyData": self.generateRandomPadding(16),
+              "rollingPeriod": 144,
+              "rollingStartNumber": 1234567,
+              "transmissionRiskLevel": 1
+            ]
+        }
+        postParams["padding"] = self.generateRandomPadding()
+        
+        self.sessionManager.request(self.serverURL(.publish), method: .post, parameters: postParams, encoding: JSONEncoding.default, headers: ["X-Chaff": "chaff"])
+          .validate()
+          .response() { response in
+            switch response.result {
+            case .success:
+              os_log("Chaff publish request succeeded", log: OSLog.checkExposure, type: .debug)
+              completion(.success(true))
+            case let .failure(error):
+              os_log("Chaff publish request failed, %@", log: OSLog.checkExposure, type: .error, error.localizedDescription)
+              completion(.failure(error))
+          }
+        }
+    }
+    
+    private func calculateChaffDate() -> Date {
+        let randomOffset = Int.random(in: 1..<self.configData.chaffWindow)
+        let calendar = Calendar.current
+        let dateToday = calendar.startOfDay(for: Date())
+        let chaffDate = calendar.date(byAdding: .day, value: randomOffset, to: dateToday)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        os_log("Calculated next chaff request date %@", log: OSLog.exposure, type: .debug, formatter.string(from: chaffDate!))
+        
+        return chaffDate!
     }
     
     private func processExposureFiles(_ configuration: ENExposureConfiguration, _ thresholds: Thresholds, _ v2Mode: Bool) {
@@ -339,10 +481,10 @@ class ExposureCheck: AsyncOperation {
       if (!self.isCancelled && !calendar.isDate(Date(), inSameDayAs: checkDate)) {
          Storage.shared.updateDailyTrace(self.storageContext, date: Date())
          self.saveMetric(event: "DAILY_ACTIVE_TRACE") { _ in
-           self.finish()
+            self.checkChaff()
          }
       } else {
-        self.finish()
+         self.checkChaff()
       }
       
     }
@@ -368,7 +510,7 @@ class ExposureCheck: AsyncOperation {
       let lastId = self.configData.lastExposureIndex ?? 0
       let version = Storage.shared.version()["display"] ?? "unknown"
       os_log("Checking for exposures against nearform server since %d, limit %d", log: OSLog.checkExposure, type: .debug, lastId, numFiles)
-        self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": numFiles, "version": version, "os": "ios"])
+      self.sessionManager.request(self.serverURL(.exposures), parameters: ["since": lastId, "limit": numFiles, "version": version, "os": "ios"])
       .validate()
       .responseDecodable(of: [CodableExposureFiles].self) { response in
         switch response.result {
@@ -616,7 +758,7 @@ class ExposureCheck: AsyncOperation {
         return self.cancelProcessing()
       }
       let version = Storage.shared.version()["display"] ?? "unknown"
-        self.sessionManager.request(self.serverURL(.settings), parameters: ["version": version, "os": "ios"])
+      self.sessionManager.request(self.serverURL(.settings), parameters: ["version": version, "os": "ios"])
           .validate()
           .responseDecodable(of: CodableSettings.self) { response in
           
@@ -672,6 +814,8 @@ class ExposureCheck: AsyncOperation {
                     exposureConfiguration.reportTypeNoneMap = ENDiagnosisReportType(rawValue:  codableExposureConfiguration.reportTypeNoneMap ?? ENDiagnosisReportType.confirmedTest.rawValue) ?? ENDiagnosisReportType.confirmedTest
  
                 }
+                self.configData.chaffEnabled = codableExposureConfiguration.chaffEnabled ?? false
+                self.configData.chaffWindow = codableExposureConfiguration.chaffWindow ?? 6
                 
                 completion(.success((exposureConfiguration, thresholds, v2Mode)))
               } catch {
@@ -772,7 +916,7 @@ class ExposureCheck: AsyncOperation {
       }
            
       let version = Storage.shared.version()["display"] ?? "unknown"
-        self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload, "version": version, "os": "ios"], encoding: JSONEncoding.default)
+      self.sessionManager.request(self.serverURL(.callback), method: .post , parameters: ["mobile": callbackNum, "closeContactDate": Int64(lastExposure.timeIntervalSince1970 * 1000.0), "daysSinceExposure": daysSinceExposure, "payload": payload, "version": version, "os": "ios"], encoding: JSONEncoding.default)
         .validate()
         .response() { response in
           switch response.result {

@@ -29,6 +29,9 @@ public class Storage {
         var lastKeyChainGetError: Int32?
         var lastUpdated: Date?
         var stopped: Bool!
+        var nextChaffDate: Date!
+        var chaffWindow: Int!
+        var chaffEnabled: Bool!
     }
     
     private struct CodableCallback: Decodable {
@@ -116,7 +119,8 @@ public class Storage {
               lastKeyChainSetError: data[0].value(forKey: "lastKeyError") as? Int32 ?? 0,
               lastKeyChainGetError: lastKeyChainError,
               lastUpdated: data[0].value(forKey: "lastUpdated") as? Date,
-              stopped: data[0].value(forKey: "serviceStopped") as? Bool ?? false
+              stopped: data[0].value(forKey: "serviceStopped") as? Bool ?? false,
+              nextChaffDate: data[0].value(forKey: "nextChaff") as? Date
             )
          }
        } catch  {
@@ -185,6 +189,26 @@ public class Storage {
       os_log("Daily Trace settings stored", log: OSLog.storage, type: .debug)
     }
 
+    public func updateNextChaffDate(_ context: NSManagedObjectContext, date: Date) {
+      let fetchRequest =
+      NSFetchRequest<NSManagedObject>(entityName: "Settings")
+
+      do {
+          let settingsResult = try context.fetch(fetchRequest)
+
+          if settingsResult.count > 0 {
+            let managedObject = settingsResult[0]
+            managedObject.setValue(date, forKey: "nextChaff")
+            try context.save()
+          } else {
+              os_log("No settings have been stored, can't update", log: OSLog.storage, type: .debug)
+          }
+      } catch {
+        os_log("Could not update next chaff date. %@", log: OSLog.storage, type: .error, error.localizedDescription)
+      }
+      os_log("Next Chaff date setting stored", log: OSLog.storage, type: .debug)
+    }
+    
     public func updateAuthToken(_ token:String) {
         let context = PersistentContainer.shared.newBackgroundContext()
 
