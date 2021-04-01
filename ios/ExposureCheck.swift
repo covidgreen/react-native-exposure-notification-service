@@ -222,17 +222,21 @@ class ExposureCheck: AsyncOperation {
              case .failure:
                  completion(.success(true))
                case .success:
-                if self.configData.keyServerType == .GoogleRefServer {
-                    self.chaffCertificate { result in
-                        switch result {
-                        case .failure:
-                            completion(.success(true))
-                        case .success:
-                            self.chaffPublish(completion: completion)
+                //simulate a delay as a real user would be going through the UI approval steps
+                let delay = Int.random(in: 3..<20)
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(delay)) {
+                    if self.configData.keyServerType == .GoogleRefServer {
+                        self.chaffCertificate { result in
+                            switch result {
+                            case .failure:
+                                completion(.success(true))
+                            case .success:
+                                self.chaffPublish(completion: completion)
+                            }
                         }
+                    } else {
+                        self.chaffPublish(completion: completion)
                     }
-                } else {
-                    self.chaffPublish(completion: completion)
                 }
              }
         }
