@@ -104,7 +104,12 @@ class ExposureCheck: AsyncOperation {
         case .refresh:
           return self.configData.serverURL + "/refresh"
         case .verify:
-          return self.configData.serverURL + "/verify"
+            switch self.configData.keyServerType {
+            case .GoogleRefServer:
+                return self.configData.keyServerUrl + "/verify"
+            default:
+                return self.configData.serverURL + "/exposures/verify"
+            }
         case .certificate:
           return self.configData.serverURL + "/certificate"
         case .publish:
@@ -247,14 +252,22 @@ class ExposureCheck: AsyncOperation {
         if (len != nil) {
             randomLength = len!
         }
-        let letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        let letters = "abcdefghijklmnopqrstuvwxyz0123456789"
         let randomString = String((0..<randomLength).map{ _ in letters.randomElement()! })
         
         return Data(randomString.utf8).base64EncodedString()
     }
     
     private func chaffVerify(completion: @escaping (Result<Bool, Error>) -> Void) {
-        self.sessionManager.request(self.serverURL(.verify), method: .post, parameters: ["code": "123456", "padding": self.generateRandomPadding()], encoding: JSONEncoding.default, headers: ["X-Chaff": "chaff"])
+        var postParams: [String: Any] = [:]
+        
+        if self.configData.keyServerType == .NearForm {
+            postParams["hash"] = self.generateRandomPadding(256)
+        } else {
+            postParams["code"] = self.generateRandomPadding(6)
+        }
+        postParams["padding"] = self.generateRandomPadding()
+        self.sessionManager.request(self.serverURL(.verify), method: .post, parameters: postParams, encoding: JSONEncoding.default, headers: ["X-Chaff": "chaff"])
           .validate()
           .response() { response in
             switch response.result {
@@ -286,19 +299,37 @@ class ExposureCheck: AsyncOperation {
     private func chaffPublish(completion: @escaping (Result<Bool, Error>) -> Void) {
         var postParams: [String: Any] = [:]
         
-        postParams["token"] = self.generateRandomPadding(16)
-        postParams["platform"] = "ios"
-        postParams["deviceVerificationPayload"] = self.generateRandomPadding(128)
-        postParams["exposures"] = String(describing: 0..<14).compactMap { _ -> [String: Any]? in
-            return [
-              "keyData": self.generateRandomPadding(16),
-              "rollingPeriod": 144,
-              "rollingStartNumber": 1234567,
-              "transmissionRiskLevel": 1
-            ]
+        if self.configData.keyServerType == .NearForm {
+            postParams["token"] = self.generateRandomPadding(16)
+            postParams["platform"] = "ios"
+            postParams["deviceVerificationPayload"] = self.generateRandomPadding(128)
+            postParams["exposures"] = String(describing: 0..<14).compactMap { _ -> [String: Any]? in
+                return [
+                  "keyData": self.generateRandomPadding(16),
+                  "rollingPeriod": 144,
+                  "rollingStartNumber": 1234567,
+                  "transmissionRiskLevel": 1
+                ]
+            }
+            postParams["padding"] = self.generateRandomPadding()
+        } else {
+            postParams["hmacKey"] = self.generateRandomPadding(16)
+            postParams["healthAuthorityID"] = "my.health.id"
+            postParams["verificationPayload"] = self.generateRandomPadding(128)
+            postParams["symptomOnsetInterval"] = 1234567
+            postParams["revisionToken"] = ""
+            postParams["traveler"] = false
+            postParams["temporaryExposureKeys"] = String(describing: 0..<14).compactMap { _ -> [String: Any]? in
+                return [
+                  "key": self.generateRandomPadding(16),
+                  "rollingPeriod": 144,
+                  "rollingStartNumber": 1234567,
+                  "transmissionRisk": 1
+                ]
+            }
+            postParams["padding"] = self.generateRandomPadding()
+
         }
-        postParams["padding"] = self.generateRandomPadding()
-        
         self.sessionManager.request(self.serverURL(.publish), method: .post, parameters: postParams, encoding: JSONEncoding.default, headers: ["X-Chaff": "chaff"])
           .validate()
           .response() { response in
@@ -1029,7 +1060,7 @@ class RequestInterceptor: Alamofire.RequestInterceptor {
         .authorization(bearerToken: self.config.refreshToken)
       ]
   
-      AF.request(self.refreshURL, method: .post, headers: headers)
+        AF.request(self.refreshURL, method: .post, parameters: ["version": Storage.shared.version()["display"] ?? "unknown", "os": "ios"], headers: headers)
         .validate()
         .responseDecodable(of: CodableToken.self) { response in
         switch response.result {
