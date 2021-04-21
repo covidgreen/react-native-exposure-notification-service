@@ -106,7 +106,7 @@ class ExposureCheck: AsyncOperation {
         case .verify:
             switch self.configData.keyServerType {
             case .GoogleRefServer:
-                return self.configData.keyServerUrl + "/verify"
+                return self.configData.serverURL + "/verify"
             default:
                 return self.configData.serverURL + "/exposures/verify"
             }
@@ -115,13 +115,33 @@ class ExposureCheck: AsyncOperation {
         case .publish:
           switch self.configData.keyServerType {
           case .GoogleRefServer:
-              return self.configData.keyServerUrl + "/publish"
+            return self.publishServerUrl() + "/publish"
           default:
               return self.configData.serverURL + "/exposures"
           }
       }
     }
   
+    private func publishServerDomain() -> String {
+        if self.configData.publishServerUrl != "" {
+            return Storage.getDomain(self.configData.publishServerUrl)
+        }
+        let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
+        
+        var parts = keyServerDomain.split(separator: ".")
+        parts.remove(at: 0)
+        
+        return parts.joined(separator: ".")
+    }
+
+    private func publishServerUrl() -> String {
+        if self.configData.publishServerUrl != "" {
+            return self.configData.publishServerUrl
+        }
+                
+        return "https://" + self.publishServerDomain() + "/v1"
+    }
+    
     private let defaultSession = URLSession(configuration: .default)
     private var dataTask: URLSessionDataTask?
     private var configData: Storage.Config!
@@ -154,9 +174,10 @@ class ExposureCheck: AsyncOperation {
  
        let serverDomain: String = Storage.getDomain(self.configData.serverURL)
        let keyServerDomain: String = Storage.getDomain(self.configData.keyServerUrl)
+        let publishServerDomain: String = self.publishServerDomain()
        var manager: ServerTrustManager
        if (self.configData.keyServerType != Storage.KeyServerType.NearForm && serverDomain != keyServerDomain) {
-          manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator(), keyServerDomain: DefaultTrustEvaluator()])
+          manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator(), keyServerDomain: DefaultTrustEvaluator(), publishServerDomain: DefaultTrustEvaluator()])
        } else {
           manager = ServerTrustManager(evaluators: [serverDomain: PinnedCertificatesTrustEvaluator()])
        }
@@ -207,7 +228,7 @@ class ExposureCheck: AsyncOperation {
             Storage.shared.updateNextChaffDate(self.storageContext, date: self.configData.nextChaffDate)
         }
         
-        if self.configData.chaffEnabled && (self.configData.nextChaffDate > Date() || self.triggerChaffRequest) {
+        if (self.configData.chaffEnabled && self.configData.nextChaffDate > Date()) || self.triggerChaffRequest {
              generateChaffRequest { _ in
                  //set next schedule for chaff request
                  self.configData.nextChaffDate = self.calculateChaffDate()
@@ -221,7 +242,10 @@ class ExposureCheck: AsyncOperation {
     }
     
     private func generateChaffRequest(completion: @escaping  (Result<Bool, Error>) -> Void) {
-
+        guard !self.isCancelled else {
+          return self.cancelProcessing()
+        }
+        
         self.chaffVerify { result in
              switch result {
              case .failure:
@@ -255,16 +279,20 @@ class ExposureCheck: AsyncOperation {
         let letters = "abcdefghijklmnopqrstuvwxyz0123456789"
         let randomString = String((0..<randomLength).map{ _ in letters.randomElement()! })
         
-        return Data(randomString.utf8).base64EncodedString()
+        return randomString
     }
     
     private func chaffVerify(completion: @escaping (Result<Bool, Error>) -> Void) {
+        guard !self.isCancelled else {
+          return self.cancelProcessing()
+        }
+        
         var postParams: [String: Any] = [:]
         
         if self.configData.keyServerType == .NearForm {
             postParams["hash"] = self.generateRandomPadding(256)
         } else {
-            postParams["code"] = self.generateRandomPadding(6)
+            postParams["code"] = self.generateRandomPadding(8)
         }
         postParams["padding"] = self.generateRandomPadding()
         self.sessionManager.request(self.serverURL(.verify), method: .post, parameters: postParams, encoding: JSONEncoding.default, headers: ["X-Chaff": "chaff"])
@@ -282,6 +310,10 @@ class ExposureCheck: AsyncOperation {
     }
     
     private func chaffCertificate(completion: @escaping (Result<Bool, Error>) -> Void) {
+        guard !self.isCancelled else {
+          return self.cancelProcessing()
+        }
+        
         self.sessionManager.request(self.serverURL(.certificate), method: .post, parameters: ["token": self.generateRandomPadding(50), "ekeyhmac": self.generateRandomPadding(44), "padding": self.generateRandomPadding()], encoding: JSONEncoding.default, headers: ["X-Chaff": "chaff"])
           .validate()
           .response() { response in
@@ -297,6 +329,10 @@ class ExposureCheck: AsyncOperation {
     }
 
     private func chaffPublish(completion: @escaping (Result<Bool, Error>) -> Void) {
+        guard !self.isCancelled else {
+          return self.cancelProcessing()
+        }
+        
         var postParams: [String: Any] = [:]
         
         if self.configData.keyServerType == .NearForm {
