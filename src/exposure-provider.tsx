@@ -109,7 +109,7 @@ export interface ExposureProviderProps {
   traceConfiguration: TraceConfiguration;
   serverUrl: string;
   keyServerUrl: string;
-  publishServerUrl: string;
+  publishServerUrl?: string;
   keyServerType: KeyServerType;
   authToken: string;
   refreshToken: string;

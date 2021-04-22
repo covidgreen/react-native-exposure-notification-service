@@ -318,16 +318,16 @@ object Fetcher {
 
     @JvmStatic
     fun post(endpoint: String, body: String, context: Context): Boolean {
-        return post(endpoint, body, context, false)
+        val serverUrl = SharedPrefs.getString("serverUrl", context)
+
+        return post(endpoint, body, context, false, serverUrl, true, true)
     }
 
     @JvmStatic
-    fun post(endpoint: String, body: String, context: Context, chaffRequest: Boolean = false): Boolean {
+    fun post(endpoint: String, body: String, context: Context, chaffRequest: Boolean, server: String, authenticate: Boolean, pin: Boolean): Boolean {
 
         try {
-            var pin = true
-            var authenticate = true
-            val url = getURL(endpoint, context)
+            var url = URL("${server}${endpoint}")
             val client = getOkClient(pin, authenticate, context)
             val builder = Request.Builder()
                     .url(url)
