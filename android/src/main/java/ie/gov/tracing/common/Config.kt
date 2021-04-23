@@ -23,6 +23,11 @@ object Config {
                 keyServerType = "nearform"
             }
             SharedPrefs.setString("keyServerUrl", keyServer, Tracing.context)
+            if (params.hasKey("publishServerUrl")) {
+                SharedPrefs.setString("publishServerUrl", params.getString("publishServerUrl")!!, Tracing.context)
+            } else {
+                SharedPrefs.setString("publishServerUrl", "", Tracing.context)
+            }
             SharedPrefs.setString("keyServerType", keyServerType, Tracing.context)
             SharedPrefs.setString("notificationTitle", params.getString("notificationTitle")!!, Tracing.context)
             SharedPrefs.setString("notificationDesc", params.getString("notificationDesc")!!, Tracing.context)

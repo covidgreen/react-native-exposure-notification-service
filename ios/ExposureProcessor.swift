@@ -352,7 +352,7 @@ public class ExposureProcessor {
        os_log("Running exposure check in background", log: OSLog.exposure, type: .debug)
        let queue = OperationQueue()
        queue.maxConcurrentOperationCount = 1
-       queue.addOperation(ExposureCheck(false, false, 0))
+       queue.addOperation(ExposureCheck(false, false, 0, false))
 
        task.expirationHandler = {
           os_log("Background task expiring", log: OSLog.checkExposure, type: .debug)
@@ -368,11 +368,11 @@ public class ExposureProcessor {
        }
     }
     
-    public func checkExposureForeground(_ skipTimeCheck: Bool, _ simulateExposure: Bool, _ simulateDays: Int) {
+    public func checkExposureForeground(_ skipTimeCheck: Bool, _ simulateExposure: Bool, _ simulateDays: Int, _ sendChaff: Bool) {
        os_log("Running exposure check in foreground", log: OSLog.exposure, type: .debug)
        let queue = OperationQueue()
        queue.maxConcurrentOperationCount = 1
-       queue.addOperation(ExposureCheck(skipTimeCheck, simulateExposure, simulateDays))
+       queue.addOperation(ExposureCheck(skipTimeCheck, simulateExposure, simulateDays, sendChaff))
 
        let lastOperation = queue.operations.last
        lastOperation?.completionBlock = {

@@ -60,7 +60,7 @@ class ExposureManager {
         // activity handler does nothing.
         if activityFlags.contains(.periodicRun) {
             os_log("Scheduling background exposure check ios 12.5", log: OSLog.setup, type: .debug)
-            ExposureProcessor.shared.checkExposureForeground(false, false, 0)
+            ExposureProcessor.shared.checkExposureForeground(false, false, 0, false)
         }
      }
   }

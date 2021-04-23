@@ -10,6 +10,7 @@ public class Storage {
         let refreshToken: String
         let serverURL: String
         let keyServerUrl: String
+        var publishServerUrl: String!
         let keyServerType: KeyServerType
         let checkExposureInterval: Int
         let storeExposuresFor: Int
@@ -29,6 +30,9 @@ public class Storage {
         var lastKeyChainGetError: Int32?
         var lastUpdated: Date?
         var stopped: Bool!
+        var nextChaffDate: Date!
+        var chaffWindow: Int!
+        var chaffEnabled: Bool!
     }
     
     private struct CodableCallback: Decodable {
@@ -98,6 +102,7 @@ public class Storage {
               refreshToken: refreshToken,
               serverURL: data[0].value(forKey: "serverURL") as! String,
               keyServerUrl: data[0].value(forKey: "keyServerUrl") as? String ?? data[0].value(forKey: "serverURL") as! String,
+              publishServerUrl: data[0].value(forKey: "publishServerUrl") as? String ?? "",
               keyServerType: Storage.KeyServerType(rawValue: keyType)!,
               checkExposureInterval: data[0].value(forKey: "checkExposureInterval") as! Int,
               storeExposuresFor: data[0].value(forKey: "storeExposuresFor") as! Int,
@@ -116,7 +121,8 @@ public class Storage {
               lastKeyChainSetError: data[0].value(forKey: "lastKeyError") as? Int32 ?? 0,
               lastKeyChainGetError: lastKeyChainError,
               lastUpdated: data[0].value(forKey: "lastUpdated") as? Date,
-              stopped: data[0].value(forKey: "serviceStopped") as? Bool ?? false
+              stopped: data[0].value(forKey: "serviceStopped") as? Bool ?? false,
+              nextChaffDate: data[0].value(forKey: "nextChaff") as? Date
             )
          }
        } catch  {
@@ -185,6 +191,26 @@ public class Storage {
       os_log("Daily Trace settings stored", log: OSLog.storage, type: .debug)
     }
 
+    public func updateNextChaffDate(_ context: NSManagedObjectContext, date: Date) {
+      let fetchRequest =
+      NSFetchRequest<NSManagedObject>(entityName: "Settings")
+
+      do {
+          let settingsResult = try context.fetch(fetchRequest)
+
+          if settingsResult.count > 0 {
+            let managedObject = settingsResult[0]
+            managedObject.setValue(date, forKey: "nextChaff")
+            try context.save()
+          } else {
+              os_log("No settings have been stored, can't update", log: OSLog.storage, type: .debug)
+          }
+      } catch {
+        os_log("Could not update next chaff date. %@", log: OSLog.storage, type: .error, error.localizedDescription)
+      }
+      os_log("Next Chaff date setting stored", log: OSLog.storage, type: .debug)
+    }
+    
     public func updateAuthToken(_ token:String) {
         let context = PersistentContainer.shared.newBackgroundContext()
 
@@ -312,6 +338,7 @@ public class Storage {
 
          managedObject.setValue(config.serverURL, forKey: "serverURL")
          managedObject.setValue(config.keyServerUrl, forKey: "keyServerUrl")
+         managedObject.setValue(config.publishServerUrl, forKey: "publishServerUrl")
          managedObject.setValue(config.keyServerType.rawValue, forKey: "keyServerType")
          managedObject.setValue(config.checkExposureInterval, forKey: "checkExposureInterval")
          managedObject.setValue(config.storeExposuresFor, forKey: "storeExposuresFor")

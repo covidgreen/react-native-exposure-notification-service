@@ -109,6 +109,7 @@ export interface ExposureProviderProps {
   traceConfiguration: TraceConfiguration;
   serverUrl: string;
   keyServerUrl: string;
+  publishServerUrl?: string;
   keyServerType: KeyServerType;
   authToken: string;
   refreshToken: string;
@@ -154,6 +155,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   traceConfiguration,
   serverUrl,
   keyServerUrl,
+  publishServerUrl,
   keyServerType = KeyServerType.nearform,
   authToken = '',
   refreshToken = '',
@@ -304,6 +306,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         exposureCheckFrequency: traceConfiguration.exposureCheckInterval,
         serverURL: serverUrl,
         keyServerUrl,
+        publishServerUrl,
         keyServerType,
         authToken,
         refreshToken,
