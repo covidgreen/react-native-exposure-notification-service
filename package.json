@@ -44,7 +44,7 @@
     "lint:fix": "npm run lint -- --fix",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepare": "npm run build",
+    "prepare": "npm run build && husky install",
     "test": "jest"
   },
   "peerDependencies": {
