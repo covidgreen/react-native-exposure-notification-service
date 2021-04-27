@@ -114,9 +114,9 @@ const mockConfig = {
   hideForeground: true
 };
 
-const ExposureProviderWithMockConfig: React.FC<Partial<
-  ExposureProviderProps
->> = ({children, ...overrides}) => {
+const ExposureProviderWithMockConfig: React.FC<
+  Partial<ExposureProviderProps>
+> = ({children, ...overrides}) => {
   return (
     <ExposureProvider {...mockConfig} {...overrides}>
       {children}
@@ -174,11 +174,11 @@ describe('<ExposureProvider />', () => {
 
     unmount();
 
+    expect(mockNativeEventEmitterRemoveSpy).toHaveBeenCalledTimes(1);
     expect(mockNativeEventEmitterRemoveListenerSpy).toHaveBeenCalledWith(
       'exposureEvent',
       expect.any(Function)
     );
-    expect(mockNativeEventEmitterRemoveSpy).toHaveBeenCalledTimes(1);
   });
 
   it('renders', async () => {
