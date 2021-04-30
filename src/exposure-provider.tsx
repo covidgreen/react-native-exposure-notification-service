@@ -109,6 +109,7 @@ export interface ExposureProviderProps {
   traceConfiguration: TraceConfiguration;
   serverUrl: string;
   keyServerUrl: string;
+  publishServerUrl?: string;
   keyServerType: KeyServerType;
   authToken: string;
   refreshToken: string;
@@ -118,6 +119,7 @@ export interface ExposureProviderProps {
   analyticsOptin?: boolean;
   notificationRepeat?: number;
   certList?: string;
+  hideForeground?: boolean;
 }
 
 export const getVersion = async () => {
@@ -153,6 +155,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   traceConfiguration,
   serverUrl,
   keyServerUrl,
+  publishServerUrl,
   keyServerType = KeyServerType.nearform,
   authToken = '',
   refreshToken = '',
@@ -161,7 +164,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
   callbackNumber = '',
   analyticsOptin = false,
   notificationRepeat = 0,
-  certList = ''
+  certList = '',
+  hideForeground = false
 }) => {
   const [state, setState] = useState<State>(initialState);
 
@@ -302,6 +306,7 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         exposureCheckFrequency: traceConfiguration.exposureCheckInterval,
         serverURL: serverUrl,
         keyServerUrl,
+        publishServerUrl,
         keyServerType,
         authToken,
         refreshToken,
@@ -311,7 +316,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({
         callbackNumber,
         analyticsOptin,
         notificationRepeat,
-        certList
+        certList,
+        hideForeground
       };
       await ExposureNotification.configure(config);
 

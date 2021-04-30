@@ -92,7 +92,7 @@ object Events {
                 raiseEvent(ERROR, "$message: $ex")
             }
         } catch (ex: Exception) {
-            Log.e(TAG, ex.toString())
+            Log.e(TAG, ex.localizedMessage)
         }
     }
 

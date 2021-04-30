@@ -8,7 +8,6 @@ import com.google.common.io.BaseEncoding
 import com.google.gson.Gson
 import ie.gov.tracing.Tracing
 import ie.gov.tracing.common.Events
-import ie.gov.tracing.common.ExposureConfig
 import ie.gov.tracing.storage.ExpoSecureStoreInterop
 import ie.gov.tracing.storage.ExposureEntity
 import ie.gov.tracing.storage.SharedPrefs
@@ -33,6 +32,7 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
+import kotlin.collections.HashMap
 
 @Keep
 data class Token(val token: String)
@@ -45,6 +45,24 @@ data class Metric(val os: String, val event: String, val version: String, val pa
 
 @Keep
 data class CallbackRecovery(val mobile: String, val code: String, val iso: String, val number: String)
+
+@Keep
+data class VerifyG(val code: String, val padding: String)
+
+@Keep
+data class VeriyNF(val hash: String, val padding: String)
+
+@Keep
+data class Certificate(val token: String, val padding: String, val ekeyhmac: String)
+
+@Keep
+data class PublishNF(val token: String, val platform: String, val deviceVerificationPayload: String, val exposures: ArrayList<Map<String, Any>>, val padding: String)
+
+@Keep
+data class PublishG(val hmacKey: String, val healthAuthorityID: String, val verificationPayload: String, val symptomOnsetInterval: Int, val revisionToken: String, val traveler: Boolean, val exposures: ArrayList<Map<String, Any>>, val padding: String)
+
+@Keep
+data class VersionData(val version: String, val platform: String)
 
 private const val FILE_PATTERN = "/diag_keys/diagnosis_key_file_%s.zip"
 private const val REFRESH = "/refresh"
@@ -118,9 +136,10 @@ object Fetcher {
             var authenticate = true
 
             val client = getOkClient(pin, authenticate, context)
+            val data = VersionData(Tracing.version(context).getString("display").toString(), "android")
             val request = Request.Builder()
                     .url(url)
-                    .post("".toRequestBody())
+                    .post(Gson().toJson(data).toRequestBody())
                     .build()
 
             client.newCall(request).execute().use { response ->
@@ -299,19 +318,26 @@ object Fetcher {
 
     @JvmStatic
     fun post(endpoint: String, body: String, context: Context): Boolean {
+        val serverUrl = SharedPrefs.getString("serverUrl", context)
+
+        return post(endpoint, body, context, false, serverUrl, true, true)
+    }
+
+    @JvmStatic
+    fun post(endpoint: String, body: String, context: Context, chaffRequest: Boolean, server: String, authenticate: Boolean, pin: Boolean): Boolean {
 
         try {
-            var pin = true
-            var authenticate = true
-            val url = getURL(endpoint, context)
+            var url = URL("${server}${endpoint}")
             val client = getOkClient(pin, authenticate, context)
-            val request = Request.Builder()
+            val builder = Request.Builder()
                     .url(url)
                     .post(body.toRequestBody())
                     .addHeader("Accept", "application/json")
                     .addHeader("Content-Type", "application/json; charset=UTF-8")
-                    .build()
-
+            if (chaffRequest) {
+                builder.addHeader("X-Chaff", "chaff")
+            }
+            val request = builder.build()
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     Events.raiseEvent(Events.INFO, "post - HTTP success: ${response.code}")

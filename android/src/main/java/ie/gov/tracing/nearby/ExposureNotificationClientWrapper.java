@@ -1,10 +1,6 @@
 package ie.gov.tracing.nearby;
 
 import android.content.Context;
-import android.os.Build;
-
-
-import androidx.annotation.RequiresApi;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
@@ -28,13 +24,11 @@ import com.google.common.util.concurrent.ListenableFuture;
 import org.threeten.bp.Duration;
 
 import java.io.File;
-import java.time.temporal.TemporalUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
@@ -181,11 +175,19 @@ public class ExposureNotificationClientWrapper extends ExposureClientWrapper {
             AppExecutors.getScheduledExecutor());
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.N)
+  private List<Integer> convertArray(int[] data) {
+    List<Integer> intList = new ArrayList<>(data.length);
+    for (int i : data)
+    {
+      intList.add(i);
+    }
+    return intList;
+  }
+
   public NfTask<List<DailySummary>> getDailySummaries(ExposureConfig config) {
     DailySummariesConfig.DailySummariesConfigBuilder builder = new DailySummariesConfig.DailySummariesConfigBuilder();
     List<Double> attenuationWeightings = Arrays.asList(config.getImmediateDurationWeight() / 100.0, config.getNearDurationWeight() / 100.0, config.getMediumDurationWeight() / 100.0, config.getOtherDurationWeight() / 100.0);
-    List<Integer> attenuations = Arrays.stream(config.getAttenuationDurationThresholds()).boxed().collect(Collectors.toList());
+    List<Integer> attenuations = convertArray(config.getAttenuationDurationThresholds());
     DailySummariesConfig dailySummaryConfig = builder
             // A map that stores a weight for each possible value of reportType.
             .setReportTypeWeight(ReportType.CONFIRMED_TEST, config.getReportTypeConfirmedTestWeight() / 100.0)

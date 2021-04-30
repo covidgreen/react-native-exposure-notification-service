@@ -97,6 +97,7 @@ const mockConfig = {
   isReady: true,
   serverUrl: 'https://test.server.url',
   keyServerUrl: 'https://key.server.url',
+  publishServerUrl: 'https://publish.server.url',
   keyServerType: KeyServerType.nearform,
   authToken: 'testAuthToken',
   refreshToken: 'testRefreshToken',
@@ -109,12 +110,13 @@ const mockConfig = {
   analyticsOptin: true,
   callbackNumber: '0123456789',
   notificationRepeat: 0,
-  certList: 'cert12'
+  certList: 'cert12',
+  hideForeground: true
 };
 
-const ExposureProviderWithMockConfig: React.FC<Partial<
-  ExposureProviderProps
->> = ({children, ...overrides}) => {
+const ExposureProviderWithMockConfig: React.FC<
+  Partial<ExposureProviderProps>
+> = ({children, ...overrides}) => {
   return (
     <ExposureProvider {...mockConfig} {...overrides}>
       {children}
@@ -172,11 +174,11 @@ describe('<ExposureProvider />', () => {
 
     unmount();
 
+    expect(mockNativeEventEmitterRemoveSpy).toHaveBeenCalledTimes(1);
     expect(mockNativeEventEmitterRemoveListenerSpy).toHaveBeenCalledWith(
       'exposureEvent',
       expect.any(Function)
     );
-    expect(mockNativeEventEmitterRemoveSpy).toHaveBeenCalledTimes(1);
   });
 
   it('renders', async () => {
@@ -218,10 +220,12 @@ describe('<ExposureProvider />', () => {
       refreshToken: mockConfig.refreshToken,
       serverURL: mockConfig.serverUrl,
       keyServerUrl: mockConfig.keyServerUrl,
+      publishServerUrl: mockConfig.publishServerUrl,
       keyServerType: mockConfig.keyServerType,
       storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
       notificationRepeat: mockConfig.notificationRepeat,
-      certList: mockConfig.certList
+      certList: mockConfig.certList,
+      hideForeground: mockConfig.hideForeground
     });
   });
 
@@ -397,10 +401,12 @@ describe('useExposure', () => {
         refreshToken: mockConfig.refreshToken,
         serverURL: mockConfig.serverUrl,
         keyServerUrl: mockConfig.keyServerUrl,
+        publishServerUrl: mockConfig.publishServerUrl,
         keyServerType: mockConfig.keyServerType,
         storeExposuresFor: mockConfig.traceConfiguration.storeExposuresFor,
         notificationRepeat: mockConfig.notificationRepeat,
-        certList: mockConfig.certList
+        certList: mockConfig.certList,
+        hideForeground: mockConfig.hideForeground
       });
     });
 
@@ -687,7 +693,8 @@ describe('useExposure', () => {
         1
       );
       expect(ExposureNotificationModule.simulateExposure).toHaveBeenCalledWith(
-        10, 4
+        10,
+        4
       );
     });
   });

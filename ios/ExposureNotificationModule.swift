@@ -73,6 +73,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
         refreshToken: refresh,
         serverURL: serverURL,
         keyServerUrl: configDict["keyServerUrl"] as? String ?? serverURL,
+        publishServerUrl: configDict["publishServerUrl"] as? String ?? "",
         keyServerType: Storage.KeyServerType (rawValue: configDict["keyServerType"] as! String) ?? Storage.KeyServerType.NearForm,
         checkExposureInterval: configDict["exposureCheckFrequency"] as? Int ?? 180,
         storeExposuresFor: configDict["storeExposuresFor"] as? Int ?? 14,
@@ -225,9 +226,9 @@ public class ExposureNotificationModule: RCTEventEmitter {
     @objc public func simulateExposure(_ timeDelay: Int, _ numDays: Int) {
         
         if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
-            os_log("Request to simulate exposure after %f", log: OSLog.setup, type: .debug, timeDelay)
+            os_log("Request to simulate exposure after %d", log: OSLog.setup, type: .debug, timeDelay)
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(timeDelay)) {
-                ExposureProcessor.shared.checkExposureForeground(true, true, numDays)
+                ExposureProcessor.shared.checkExposureForeground(true, true, numDays, true)
             }
         }
     }
@@ -242,7 +243,7 @@ public class ExposureNotificationModule: RCTEventEmitter {
      
     @objc public func checkExposure(_ skipTimeCheck: Bool) {
         if #available(iOS 12.5, *), ExposureNotificationModule.isExposureNotificationsSupported() {
-            ExposureProcessor.shared.checkExposureForeground(skipTimeCheck, false, 0)
+            ExposureProcessor.shared.checkExposureForeground(skipTimeCheck, false, 0, false)
         }
     }
      

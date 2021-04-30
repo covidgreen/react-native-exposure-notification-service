@@ -32,6 +32,8 @@ data class ExposureConfig(
         val attenuationDurationThresholds: IntArray = intArrayOf(50, 70, 90),
         val infectiousnessForDaysSinceOnsetOfSymptoms: IntArray = intArrayOf(),
         val contiguousMode: Boolean = false,
-        val v2Mode: Boolean = false
+        val v2Mode: Boolean = false,
+        val chaffEnabled: Boolean = false,
+        val chaffWindow: Int = 5
 )
 

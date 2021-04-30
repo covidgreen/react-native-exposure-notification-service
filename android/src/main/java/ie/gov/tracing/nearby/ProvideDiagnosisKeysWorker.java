@@ -90,8 +90,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     } else {
       client = ExposureNotificationClientWrapper.get(context);
     }
-
-    setForegroundAsync(createForegroundInfo());
   }
 
   private String generateRandomToken() {
@@ -140,9 +138,17 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   @NonNull
   @Override
   public ListenableFuture<Result> startWork() {
+      // validate config set before running
+      final String server = SharedPrefs.getString("serverUrl", this.context);
+      if (server.isEmpty()) {
+        // config not yet populated so don't run
+        SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", this.context);
+        Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
+        return Futures.immediateFuture(Result.success());
+      }
+
       try {
         Tracing.currentContext = this.context;
-        Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork");
         SharedPrefs.remove("lastApiError", this.context);
         SharedPrefs.remove("lastError", this.context);
         final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);
@@ -163,15 +169,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
 
         updateLastRun();
 
-        // validate config set before running
-        final String server = SharedPrefs.getString("serverUrl", this.context);
-        if (server.isEmpty()) {
-          // config not yet populated so don't run
-          SharedPrefs.setString("lastError", "No config set so can't proceed with checking exposures", this.context);
-          Events.raiseEvent(Events.INFO, "No config set so can't proceed with checking exposures");
-          return Futures.immediateFuture(Result.success());
-        }
-
         saveDailyMetric();
 
         final Boolean paused = SharedPrefs.getBoolean("servicePaused", this.context);
@@ -190,8 +187,18 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         return FluentFuture.from(client.isEnabled())
                 .transformAsync(isEnabled -> {
                           // Only continue if it is enabled.
-                          if (isEnabled) {
-                            return fetchExposureConfig(this.context);
+                          if (isEnabled != null && isEnabled) {
+                            boolean hideForeground = SharedPrefs.getBoolean("hideForeground", this.context);
+                            Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork foreground: " + !hideForeground);
+                            try {
+                              if (!hideForeground) {
+                                setForegroundAsync(createForegroundInfo()).get();
+                              }
+                            }
+                            catch(Exception ex) {
+                                // ignore if fails to create foreground worker
+                            }                            
+                            return ExposureNotificationClientWrapper.get(this.context).fetchExposureConfig(this.context);
                           } else {
                             // Stop here because things aren't enabled. Will still return successful though.
                             SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
@@ -210,7 +217,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                 .transformAsync(done -> repository.upsertTokenEntityAsync(TokenEntity.create(token, false)),
                         AppExecutors.getBackgroundExecutor())
                 .transform(done -> processSuccess(), // all done, do tidy ups here
-                        AppExecutors.getLightweightExecutor())
+                        AppExecutors.getBackgroundExecutor())
                 .catching(NotEnabledException.class,
                         ex -> {
                           SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
