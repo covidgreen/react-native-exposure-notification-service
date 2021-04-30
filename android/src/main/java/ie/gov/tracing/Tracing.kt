@@ -791,7 +791,7 @@ object Tracing {
         }
 
         @JvmStatic
-        fun getExposureStatus(promise: Promise? = null): ReadableMap {
+        fun getExposureStatus(promise: Promise? = null): ReadableMap = runBlocking {
             val result: WritableMap = Arguments.createMap()
             
             Events.raiseEvent(Events.INFO, "Retrieving current status")
@@ -801,7 +801,7 @@ object Tracing {
                 var enabled = false
 
                 try {
-                    enabled = ExposureNotificationHelper.isEnabled().await()
+                    enabled = exposureWrapper.isEnabled().await()
                 } catch (ex: Exception) {
                     Events.raiseError("Error reading ENS status", ex)
                 }
@@ -834,7 +834,7 @@ object Tracing {
                     promise?.resolve(result)
                 }
             }
-            return result
+            result
         }
 
         @JvmStatic

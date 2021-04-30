@@ -198,7 +198,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                             catch(Exception ex) {
                                 // ignore if fails to create foreground worker
                             }                            
-                            return ExposureNotificationClientWrapper.get(this.context).fetchExposureConfig(this.context);
+                            return fetchExposureConfig(this.context);
                           } else {
                             // Stop here because things aren't enabled. Will still return successful though.
                             SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
