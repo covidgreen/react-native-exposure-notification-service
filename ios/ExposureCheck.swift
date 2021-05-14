@@ -65,6 +65,7 @@ class ExposureCheck: AsyncOperation {
         let contiguousMode: Bool?
         let chaffEnabled: Bool?
         let chaffWindow: Int?
+        let disableENSChecks: Bool?
     }
   
     private struct CodableExposureFiles: Codable {
@@ -214,6 +215,10 @@ class ExposureCheck: AsyncOperation {
                 if (self.simulateExposureOnly) {
                     os_log("Simulating exposure alert", log: OSLog.exposure, type: .debug)
                     self.simulateExposureEvent(self.simulateExposureDays)
+                } else if self.configData.disableENSChecks {
+                    os_log("ENS checks are disabled", log: OSLog.exposure, type: .debug)
+                    self.finishNoProcessing("ENS checks are disabled", false)
+
                 } else {
                     self.processExposureFiles(configuration, thresholds, v2Mode)
                 }
@@ -223,12 +228,12 @@ class ExposureCheck: AsyncOperation {
     
     private func checkChaff() {
         if (self.configData.nextChaffDate == nil) {
-            os_log("Chaff request date not set", log: OSLog.exposure, type: .debug)
+            os_log("Chaff request date not set, %d, %d", log: OSLog.exposure, type: .debug, self.configData.chaffEnabled, self.configData.chaffWindow)
             self.configData.nextChaffDate = self.calculateChaffDate()
             Storage.shared.updateNextChaffDate(self.storageContext, date: self.configData.nextChaffDate)
         }
-        
-        if (self.configData.chaffEnabled && self.configData.nextChaffDate > Date()) || self.triggerChaffRequest {
+        os_log("Chaff config, %d, %d", log: OSLog.exposure, type: .debug, self.configData.chaffEnabled, self.configData.chaffWindow)
+        if (self.configData.chaffEnabled && Date() > self.configData.nextChaffDate) || self.triggerChaffRequest {
              generateChaffRequest { _ in
                  //set next schedule for chaff request
                  self.configData.nextChaffDate = self.calculateChaffDate()
@@ -381,7 +386,7 @@ class ExposureCheck: AsyncOperation {
     }
     
     private func calculateChaffDate() -> Date {
-        let randomOffset = Int.random(in: 1..<self.configData.chaffWindow)
+        let randomOffset = Int.random(in: 1..<(max(self.configData.chaffWindow, 2)))
         let calendar = Calendar.current
         let dateToday = calendar.startOfDay(for: Date())
         let chaffDate = calendar.date(byAdding: .day, value: randomOffset, to: dateToday)
@@ -887,6 +892,7 @@ class ExposureCheck: AsyncOperation {
                 }
                 self.configData.chaffEnabled = codableExposureConfiguration.chaffEnabled ?? false
                 self.configData.chaffWindow = codableExposureConfiguration.chaffWindow ?? 6
+                self.configData.disableENSChecks = codableExposureConfiguration.disableENSChecks ?? false
                 
                 completion(.success((exposureConfiguration, thresholds, v2Mode)))
               } catch {

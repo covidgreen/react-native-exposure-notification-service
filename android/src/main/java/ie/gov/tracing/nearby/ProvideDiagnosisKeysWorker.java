@@ -202,7 +202,11 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                         AppExecutors.getBackgroundExecutor())
                 .transformAsync(config -> {
                           ensConfig.set(config);
-                          return diagnosisKeys.download(config.getNumFilesAndroid());
+                          if (config.getDisableENSChecks()) {
+                            return Futures.immediateFailedFuture(new NotEnabledException());
+                          } else {
+                            return diagnosisKeys.download(config.getNumFilesAndroid());
+                          }
                         },
                         AppExecutors.getBackgroundExecutor())
                 .transformAsync(files -> submitter.parseFiles(files, token, ensConfig.get()),
@@ -213,8 +217,13 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                         AppExecutors.getBackgroundExecutor())
                 .catching(NotEnabledException.class,
                         ex -> {
-                          SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
-                          Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
+                          if (ensConfig.get().getDisableENSChecks()) {
+                            SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
+                            Events.raiseEvent(Events.INFO, "Not authorised so can't run exposure checks");
+                          } else {
+                            SharedPrefs.setString("lastError", "ENS checks are disabled", this.context);
+                            Events.raiseEvent(Events.INFO, "ENS checks are disabled");
+                          }
                           return Result.success(); // not enabled, just return success
                         },
                         AppExecutors.getBackgroundExecutor())

@@ -34,6 +34,6 @@ data class ExposureConfig(
         val contiguousMode: Boolean = false,
         val v2Mode: Boolean = false,
         val chaffEnabled: Boolean = false,
-        val chaffWindow: Int = 5
+        val chaffWindow: Int = 5,
+        val disableENSChecks: Boolean = false
 )
-
