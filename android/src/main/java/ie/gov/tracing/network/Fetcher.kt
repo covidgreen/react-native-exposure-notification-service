@@ -324,6 +324,20 @@ object Fetcher {
     }
 
     @JvmStatic
+    fun postOnThread(endpoint: String, body: String, context: Context, chaffRequest: Boolean, server: String, authenticate: Boolean, pin: Boolean) {
+        Single.fromCallable {
+            return@fromCallable Fetcher.post(endpoint, body, context, chaffRequest, server, authenticate, pin)
+        }
+        .subscribeOn(Schedulers.io())
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribe({ success ->
+            Events.raiseEvent(if (success) Events.INFO else Events.ERROR, "postOnThread - ${if (success) "success" else "failed"}")
+        }, {
+            Events.raiseError("postOnThread - error - background", java.lang.Exception(it))
+        })
+    }
+
+    @JvmStatic
     fun post(endpoint: String, body: String, context: Context, chaffRequest: Boolean, server: String, authenticate: Boolean, pin: Boolean): Boolean {
 
         try {
@@ -480,6 +494,7 @@ object Fetcher {
             Events.raiseError("triggerCallback - error", ex)
         }
     }
+
 
     @SuppressLint("CheckResult")
     @JvmStatic
