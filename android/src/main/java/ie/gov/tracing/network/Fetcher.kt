@@ -62,7 +62,7 @@ data class PublishNF(val token: String, val platform: String, val deviceVerifica
 data class PublishG(val hmacKey: String, val healthAuthorityID: String, val verificationPayload: String, val symptomOnsetInterval: Int, val revisionToken: String, val traveler: Boolean, val exposures: ArrayList<Map<String, Any>>, val padding: String)
 
 @Keep
-data class VersionData(val version: String, val platform: String)
+data class VersionData(val version: String, val os: String)
 
 private const val FILE_PATTERN = "/diag_keys/diagnosis_key_file_%s.zip"
 private const val REFRESH = "/refresh"
