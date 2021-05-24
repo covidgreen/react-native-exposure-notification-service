@@ -33,6 +33,7 @@ public class Storage {
         var nextChaffDate: Date!
         var chaffWindow: Int!
         var chaffEnabled: Bool!
+        var disableENSChecks: Bool!
     }
     
     private struct CodableCallback: Decodable {

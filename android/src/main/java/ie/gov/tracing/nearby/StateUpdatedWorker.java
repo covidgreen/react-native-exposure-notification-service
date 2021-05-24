@@ -27,6 +27,8 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.net.URL;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -39,6 +41,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 import ie.gov.tracing.R;
@@ -201,6 +205,7 @@ public class StateUpdatedWorker extends ListenableWorker {
 
     }
 
+    @NotNull
     private String getPublishUrl() {
         try {
             String keyServerUrl = SharedPrefs.getString("keyServerUrl", context);
@@ -213,6 +218,7 @@ public class StateUpdatedWorker extends ListenableWorker {
         }
 
     }
+
     private void generateChaffRequest(boolean sendChaff, int chaffWindow, boolean chaffEnabled) {
         // if chaff time
         long chaffTime = SharedPrefs.getLong("nextChaff", context);
@@ -235,26 +241,27 @@ public class StateUpdatedWorker extends ListenableWorker {
         Events.raiseEvent(Events.INFO, "Chaff  requests " + sendChaff + ", " + chaffEnabled + ", " + chaffWindow + ", " + chaffTime);
         if (sendChaff || (chaffEnabled && System.currentTimeMillis() > chaffTime)) {
             Events.raiseEvent(Events.INFO, "Sending chaff request");
-            if (sendChaffVerify(context, keyServerType, serverUrl)) {
-                // insert time delay here to simulate user
-                Random rand = new Random();
-                int randomDelay = rand.nextInt((20 - 3) + 1) + 3;
-                try {
-                    Thread.sleep(randomDelay * 1000);
-                } catch(Exception e) {
-                    // do nothing
-                }
-                Events.raiseEvent(Events.INFO, "Continuing chaff request after simulated delay");
-                if (keyServerType.equals("google")) {
-                    Events.raiseEvent(Events.INFO, "Continuing chaff request with cert call");
-                    sendChaffCertificate(context, serverUrl);
-                }
-            }
-            Events.raiseEvent(Events.INFO, "Continuing chaff request with publish call");
-            sendChaffPublish(context, keyServerType, serverUrl, publishServerUrl);
-            SharedPrefs.setLong("nextChaff", generateNextChaffTime(context, chaffWindow), context);
-        }
+            sendChaffVerify(context, keyServerType, serverUrl);
+            // insert time delay here to simulate user
+            Random rand = new Random();
+            int randomDelay = rand.nextInt((20 - 3) + 1) + 3;
+            Timer timer = new Timer("chaffpublish");
+            String finalPublishServerUrl = publishServerUrl;
+            TimerTask publishTask = new TimerTask() {
+                public void run() {
+                    Events.raiseEvent(Events.INFO, "Continuing chaff request after simulated delay");
+                    if (keyServerType.equals("google")) {
+                        Events.raiseEvent(Events.INFO, "Continuing chaff request with cert call");
+                        sendChaffCertificate(context, serverUrl);
+                    }
 
+                    Events.raiseEvent(Events.INFO, "Continuing chaff request with publish call");
+                    sendChaffPublish(context, keyServerType, serverUrl, finalPublishServerUrl);
+                    SharedPrefs.setLong("nextChaff", generateNextChaffTime(context, chaffWindow), context);
+                }
+            };
+            timer.schedule(publishTask, randomDelay * 1000);
+        }
     }
 
     private String randomString(int min, int max) {
@@ -271,20 +278,20 @@ public class StateUpdatedWorker extends ListenableWorker {
         return new String(buf);
     }
 
-    private Boolean sendChaffVerify(Context context, String keyServerType, String serverUrl) {
+    private void sendChaffVerify(Context context, String keyServerType, String serverUrl) {
         if (keyServerType.equals("nearform")) {
             VeriyNF verify = new VeriyNF(randomString(256, 256), randomString(512, 1024));
-            return Fetcher.post("/exposures/verify", new Gson().toJson(verify), context, true, serverUrl, true, true);
+            Fetcher.postOnThread("/exposures/verify", new Gson().toJson(verify), context, true, serverUrl, true, true);
         } else {
             VerifyG verify = new VerifyG(randomString(8, 8), randomString(512, 1024));
-            return Fetcher.post("/verify", new Gson().toJson(verify), context, true, serverUrl, true, true);
+            Fetcher.postOnThread("/verify", new Gson().toJson(verify), context, true, serverUrl, true, true);
         }
 
     }
 
     private void sendChaffCertificate(Context context, String serverUrl) {
         Certificate cert = new Certificate(randomString(44, 44), randomString(512, 1024), randomString(44, 44));
-        Fetcher.post("/certificate", new Gson().toJson(cert), context, true, serverUrl, true, true);
+        Fetcher.postOnThread("/certificate", new Gson().toJson(cert), context, true, serverUrl, true, true);
     }
 
     private void sendChaffPublish(Context context, String keyServerType, String serverUrl, String publishServerUrl) {
@@ -302,7 +309,7 @@ public class StateUpdatedWorker extends ListenableWorker {
                 exposures.add(exposure);
             }
             PublishNF pub = new PublishNF(randomString(16, 16), "android", randomString(128, 128), exposures, randomString(512, 1204));
-            Fetcher.post("/exposures", new Gson().toJson(pub), context, true, serverUrl, true, true);
+            Fetcher.postOnThread("/exposures", new Gson().toJson(pub), context, true, serverUrl, true, true);
         } else {
             for (int i = 0; i < dataSize; i++) {
                 HashMap<String, Object> exposure = new HashMap<>();
@@ -313,7 +320,7 @@ public class StateUpdatedWorker extends ListenableWorker {
                 exposures.add(exposure);
             }
             PublishG pub = new PublishG(randomString(16, 16), "my.health.id", randomString(128, 128), 1234567, "", false, exposures, randomString(512, 1204));
-            Fetcher.post("/publish", new Gson().toJson(pub), context, true, publishServerUrl, false, false);
+            Fetcher.postOnThread("/publish", new Gson().toJson(pub), context, true, publishServerUrl, false, false);
         }
 
     }

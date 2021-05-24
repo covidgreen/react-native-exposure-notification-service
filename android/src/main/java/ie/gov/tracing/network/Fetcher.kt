@@ -62,7 +62,7 @@ data class PublishNF(val token: String, val platform: String, val deviceVerifica
 data class PublishG(val hmacKey: String, val healthAuthorityID: String, val verificationPayload: String, val symptomOnsetInterval: Int, val revisionToken: String, val traveler: Boolean, val exposures: ArrayList<Map<String, Any>>, val padding: String)
 
 @Keep
-data class VersionData(val version: String, val platform: String)
+data class VersionData(val version: String, val os: String)
 
 private const val FILE_PATTERN = "/diag_keys/diagnosis_key_file_%s.zip"
 private const val REFRESH = "/refresh"
@@ -324,6 +324,20 @@ object Fetcher {
     }
 
     @JvmStatic
+    fun postOnThread(endpoint: String, body: String, context: Context, chaffRequest: Boolean, server: String, authenticate: Boolean, pin: Boolean) {
+        Single.fromCallable {
+            return@fromCallable Fetcher.post(endpoint, body, context, chaffRequest, server, authenticate, pin)
+        }
+        .subscribeOn(Schedulers.io())
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribe({ success ->
+            Events.raiseEvent(if (success) Events.INFO else Events.ERROR, "postOnThread - ${if (success) "success" else "failed"}")
+        }, {
+            Events.raiseError("postOnThread - error - background", java.lang.Exception(it))
+        })
+    }
+
+    @JvmStatic
     fun post(endpoint: String, body: String, context: Context, chaffRequest: Boolean, server: String, authenticate: Boolean, pin: Boolean): Boolean {
 
         try {
@@ -480,6 +494,7 @@ object Fetcher {
             Events.raiseError("triggerCallback - error", ex)
         }
     }
+
 
     @SuppressLint("CheckResult")
     @JvmStatic
