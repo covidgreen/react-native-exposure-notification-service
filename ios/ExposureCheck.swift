@@ -227,7 +227,7 @@ class ExposureCheck: AsyncOperation {
     }
     
     private func checkChaff() {
-        if (self.configData.nextChaffDate == nil) {
+        if (self.configData.chaffEnabled && self.configData.nextChaffDate == nil) {
             os_log("Chaff request date not set, %d, %d", log: OSLog.exposure, type: .debug, self.configData.chaffEnabled, self.configData.chaffWindow)
             self.configData.nextChaffDate = self.calculateChaffDate()
             Storage.shared.updateNextChaffDate(self.storageContext, date: self.configData.nextChaffDate)
