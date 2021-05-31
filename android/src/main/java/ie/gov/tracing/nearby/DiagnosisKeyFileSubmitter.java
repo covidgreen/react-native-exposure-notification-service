@@ -15,16 +15,25 @@ import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
+import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.storage.SharedPrefs;
 
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
+import ie.gov.tracing.hms.ContactShieldWrapper;
+
 class DiagnosisKeyFileSubmitter {
   private static final Duration API_TIMEOUT = Duration.ofSeconds(10);
-
-  private final ExposureNotificationClientWrapper client;
+  private final ExposureClientWrapper client;
+  private Context context;
 
   DiagnosisKeyFileSubmitter(Context context) {
-    client = ExposureNotificationClientWrapper.get(context);
+    if (ApiAvailabilityCheckUtils.isHMS(context)) {
+      client = ContactShieldWrapper.get(context);
+    } else {
+      client = ExposureNotificationClientWrapper.get(context);
+    }
+    this.context = context;
   }
 
   ListenableFuture<?> parseFiles(List<File> files, String token, ExposureConfig config) {
@@ -36,19 +45,22 @@ class DiagnosisKeyFileSubmitter {
 
     Events.raiseEvent(Events.INFO, "Processing " + files.size() + " export files...");
 
-    if (config.getV2Mode()) {
+    // not supporting V2 in HMS yet
+    if (config.getV2Mode() && ApiAvailabilityCheckUtils.isGMS(this.context)) {
       client.setDiagnosisKeysDataMapping(config);
       return TaskToFutureAdapter.getFutureWithTimeout(
-                  client.provideDiagnosisKeys(files),
-                  API_TIMEOUT.toMillis(),
-                  TimeUnit.MILLISECONDS,
-                  AppExecutors.getScheduledExecutor());
+        client.provideDiagnosisKeys(files),
+        API_TIMEOUT.toMillis(),
+        TimeUnit.MILLISECONDS,
+        this.context,
+        AppExecutors.getScheduledExecutor());      
     } else {
       return TaskToFutureAdapter.getFutureWithTimeout(
-              client.provideDiagnosisKeys(files, token, config),
-              API_TIMEOUT.toMillis(),
-              TimeUnit.MILLISECONDS,
-              AppExecutors.getScheduledExecutor());
+        client.provideDiagnosisKeys(files, token, config),
+        API_TIMEOUT.toMillis(),
+        TimeUnit.MILLISECONDS,
+        this.context,
+        AppExecutors.getScheduledExecutor());        
     }
   }
 }
