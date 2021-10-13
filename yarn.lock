@@ -6006,10 +6006,10 @@ react-is@^17.0.1:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-17.0.2.tgz#e691d4a8e9c789365655539ab372762b0efb54f0"
   integrity sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==
 
-react-native-permissions@^2.1.5:
-  version "2.1.5"
-  resolved "https://registry.yarnpkg.com/react-native-permissions/-/react-native-permissions-2.1.5.tgz#6cfc4f1ab1590f4952299b7cdc9698525ad540e0"
-  integrity sha512-b9KO/4UEV9qddl+kcSybmdk8nlAifclSDBR2rSvc5KZM06vIaJWJNIzK2ZwPXqDQ5yD3CJLuKTRj7Fz+jM9qyQ==
+react-native-permissions@^3.0.6:
+  version "3.0.6"
+  resolved "https://registry.yarnpkg.com/react-native-permissions/-/react-native-permissions-3.0.6.tgz#0cb146cecb8b883c3770f8072196ad1a081b20b8"
+  integrity sha512-vnR13M7uqr1ZDsK3Edloo1+m6PdIRQPOontGFIjUqUOSFzF8LIm7pkF9fv+dY1hsCtTGGG6GnyOS8KDJ/uLyjg==
 
 react-native@0.63.3:
   version "0.63.3"
