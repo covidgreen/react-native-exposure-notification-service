@@ -129,8 +129,7 @@ export interface ExposureNotificationModule extends EventSubscriptionVendor {
   triggerUpdate(): Promise<string>;
 }
 
-const {
-  ExposureNotificationModule: NativeExposureNotificationModule
-} = NativeModules;
+const {ExposureNotificationModule: NativeExposureNotificationModule} =
+  NativeModules;
 
 export default NativeExposureNotificationModule as ExposureNotificationModule;

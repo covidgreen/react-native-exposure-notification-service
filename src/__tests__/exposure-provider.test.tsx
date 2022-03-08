@@ -114,15 +114,14 @@ const mockConfig = {
   hideForeground: true
 };
 
-const ExposureProviderWithMockConfig: React.FC<
-  Partial<ExposureProviderProps>
-> = ({children, ...overrides}) => {
-  return (
-    <ExposureProvider {...mockConfig} {...overrides}>
-      {children}
-    </ExposureProvider>
-  );
-};
+const ExposureProviderWithMockConfig: React.FC<Partial<ExposureProviderProps>> =
+  ({children, ...overrides}) => {
+    return (
+      <ExposureProvider {...mockConfig} {...overrides}>
+        {children}
+      </ExposureProvider>
+    );
+  };
 
 function flushPromises() {
   return new Promise((resolve) => setImmediate(resolve));
