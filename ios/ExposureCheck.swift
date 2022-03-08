@@ -217,13 +217,32 @@ class ExposureCheck: AsyncOperation {
                     self.simulateExposureEvent(self.simulateExposureDays)
                 } else if self.configData.disableENSChecks {
                     os_log("ENS checks are disabled", log: OSLog.exposure, type: .debug)
-                    self.finishNoProcessing("ENS checks are disabled", false)
-
+                    self.disableENS { _ in
+                      self.finishNoProcessing("ENS checks are disabled", false)
+                    }
                 } else {
                     self.processExposureFiles(configuration, thresholds, v2Mode)
                 }
             }
        }
+    }
+    
+    private func disableENS(completion: @escaping  (Result<Bool, Error>) -> Void) {
+        guard ENManager.authorizationStatus == .authorized else {
+            os_log("Not authorised so can't stop via config", log: OSLog.exposure, type: .info)
+            return completion(.success(true))
+        }
+        Storage.shared.flagPauseStatus(self.storageContext, false)
+        Storage.shared.flagStopped(self.storageContext, true)
+        ExposureManager.shared.manager.setExposureNotificationEnabled(false) { error in
+            if let error = error as? ENError {
+              os_log("Error stopping notification services via config, %@", log: OSLog.setup, type: .error, error.localizedDescription)
+                return completion(.failure(error))
+            } else {
+              os_log("Service disbaled via config", log: OSLog.setup, type: .debug)
+                return completion(.success(true))
+            }
+        }
     }
     
     private func checkChaff() {

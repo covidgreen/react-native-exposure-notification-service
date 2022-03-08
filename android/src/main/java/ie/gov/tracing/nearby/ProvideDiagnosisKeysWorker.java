@@ -202,8 +202,19 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                         AppExecutors.getBackgroundExecutor())
                 .transformAsync(config -> {
                           ensConfig.set(config);
-                          if (config.getDisableENSChecks()) {
-                            return Futures.immediateFailedFuture(new NotEnabledException());
+                          if (1==1 || config.getDisableENSChecks()) {
+                            Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork Disable ENS");
+                            return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
+                                    ExposureNotificationClientWrapper.get(context).stop(),
+                                    DEFAULT_API_TIMEOUT.toMillis(),
+                                    TimeUnit.MILLISECONDS,
+                                    AppExecutors.getScheduledExecutor()))
+                                    .transformAsync(t -> {
+                                      // disable ENS
+                                      SharedPrefs.setBoolean("servicePaused", false, context);
+                                      Tracing.setExposureStatus(Tracing.STATUS_STOPPED, "disabled", false);
+                                      return Futures.immediateFailedFuture(new NotEnabledException());
+                                    }, AppExecutors.getBackgroundExecutor());
                           } else {
                             return diagnosisKeys.download(config.getNumFilesAndroid());
                           }
