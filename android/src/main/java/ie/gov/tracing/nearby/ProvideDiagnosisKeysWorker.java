@@ -202,7 +202,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                         AppExecutors.getBackgroundExecutor())
                 .transformAsync(config -> {
                           ensConfig.set(config);
-                          if (1==1 || config.getDisableENSChecks()) {
+                          if (config.getDisableENSChecks()) {
                             Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startWork Disable ENS");
                             return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
                                     ExposureNotificationClientWrapper.get(context).stop(),
