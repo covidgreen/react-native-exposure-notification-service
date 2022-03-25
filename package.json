@@ -77,5 +77,8 @@
       "pre-commit": "lint-staged",
       "pre-push": "npm test"
     }
+  },
+  "dependencies": {
+    "user": "^0.0.0"
   }
 }
