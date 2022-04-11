@@ -462,9 +462,9 @@ class ExposureCheck: AsyncOperation {
         let payload:[String: Any] = [
           "description": message
         ]
-        self.saveMetric(event: "LOG_ERROR", payload: payload) { _ in
+        // self.saveMetric(event: "LOG_ERROR", payload: payload) { _ in
           self.trackDailyMetrics()
-        }
+        // }
       } else {
         self.trackDailyMetrics()
       }
