@@ -2,23 +2,59 @@ package ie.gov.tracing.storage
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
+import android.security.KeyPairGeneratorSpec
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 import ie.gov.tracing.common.Events
+import java.math.BigInteger
+import java.security.KeyPair
+import java.security.KeyPairGenerator
+import java.util.*
+import javax.security.auth.x500.X500Principal
 
 class SharedPrefs {
     companion object {
         private var INSTANCE: SharedPreferences? = null
 
+        private fun createMasterKey(context: Context): String {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+            } else {
+                val alias = "your_alias"
+                val start: Calendar = GregorianCalendar()
+                val end: Calendar = GregorianCalendar()
+                end.add(Calendar.YEAR, 30)
+
+                val spec =
+                        KeyPairGeneratorSpec.Builder(context)
+                                .setAlias(alias)
+                                .setSubject(X500Principal("CN=$alias"))
+                                .setSerialNumber(
+                                        BigInteger.valueOf(
+                                                Math.abs(alias.hashCode()).toLong()
+                                        )
+                                )
+                                .setStartDate(start.time).setEndDate(end.time)
+                                .build()
+
+                val kpGenerator: KeyPairGenerator = KeyPairGenerator.getInstance(
+                        "RSA",
+                        "AndroidKeyStore"
+                )
+                kpGenerator.initialize(spec)
+                val kp: KeyPair = kpGenerator.generateKeyPair()
+                kp.public.toString()
+            }
+        }
+
         private fun getEncryptedSharedPrefs(context: Context): SharedPreferences? {
             try {
                 if (INSTANCE != null) return INSTANCE!!
 
-                val masterKeyAlias: String = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-
                 INSTANCE = EncryptedSharedPreferences.create(
                         "secret_shared_prefs",
-                        masterKeyAlias,
+                        createMasterKey(context.applicationContext),
                         context.applicationContext,
                         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
