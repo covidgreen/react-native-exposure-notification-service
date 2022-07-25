@@ -10,10 +10,13 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import org.jetbrains.annotations.NotNull;
 
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
+import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.ExposureConfig;
 import ie.gov.tracing.common.TaskToFutureAdapter;
+import ie.gov.tracing.hms.ContactShieldWrapper;
 import ie.gov.tracing.nearby.ExposureNotificationClientWrapper;
 import ie.gov.tracing.storage.ExposureEntity;
 
@@ -28,11 +31,19 @@ import static ie.gov.tracing.nearby.ProvideDiagnosisKeysWorker.DEFAULT_API_TIMEO
 
 public class RiskCalculationV2 implements RiskCalculation {
 
-    ExposureConfig ensConfig;
+    private final ExposureConfig ensConfig;
+    private final ExposureClientWrapper client;
+    private final Context context;
 
-    public RiskCalculationV2(ExposureConfig config) {
-            ensConfig = config;
+    public RiskCalculationV2(ExposureConfig config, Context context) {
+        ensConfig = config;
+        this.context = context;
+        if (ApiAvailabilityCheckUtils.isHMS(context)) {
+            client = ContactShieldWrapper.get(context);
+        } else {
+            client = ExposureNotificationClientWrapper.get(context);
         }
+    }
 
     @NotNull
     private ExposureEntity buildSimulatedExposureEntity(int simulateDays) {
@@ -235,15 +246,17 @@ public class RiskCalculationV2 implements RiskCalculation {
     public ListenableFuture<ExposureEntity> processKeys(Context context, Boolean simulate, Integer simulateDays) {
 
         return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                    ExposureNotificationClientWrapper.get(context).getDailySummaries(this.ensConfig),
+                    client.getDailySummaries(this.ensConfig),
                     DEFAULT_API_TIMEOUT.toMillis(),
                     TimeUnit.MILLISECONDS,
+                    this.context,
                     AppExecutors.getScheduledExecutor()))
                 .transformAsync(dailySummaries -> {
                     return FluentFuture.from(TaskToFutureAdapter.getFutureWithTimeout(
-                        ExposureNotificationClientWrapper.get(context).getExposureWindows(),
+                        client.getExposureWindows(),
                         DEFAULT_API_TIMEOUT.toMillis(),
                         TimeUnit.MILLISECONDS,
+                        this.context,
                         AppExecutors.getScheduledExecutor()))
                     .transformAsync(exposureWindows -> {
                         if (simulate) {

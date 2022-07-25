@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 
 import ie.gov.tracing.R;
 import ie.gov.tracing.Tracing;
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
@@ -147,9 +148,9 @@ public class StateUpdatedWorker extends ListenableWorker {
                 return Futures.immediateFuture(Result.success());
             }
             if (inV2Mode) {
-                risk = new RiskCalculationV2(config);
+                risk = new RiskCalculationV2(config, context);
             } else {
-                risk = new RiskCalculationV1(repository, token);
+                risk = new RiskCalculationV1(repository, token, context);
             }
 
             return FluentFuture.from(risk.processKeys(context, simulate, simulateDays))

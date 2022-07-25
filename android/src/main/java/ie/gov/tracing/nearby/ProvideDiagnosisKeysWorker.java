@@ -25,6 +25,7 @@ import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.gson.Gson;
 
 import java.util.HashMap;
 import java.io.File;
@@ -34,6 +35,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -44,6 +46,7 @@ import ie.gov.tracing.Tracing;
 import ie.gov.tracing.common.AppExecutors;
 import ie.gov.tracing.common.Events;
 import ie.gov.tracing.common.ExposureConfig;
+import ie.gov.tracing.common.ExposureClientWrapper;
 import ie.gov.tracing.common.TaskToFutureAdapter;
 import ie.gov.tracing.network.DiagnosisKeyDownloader;
 import ie.gov.tracing.network.Fetcher;
@@ -51,6 +54,9 @@ import ie.gov.tracing.storage.ExposureNotificationRepository;
 import ie.gov.tracing.storage.SharedPrefs;
 import ie.gov.tracing.storage.TokenEntity;
 import ie.gov.tracing.R;
+
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils;
+import ie.gov.tracing.hms.ContactShieldWrapper;
 
 public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   public static final Duration DEFAULT_API_TIMEOUT = Duration.ofSeconds(15);
@@ -62,8 +68,6 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
           "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID";
   private static final String FOREGROUND_NOTIFICATION_ID =
           "ProvideDiagnosisKeysWorker.FOREGROUND_NOTIFICATION_ID.noBadge";
-  private static int INITIAL_DELAY = 30;
-  private static int MAX_DELAY = 15 * 60;
 
   private final DiagnosisKeyDownloader diagnosisKeys;
   private final DiagnosisKeyFileSubmitter submitter;
@@ -71,6 +75,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
   private final ExposureNotificationRepository repository;
   public static long nextSince = 0;
   private final Context context;
+  private final ExposureClientWrapper client;
 
   public ProvideDiagnosisKeysWorker(@NonNull Context context,
                                     @NonNull WorkerParameters workerParams) {
@@ -80,6 +85,11 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     secureRandom = new SecureRandom();
     repository = new ExposureNotificationRepository(context);
     this.context = context;
+    if (ApiAvailabilityCheckUtils.isHMS(context)) {
+      client = ContactShieldWrapper.get(context);
+    } else {
+      client = ExposureNotificationClientWrapper.get(context);
+    }
   }
 
   private String generateRandomToken() {
@@ -142,6 +152,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         SharedPrefs.remove("lastApiError", this.context);
         SharedPrefs.remove("lastError", this.context);
         final boolean skipTimeCheck = getInputData().getBoolean("skipTimeCheck", false);
+
+        setForegroundAsync(createForegroundInfo());
   
         /*long lastRun = SharedPrefs.getLong("lastRunDate", Tracing.currentContext);
         long checkFrequency = SharedPrefs.getLong("exposureCheckFrequency", Tracing.context);
@@ -172,12 +184,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         final String token = generateRandomToken();
         AtomicReference<ExposureConfig> ensConfig = new AtomicReference<>();
 
-        return FluentFuture.from(TaskToFutureAdapter
-                .getFutureWithTimeout(
-                        ExposureNotificationClientWrapper.get(this.context).isEnabled(),
-                        DEFAULT_API_TIMEOUT.toMillis(),
-                        TimeUnit.MILLISECONDS,
-                        AppExecutors.getScheduledExecutor()))
+        return FluentFuture.from(client.isEnabled())
                 .transformAsync(isEnabled -> {
                           // Only continue if it is enabled.
                           if (isEnabled != null && isEnabled) {
@@ -191,7 +198,7 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                             catch(Exception ex) {
                                 // ignore if fails to create foreground worker
                             }                            
-                            return ExposureNotificationClientWrapper.get(this.context).fetchExposureConfig(this.context);
+                            return fetchExposureConfig(this.context);
                           } else {
                             // Stop here because things aren't enabled. Will still return successful though.
                             SharedPrefs.setString("lastError", "Not authorised so can't run exposure checks", this.context);
@@ -246,6 +253,18 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
         
         return Futures.immediateFuture(Result.success());
       }
+  }
+
+  private ListenableFuture<ExposureConfig> fetchExposureConfig(Context context) {
+    String version = Tracing.version(context).getString("display");
+    String settings = Fetcher.fetch("/settings/exposures?os=android&version=" + version, context);
+    Gson gson = new Gson();
+    Map map = gson.fromJson(settings, Map.class);
+    String exposureConfig = (String) map.get("exposureConfig");
+    ExposureConfig config = gson.fromJson(exposureConfig, ExposureConfig.class);
+
+    SharedPrefs.setString("exposureConfig", exposureConfig, context);
+    return Futures.immediateFuture(config);
   }
 
   @NonNull
@@ -372,11 +391,9 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
     Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startScheduler: run every " +
             checkFrequency + " minutes");
     WorkManager workManager = WorkManager.getInstance(Tracing.context);
-
-    long delay = Math.round(Math.random() * (MAX_DELAY - INITIAL_DELAY) + INITIAL_DELAY);
     PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
             ProvideDiagnosisKeysWorker.class, checkFrequency, TimeUnit.MINUTES)
-            .setInitialDelay(delay, TimeUnit.SECONDS) // could offset this, but idle may be good enough
+            .setInitialDelay(30, TimeUnit.SECONDS) // could offset this, but idle may be good enough
             .addTag(WORKER_NAME)
             .setConstraints(
                     new Constraints.Builder()
@@ -385,14 +402,8 @@ public class ProvideDiagnosisKeysWorker extends ListenableWorker {
                             .setRequiredNetworkType(NetworkType.CONNECTED)
                             .build())
             .build();
-    long scheduledCheckFrequency = SharedPrefs.getLong("scheduledExposureCheckFrequency", Tracing.context);
-    ExistingPeriodicWorkPolicy policy = scheduledCheckFrequency == 0 || checkFrequency != scheduledCheckFrequency
-            ? ExistingPeriodicWorkPolicy.REPLACE
-            : ExistingPeriodicWorkPolicy.KEEP;
     workManager
-            .enqueueUniquePeriodicWork(WORKER_NAME, policy, workRequest);
-    SharedPrefs.setLong("scheduledExposureCheckFrequency", checkFrequency, Tracing.context);
-    Events.raiseEvent(Events.INFO, "ProvideDiagnosisKeysWorker.startScheduler: policy " + policy);
+            .enqueueUniquePeriodicWork(WORKER_NAME, ExistingPeriodicWorkPolicy.REPLACE, workRequest);
   }
 
 

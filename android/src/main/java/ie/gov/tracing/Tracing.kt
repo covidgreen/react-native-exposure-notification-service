@@ -22,8 +22,10 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.nearby.exposurenotification.ExposureNotificationStatusCodes
 import com.google.android.gms.nearby.exposurenotification.TemporaryExposureKey
 import com.google.common.io.BaseEncoding
+import com.google.common.util.concurrent.ListenableFuture
 import ie.gov.tracing.common.Config
 import ie.gov.tracing.common.Events
+import ie.gov.tracing.common.ExposureClientWrapper
 import ie.gov.tracing.nearby.ExposureNotificationRepeater
 import ie.gov.tracing.nearby.ExposureNotificationClientWrapper
 import ie.gov.tracing.nearby.ExposureNotificationHelper
@@ -37,8 +39,13 @@ import ie.gov.tracing.storage.SharedPrefs
 import ie.gov.tracing.storage.SharedPrefs.Companion.getLong
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.util.*
-import kotlin.concurrent.schedule
+import com.huawei.hms.api.HuaweiApiAvailability
+import com.huawei.hms.contactshield.PeriodicKey
+import com.huawei.hms.utils.HMSPackageManager
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils.isGMS
+import ie.gov.tracing.common.ApiAvailabilityCheckUtils.isHMS
+import ie.gov.tracing.hms.ContactShieldWrapper
 
 object Tracing {
     class Listener: ActivityEventListener {
@@ -54,11 +61,11 @@ object Tracing {
                         if(Tracing.status == Tracing.STATUS_STARTING) {
                             // call start after authorization if starting,
                             // fulfils promise after successful start
-                            Tracing.start(null)
+                            Tracing.start(resolutionPromise)
                         } else {
                             // in order for isAuthorised to work, we must start
                             // start failure will resolve authorisation permissions promise
-                            Tracing.authoriseExposure(null)
+                            Tracing.authoriseExposure(resolutionPromise)
                         }
                     } else {
                         Events.raiseEvent(Events.INFO, "onActivityResult - START_EXPOSURE_NOTIFICATION_FAILED: $resultCode")
@@ -75,7 +82,7 @@ object Tracing {
                 if (requestCode == RequestCodes.REQUEST_CODE_GET_TEMP_EXPOSURE_KEY_HISTORY) {
                     if (resultCode == Activity.RESULT_OK) {
                         Events.raiseEvent(Events.INFO, "onActivityResult - GET_TEMP_EXPOSURE_KEY_HISTORY_OK")
-                        Tracing.getDiagnosisKeys(null)
+                        Tracing.getDiagnosisKeys(resolutionPromise)
                     } else {
                         Tracing.resolutionPromise?.reject(Throwable("Rejected"))
                         Events.raiseEvent(Events.ERROR, "onActivityResult - GET_TEMP_EXPOSURE_KEY_HISTORY_FAILED: $resultCode")
@@ -87,8 +94,25 @@ object Tracing {
                     if (resultCode == Activity.RESULT_OK) {
                         val gps = GoogleApiAvailability.getInstance()
                         val result = gps.isGooglePlayServicesAvailable(Tracing.context.applicationContext)
-                        Tracing.base.playServicesVersion = gps.getApkVersion(Tracing.context.applicationContext)
-                        Events.raiseEvent(Events.INFO, "triggerUpdate - version after activity: ${Tracing.base.playServicesVersion}")
+                        Tracing.base.gmsServicesVersion = gps.getApkVersion(Tracing.context.applicationContext)
+                        Events.raiseEvent(Events.INFO, "triggerUpdate - version after activity: ${Tracing.base.gmsServicesVersion}")
+
+                        if(result == ConnectionResult.SUCCESS) {
+                            Events.raiseEvent(Events.INFO, "triggerUpdate - update successful")
+                            Tracing.resolutionPromise?.resolve("success")
+                        } else {
+                            Events.raiseEvent(Events.ERROR, "triggerUpdate - update failed: $result")
+                            Tracing.resolutionPromise?.resolve("failed")
+                        }
+                    } else {
+                        Events.raiseEvent(Events.INFO, "triggerUpdate - update cancelled")
+                        Tracing.resolutionPromise?.resolve("cancelled")
+                    }
+                } else if(requestCode == RequestCodes.HMS_PLAY_SERVICES_UPDATE){
+                    if (resultCode == Activity.RESULT_OK) {
+                        val result = HuaweiApiAvailability.getInstance().isHuaweiMobileServicesAvailable(Tracing.context.applicationContext);
+                        Tracing.base.hmsServicesVersion = HMSPackageManager.getInstance(Tracing.context.applicationContext).hmsVersionCode
+                        Events.raiseEvent(Events.INFO,"triggerUpdate - version after activity: ${Tracing.base.hmsServicesVersion}")
 
                         if(result == ConnectionResult.SUCCESS) {
                             Events.raiseEvent(Events.INFO, "triggerUpdate - update successful")
@@ -102,7 +126,6 @@ object Tracing {
                         Tracing.resolutionPromise?.resolve("cancelled")
                     }
                 }
-
             } catch (ex: Exception) {
                 Events.raiseError("onActivityResult", ex)
                 Tracing.resolutionPromise?.resolve(false)
@@ -174,7 +197,7 @@ object Tracing {
         var doesSupportENS = false
         var hasCheckedENS = false
 
-        private lateinit var exposureWrapper: ExposureNotificationClientWrapper
+        private lateinit var exposureWrapper: ExposureClientWrapper
 
         var resolutionPromise: Promise? = null
         var startPromise: Promise? = null
@@ -192,14 +215,8 @@ object Tracing {
                 changed = true
             }
             if (changed) {
-                if (scheduleCheck) {
-                    Timer("DelayedENSCheck", false).schedule(300) {
-                        Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
-                    }
-                } else {
-                    Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
-                }
-            }                
+                Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
+            }
         }
 
         @JvmStatic
@@ -210,6 +227,7 @@ object Tracing {
             } else if ((exposureStatus == EXPOSURE_STATUS_DISABLED) && serviceStatus) {
                 start(null)
 
+                Events.raiseEvent(Events.ON_STATUS_CHANGED, getExposureStatus(null))
             }
             Events.raiseEvent(Events.INFO, "ENS Service Status updated status " + exposureStatus)
         }
@@ -309,7 +327,11 @@ object Tracing {
                 base = baseJavaModule
                 reactContext = appContext
                 context = reactContext.applicationContext
-                exposureWrapper = ExposureNotificationClientWrapper.get(context)
+                if (isHMS(context)) {
+                    exposureWrapper = ContactShieldWrapper.get(context)
+                } else {
+                    exposureWrapper = ExposureNotificationClientWrapper.get(context)
+                }                
                 reactContext.addActivityEventListener(Listener())
                 currentContext = context // this is overridden depending on path into codebase
 
@@ -347,7 +369,7 @@ object Tracing {
         }
 
         @JvmStatic
-        fun start(promise: Promise?) {
+        fun start(promise: Promise?) = runBlocking<Unit> {
             try {
                 setNewStatus(STATUS_STARTING)
                 SharedPrefs.setBoolean("servicePaused", false, context)
@@ -355,81 +377,52 @@ object Tracing {
                     resolutionPromise = null
                     startPromise = promise
                 }
-                ExposureNotificationHelper(authorisationCallback).startExposure()
+                exposureWrapper.start().await()
+                setNewStatus(STATUS_STARTED)
+                startPromise?.resolve(true)
             } catch (ex: Exception) {
-                Events.raiseError("start", ex)
-                promise?.resolve(false)
+                Events.raiseError("authorisationCallback.onSuccess", ex)
+                startPromise?.resolve(false)
             }
         }
 
         @JvmStatic
-        fun pause(promise: Promise?) {
+        fun pause(promise: Promise?) = runBlocking<Unit> {
             try {
                 setNewStatus(STATUS_STOPPING)
                 SharedPrefs.setBoolean("servicePaused", true, context)
-                val permissionHelperCallback: Callback = object : Callback {
-                    override fun onFailure(t: Throwable) {
-                        Events.raiseError("paused", Exception(t))
-                        setNewStatus(STATUS_PAUSED)
-                        promise?.resolve(true)
-                    }
-
-                    override fun onSuccess(status: String) {
-                        Events.raiseEvent(Events.INFO, "exposure tracing $status")
-                        ProvideDiagnosisKeysWorker.stopScheduler()
-                        setNewStatus(STATUS_PAUSED)
-                        promise?.resolve(true)
-                    }
-                }
-                ExposureNotificationHelper(permissionHelperCallback).stopExposure()
-            } catch (ex: Exception) {
+                exposureWrapper.stop().await()
+                setNewStatus(STATUS_PAUSED)
+                promise?.resolve(true)
+            } catch(ex: Exception) {
                 Events.raiseError("paused", ex)
                 promise?.resolve(false)
             }
         }
 
         @JvmStatic
-        fun stop() {
+        fun stop() = runBlocking<Unit> {
             try {
                 setNewStatus(STATUS_STOPPING)
                 SharedPrefs.setBoolean("servicePaused", false, context)
-                val permissionHelperCallback: Callback = object : Callback {
-                    override fun onFailure(t: Throwable) {
-                        Events.raiseError("stop", Exception(t))
-                        setNewStatus(STATUS_STOPPED)
-                    }
-
-                    override fun onSuccess(status: String) {
-                        Events.raiseEvent(Events.INFO, "exposure tracing $status")
-                        ProvideDiagnosisKeysWorker.stopScheduler()
-                        setNewStatus(STATUS_STOPPED)
-                    }
-                }
-                ExposureNotificationHelper(permissionHelperCallback).stopExposure()
+                exposureWrapper.stop().await()
+                setNewStatus(STATUS_STOPPED)
             } catch (ex: Exception) {
                 Events.raiseError("stop", ex)
+                setNewStatus(STATUS_STOPPED)
             }
         }
 
         @JvmStatic
-        fun exposureEnabled(promise: Promise) {
+        fun exposureEnabled(promise: Promise) = runBlocking<Unit> {
             try {
-                exposureWrapper.isEnabled
-                        .addOnSuccessListener { enabled: Boolean? ->
-                            if (enabled != null) {
-                                promise.resolve(enabled)
-                            } else {
-                                Events.raiseEvent(Events.INFO, "exposureEnabled: null")
-                                promise.resolve(false)
-                            }
-                        }
-                        .addOnFailureListener { ex ->
-                            Events.raiseError("exposureEnabled - onFailure", ex)
-                            handleApiException(ex)
-                            promise.resolve(false)
-                        }
+                val enabled = exposureWrapper.isEnabled().await()
+                promise.resolve(enabled)
             } catch (ex: Exception) {
                 Events.raiseError("exposureEnabled - exception", ex)
+                if (ex is ApiException) {
+                    handleApiException((ex))
+                }
                 promise.resolve(false)
             }
         }
@@ -497,107 +490,125 @@ object Tracing {
             return result
         }
 
-        // get the diagnosis keys for this user for the past 14 days (config)
-        @JvmStatic
-        fun getDiagnosisKeys(promise: Promise?) {
-            try {
-                if (promise != null) { // called from client
-                    resolutionPromise = promise
+        private fun retrieveKeys(promise: Promise?) = runBlocking<Unit> {
+            val keys = exposureWrapper.getTemporaryExposureKeyHistory().await()
+
+            if (keys != null) {
+                // convert the keys into a structure we can convert to json
+                val result: WritableArray = Arguments.createArray()
+
+                for (temporaryExposureKey in keys) {
+                    result.pushMap(getExposureKeyAsMap(temporaryExposureKey))
                 }
-                exposureWrapper.temporaryExposureKeyHistory
-                        .addOnSuccessListener {
-                            if (it != null) {
-                                // convert the keys into a structure we can convert to json
-                                val result: WritableArray = Arguments.createArray()
 
-                                for (temporaryExposureKey in it) {
-                                    result.pushMap(getExposureKeyAsMap(temporaryExposureKey))
-                                }
-
-                                Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success, #keys: ${it.size}")
-                                resolutionPromise?.resolve(result)
-                            } else {
-                                Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success - no keys")
-                                resolutionPromise?.resolve(Arguments.createArray())
-                            }
-                        }
-                        .addOnFailureListener { ex ->
-                            if (ex is ApiException && ex.statusCode == ExposureNotificationStatusCodes.RESOLUTION_REQUIRED) {
-                                Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure api exception: " +
-                                        ExposureNotificationStatusCodes.getStatusCodeString(ex.statusCode))
-                                if (promise != null) { // ask permission, if failed and no promise set as param
-                                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - ask user for permission")
-                                    try {
-                                        ex.status.startResolutionForResult(base.activity,
-                                                RequestCodes.REQUEST_CODE_GET_TEMP_EXPOSURE_KEY_HISTORY)
-
-                                        // we will need to resolve promise and attempt to get the keys again
-                                        // promise will be resolved if successful in success listener
-                                    } catch (ex: Exception) {
-                                        resolutionPromise?.resolve(Arguments.createArray())
-                                        Events.raiseError("getDiagnosisKeys - exposure api exception", ex)
-                                    }
-                                } else {
-                                    resolutionPromise?.resolve(Arguments.createArray())
-                                    Events.raiseError("getDiagnosisKeys - failed post-resolution, not trying again", ex)
-                                }
-                            } else {
-                                resolutionPromise?.resolve(Arguments.createArray())
-                                Events.raiseError("getDiagnosisKeys - general exception", ex)
-                            }
-                        }
-            } catch (ex: Exception) {
-                Events.raiseError("getDiagnosisKeys", ex)
+                Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success, #keys: ${keys.size}")
+                promise?.resolve(result)
+            } else {
+                Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure key retrieval success - no keys")
                 promise?.resolve(Arguments.createArray())
             }
+
+        }
+        // get the diagnosis keys for this user for the past 14 days (config)
+        @JvmStatic
+        fun getDiagnosisKeys(promise: Promise?) = runBlocking<Unit> {
+            resolutionPromise = null
+            try {
+                retrieveKeys(promise)
+            } catch (ex: Exception) {
+                if (ex is ApiException && ex.statusCode == ExposureNotificationStatusCodes.RESOLUTION_REQUIRED) {
+                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - exposure api exception: " +
+                            ExposureNotificationStatusCodes.getStatusCodeString(ex.statusCode))
+                    Events.raiseEvent(Events.INFO, "getDiagnosisKeys - ask user for permission")
+                    try {
+                        resolutionPromise = promise
+                        ex.status.startResolutionForResult(base.activity,
+                                RequestCodes.REQUEST_CODE_GET_TEMP_EXPOSURE_KEY_HISTORY)
+                        // we will need to resolve promise and attempt to get the keys again
+                        // promise will be resolved if successful in success listener
+                    } catch (ex: Exception) {
+                        promise?.resolve(Arguments.createArray())
+                        Events.raiseError("getDiagnosisKeys - exposure api exception", ex)
+                    }
+                } else {
+                    promise?.resolve(Arguments.createArray())
+                    Events.raiseError("getDiagnosisKeys - general exception", ex)
+                }
+            }
         }
 
+
         @JvmStatic
-        fun isAuthorised(promise: Promise) {
+        fun isAuthorised(promise: Promise) = runBlocking<Unit> {
             Events.raiseEvent(Events.INFO, "Checking isAuthorised");
             try {
-                exposureWrapper.isEnabled
-                        .addOnSuccessListener { enabled: Boolean? ->
+                val enabled = exposureWrapper.isEnabled().await()
 
-                            if (enabled == true) {
-                                Events.raiseEvent(Events.INFO, "isAuthorised: granted")
-                                promise.resolve("granted")
-                            } else {
-                                Events.raiseEvent(Events.INFO, "isAuthorised: denied")
-                                promise.resolve("blocked")
-                            }
-                        }
-                        .addOnFailureListener { ex ->
-                            Events.raiseError("isAuthorised - onFailure", ex)
-                            handleApiException(ex)
-                            promise.resolve("blocked")
-                        }
+                if (enabled == true) {
+                    Events.raiseEvent(Events.INFO, "isAuthorised: granted")
+                    promise.resolve("granted")
+                } else {
+                    Events.raiseEvent(Events.INFO, "isAuthorised: denied")
+                    promise.resolve("denied")
+                }
             } catch (ex: Exception) {
-                Events.raiseError("isAuthorised - exception", ex)
-                promise.resolve("blocked")
+                if (ex is ApiException) {
+                    handleApiException(ex)
+                } else {
+                    Events.raiseError("isAuthorised - exception", ex)
+                    promise.resolve("blocked")
+                }
             }
         }
 
         @JvmStatic
-        fun authoriseExposure(promise: Promise?) {
+        fun authoriseExposure(promise: Promise?) = runBlocking<Unit> {
             // the only way to authorise is to call start, we just resolve promise differently
+            resolutionPromise = null
             try {
-                if (promise != null) {
-                    resolutionPromise = null
-                    startPromise = promise
-                }
-                ExposureNotificationHelper(authorisationCallback).startExposure()
+                exposureWrapper.start().await()
+                promise?.resolve("granted")
             } catch (ex: Exception) {
-                Events.raiseError("authorizeExposure", ex)
-                promise?.resolve("unavailable")
+                if (ex is ApiException) {
+                    handleApiException(ex)
+                    if (ex.statusCode == ExposureNotificationStatusCodes.RESOLUTION_REQUIRED) {
+                        try {
+                            resolutionPromise = promise
+                            // opens dialog box to allow exposure tracing
+                            Events.raiseEvent(Events.INFO, "authorisationCallback - start resolution")
+                            ex.status.startResolutionForResult(base.activity,
+                                    RequestCodes.REQUEST_CODE_START_EXPOSURE_NOTIFICATION)
+                        } catch (exI: SendIntentException) {
+                            var status = "denied"
+                            Events.raiseError("authorisationCallback - error starting resolution, " +
+                                    "open settings to resolve", ex)
+                            if (exI is ApiException) {
+                                if (exI.statusCode == ExposureNotificationStatusCodes.FAILED_NOT_SUPPORTED)
+                                    status = "unavailable"
+                                else
+                                    status = "blocked"
+                            }
+                            promise?.resolve(status)
+                        }
+                    }
+                } else {
+                    Events.raiseError("authorizeExposure: non apiException", ex)
+                    promise?.resolve("denied")
+                }
+
             }
         }
 
         @JvmStatic
         fun canSupport(promise: Promise) {
-            val apiResult = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
-            Events.raiseEvent(Events.INFO, "GMS - isAvailable: $apiResult")
-            promise.resolve(apiResult == ConnectionResult.SUCCESS)
+            try {
+                val available = exposureWrapper.checkAvailability()
+                Events.raiseEvent(Events.INFO, "GMS/HMS - isAvailable: $available")
+                promise.resolve(available)
+            } catch (ex: Exception) {
+                Events.raiseError("canSupported - Exception", ex)
+                promise?.resolve(false)
+            }
         }
 
         @JvmStatic
@@ -606,18 +617,18 @@ object Tracing {
                 Events.raiseEvent(Events.INFO, "isSupported - Checking if ENS supported")
 
                 try {
-                    val apiResult = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
-                    Events.raiseEvent(Events.INFO, "isSupported - isGooglePlayServicesAvailable: $apiResult")
-                    if (apiResult == ConnectionResult.SUCCESS) {
-                        val version = ExposureNotificationHelper.getDeviceENSVersion().await()
+                    val available = exposureWrapper.checkAvailability()
+                    Events.raiseEvent(Events.INFO, "isSupported - checkAvailability: $available")
+                    promise?.resolve(available)
+                    if (available) {
+                        val version = exposureWrapper.getDeviceENSVersion().await()
                         Events.raiseEvent(Events.INFO, "isSupported - getDeviceENSVersion: $version")
                         doesSupportENS = true
                         hasCheckedENS = true
                         promise?.resolve(true)
-                    } else if (apiResult == ConnectionResult.SERVICE_INVALID || apiResult == ConnectionResult.SERVICE_DISABLED || apiResult == ConnectionResult.SERVICE_MISSING) {
+                    } else {
                         doesSupportENS = false
                         hasCheckedENS = true
-                        base.setApiError(apiResult)
                         promise?.resolve(false)
                     }
                 } catch (ex: Exception) {
@@ -635,9 +646,10 @@ object Tracing {
             launch {
                 try {
                     Events.raiseEvent(Events.INFO, "triggerUpdate - trigger update")
+                    //if (isGMS(this.context)) {
                     val gps = GoogleApiAvailability.getInstance()
-                    base.playServicesVersion = gps.getApkVersion(context.applicationContext)
-                    Events.raiseEvent(Events.INFO, "triggerUpdate - version: ${base.playServicesVersion}")
+                    base.gmsServicesVersion = gps.getApkVersion(context.applicationContext)
+                    Events.raiseEvent(Events.INFO, "triggerUpdate - version: ${base.gmsServicesVersion}")
                     val result = gps.isGooglePlayServicesAvailable(context.applicationContext)
                     Events.raiseEvent(Events.INFO, "triggerUpdate - result: $result")
                     if (result == ConnectionResult.SUCCESS) {
@@ -694,6 +706,7 @@ object Tracing {
         private fun scheduleCheckExposure() {
             try {
                 // stop and re-start with config value
+                ProvideDiagnosisKeysWorker.stopScheduler()
                 ProvideDiagnosisKeysWorker.startScheduler()
             } catch (ex: Exception) {
                 Events.raiseError("scheduleCheckExposure", ex)
@@ -788,7 +801,7 @@ object Tracing {
                 var enabled = false
 
                 try {
-                    enabled = ExposureNotificationHelper.isEnabled().await()
+                    enabled = exposureWrapper.isEnabled().await()
                 } catch (ex: Exception) {
                     Events.raiseError("Error reading ENS status", ex)
                 }
@@ -828,7 +841,12 @@ object Tracing {
         fun getLogData(promise: Promise) {
             val map = Arguments.createMap()
 
-            map.putInt("installedPlayServicesVersion", base.playServicesVersion)
+            map.putBoolean("isGMS", isGMS(context))
+            if (isGMS(context)) {
+                map.putInt("installedGMSServicesVersion", base.gmsServicesVersion)
+            } else {
+                map.putInt("installedHMSServicesVersion", base.hmsServicesVersion)
+            }
             map.putBoolean("nearbyApiSupported", !base.nearbyNotSupported())
 
             map.putDouble("lastIndex", getLong("since", context).toDouble())
@@ -872,8 +890,8 @@ object Tracing {
                     ExposureNotificationStatusCodes.RESOLUTION_REQUIRED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "resolution")
                     ExposureNotificationStatusCodes.SIGN_IN_REQUIRED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "signin_required")
                     ExposureNotificationStatusCodes.FAILED_BLUETOOTH_DISABLED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "bluetooth")
-                    ExposureNotificationStatusCodes.FAILED_NOT_SUPPORTED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "not_supported")
                     ExposureNotificationStatusCodes.FAILED_REJECTED_OPT_IN -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "rejected")
+                    ExposureNotificationStatusCodes.FAILED_NOT_SUPPORTED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "not_supported")
                     ExposureNotificationStatusCodes.FAILED_SERVICE_DISABLED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "disabled")
                     ExposureNotificationStatusCodes.FAILED_UNAUTHORIZED -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "unauthorised")
                     ExposureNotificationStatusCodes.FAILED_DISK_IO -> setExposureStatus(EXPOSURE_STATUS_DISABLED, "disk")

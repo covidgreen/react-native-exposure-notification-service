@@ -3,10 +3,13 @@ package ie.gov.tracing.common
 import com.facebook.react.bridge.ReadableMap
 import ie.gov.tracing.Tracing
 import ie.gov.tracing.storage.SharedPrefs
+import org.threeten.bp.Duration
 import java.text.SimpleDateFormat
 import java.util.*
 
 object Config {
+    const val API_TIMEOUT = 10
+
     fun configure(params: ReadableMap) {
         try {
             Events.raiseEvent(Events.INFO, "Saving configuration...")
